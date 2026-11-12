@@ -4,13 +4,34 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>N Ops | Neko Nik</title>
-    <meta name="author" content="Neko Nik" />
-    <meta name="description" content="N Ops is a powerful tool for managing and monitoring your entire server infrastructure" />
-    <meta name="keywords" content="N Ops, Neko Nik, server management, infrastructure monitoring, DevOps tools" />
+    <meta name="description" content="N-Ops Admin — sign in to the infrastructure control plane." />
+    <script>
+      (function () {
+        try {
+          var stored = JSON.parse(localStorage.getItem('nops-theme') || '"system"')
+          var resolved =
+            stored === 'system'
+              ? window.matchMedia('(prefers-color-scheme: light)').matches
+                ? 'light'
+                : 'dark'
+              : stored
+          document.documentElement.dataset.theme = resolved
+        } catch (error) {
+          document.documentElement.dataset.theme = 'dark'
+        }
+      })()
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <title>N-Ops Admin</title>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
