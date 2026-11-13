@@ -18,12 +18,13 @@ src/
   pages/        route-level screens, composed from templates + features
   types/        cross-app shared types
   utils/        small framework-free helpers
+test/           all tests (vitest), mirroring src/: test/config/env.test.ts tests src/config/env.ts
 ```
 
 ## Getting started
 
 ```bash
-cp .env.example .env   # fill in VITE_API_BASE_URL / VITE_TURNSTILE_SITE_KEY
+cp .env.example .env   # fill in the values (VITE_* for npm run dev)
 npm install
 npm run dev
 ```
@@ -57,27 +58,45 @@ Two very different levels of "real" feed the Overview page:
 - **Tags are real** — `features/tags/api/tags.ts` calls the actual `GET /tag/list` endpoint and drives the tag-filter pills.
 - **Fleet/approvals/workflow/alert data is fully speculative** — N-Ops-Main-API has no backend for any of it (no tables, no routes, not even a commented-out stub). `features/dashboard/api/dashboard.ts` guesses one aggregate `GET /dashboard/overview` call. Rather than fabricate numbers when that 404s, the page shows an honest "Live fleet data isn't connected yet" panel instead of the stat tiles/fleet table/approvals list — consistent with how the invite and 2FA screens handle their own guessed endpoints. The `Approve`/`Open thread`/`+ Add server`/notification-bell actions are all present for layout fidelity but show a "not wired up yet" toast rather than doing nothing silently.
 
+## Configuration
+
+Two settings, read **at run time** (not baked into the build):
+
+| Container env (`docker compose`) | Local dev (`.env`, Vite) | What it is |
+|---|---|---|
+| `API_BASE_URL` | `VITE_API_BASE_URL` | N-Ops Main API base URL, no trailing slash |
+| `TURNSTILE_SITE_KEY` | `VITE_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key for login |
+
+On container start, `docker/write-env.mjs` writes `dist/env.js` (`window.__NOPS_ENV__ = {...}`) from the container's environment; `index.html` loads it before the app, and `src/config/env.ts` prefers it over the `VITE_*` build values. So **one image runs anywhere**: change a value in compose and `docker compose up -d`, no rebuild. The container refuses to start if either value is missing. `env.js` and `index.html` are served `no-cache` (`docker/serve.json`) so a config change is picked up on the next page load.
+
 ## Docker
 
 ```bash
-docker build --build-arg VITE_API_BASE_URL=... --build-arg VITE_TURNSTILE_SITE_KEY=... -t n-ops-admin-ui .
-docker run -p 8080:8080 n-ops-admin-ui
+cp .env.example .env              # fill in API_BASE_URL / TURNSTILE_SITE_KEY
+docker compose up -d              # runs neko7nik/n-ops-admin-ui:latest on 127.0.0.1:8080, config from .env
 ```
 
-Vite bakes `VITE_*` vars into the bundle at build time, so they're passed as Docker build args, not runtime env vars — rebuild the image to change them. `docker-compose.yaml` wraps this for local use.
+To try a local build instead of the published image: `docker build -t neko7nik/n-ops-admin-ui:latest .` then `docker compose up -d`.
 
-The runtime stage serves `dist/` with [`serve`](https://github.com/vercel/serve) (`-s` for SPA fallback) on a plain `node:22-alpine` image, rather than nginx — no `nginx.conf` to maintain, at the cost of a heavier runtime image than nginx's would have been.
+The runtime stage serves `dist/` with [`serve`](https://github.com/vercel/serve) (`-s` for SPA fallback) on `node:22-alpine`. Port is bound to `127.0.0.1` only; put a reverse proxy in front on the server.
 
 ## CI/CD
 
-`.github/workflows/ci.yml`: lint + typecheck + test + build on every PR and push to `main`; on push to `main`, also builds and pushes a Docker image to `ghcr.io/<repo>:latest` / `:<sha>`. Set repo variable `VITE_API_BASE_URL` and secret `VITE_TURNSTILE_SITE_KEY` for that image build, or switch the registry to Docker Hub to match `N-Ops-Main-API`'s `neko7nik/*` images.
+- **`.github/workflows/ci.yml`**: on every PR and push to `main`, without secrets. Lint, typecheck, test, build, then builds the Docker image and smoke-tests it (container starts, writes `env.js`, serves the SPA, refuses to start without config).
+- **`.github/workflows/docker-build-and-deploy.yaml`**: on push to `main` or a tag. Same flow as `YFS-FrontEnd`:
+  - **build** pushes `neko7nik/n-ops-admin-ui:latest` plus `:<branch or tag>` to Docker Hub.
+  - **deploy** SSHes to the server as `root`, checks `/srv/n-ops-admin-ui/.env` exists and the compose file there uses `env_file`, then `docker compose pull && docker compose up -d`.
+
+Repo secrets: `DOCKER_USERNAME`, `DOCKER_PASSWORD`, `SSH_PRIVATE_KEY`, `SERVER_IP`.
+
+One-time server setup: Docker with the compose plugin, then in `/srv/n-ops-admin-ui` put `docker-compose.yaml` (from this repo) and a `.env` with `API_BASE_URL` and `TURNSTILE_SITE_KEY`. Deploys don't touch either file, so config stays on the server.
 
 ## Known gaps / deliberate calls made without asking
 
 - Added `react-router-dom` and `vitest` beyond the requested package list — routing is load-bearing for an "Admin UI" (more pages are coming), and vitest covers the couple of non-trivial logic paths (the login schema, base64 encoding) with minimal tests.
 - Visual design is dark-first (with light/dark/system support), IBM Plex Sans/Mono, mint (`--color-signal`) + violet (`--color-accent-secondary`) brand gradient — matched to a reference screenshot provided mid-project after the original design-reference links came back empty.
 - The login page's "Forgot password?" link and the "ask an admin to create an account" line are copy/UI only — there's no password-reset or invite-link endpoint on the backend yet, so the former shows a toast explaining that instead of a dead link. The reference mockup's org-switcher badge and "recorded in the audit log" line were left out: N-Ops has no pre-login org/tenant concept today (the login API takes only `user_name`/`password`), and login isn't confirmed to be audit-logged yet.
-- Cloudflare Turnstile site key defaults to the one already used by `N-Ops-WebSite`; request a key scoped to the admin domain before production.
+- Request a Cloudflare Turnstile site key scoped to the admin domain before production (`.env.example` ships Cloudflare's always-pass test key).
 - Session restore on page reload calls `/auth/verify` but doesn't re-fetch user details (there's no "current user" endpoint wired up yet), so a refreshed session shows a generic signed-in state rather than the user's name until they log in again.
 - Added a `--color-warning` token (amber) alongside `--color-danger` (red) — the dashboard reference visually distinguishes "pending/waiting" from "failed/offline", and reusing the red danger color for both would have been semantically wrong.
 - The reference dashboard has no visible sign-out control, so it was added as a small account row at the bottom of the sidebar (name + icon button) rather than left unreachable.
