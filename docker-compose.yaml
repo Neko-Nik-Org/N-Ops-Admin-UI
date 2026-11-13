@@ -1,9 +1,20 @@
+
 services:
-  admin-ui:
-    build:
-      context: .
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://main-api.test.nops.app}
-        VITE_TURNSTILE_SITE_KEY: ${VITE_TURNSTILE_SITE_KEY}
+  n-ops-admin-ui:
+    image: neko7nik/n-ops-admin-ui:latest
+    container_name: n-ops-admin-ui
+
+    # API_BASE_URL and TURNSTILE_SITE_KEY; the container refuses to start if either is missing
+    env_file: .env
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # local-only; put a reverse proxy (nginx / Caddy / Cloudflare Tunnel) in front on the server
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
+
+    restart: always

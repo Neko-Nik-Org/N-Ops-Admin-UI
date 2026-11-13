@@ -31,5 +31,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // all tests live in /test, mirroring the src/ structure
+    include: ['test/**/*.test.{ts,tsx}'],
   },
 })

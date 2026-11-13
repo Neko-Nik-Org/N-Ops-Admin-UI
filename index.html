@@ -32,6 +32,8 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- runtime config (API URL, Turnstile key); written by the container on start, see docker/write-env.mjs -->
+    <script src="/env.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
