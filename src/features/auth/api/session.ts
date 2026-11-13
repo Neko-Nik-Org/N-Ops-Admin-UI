@@ -18,10 +18,15 @@
 /** Session lifecycle API calls: verify, sign out and refresh. */
 
 import { apiClient } from '@/lib/axios'
+import { toCurrentUser, type CurrentUser, type RawSessionProfile } from '../types'
 
-/** `GET /auth/verify`: resolves when the stored session token is still valid, rejects otherwise. */
-export const verifySession = async (): Promise<void> => {
-  await apiClient.get('/auth/verify')
+/**
+ * `GET /auth/verify`: resolves with the signed-in user's profile when the stored session token
+ * is still valid, rejects otherwise. Resolves null if an older API answers 204 with no body.
+ */
+export const verifySession = async (): Promise<CurrentUser | null> => {
+  const { data } = await apiClient.get<{ data?: RawSessionProfile } | ''>('/auth/verify')
+  return data && data.data ? toCurrentUser(data.data) : null
 }
 
 /** `DELETE /auth/logout`: ends the session on the server. */

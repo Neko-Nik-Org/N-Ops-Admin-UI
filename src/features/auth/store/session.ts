@@ -25,8 +25,5 @@ export type SessionStatus = 'checking' | 'authenticated' | 'unauthenticated'
 
 /** Current session status; the route guards render from this. */
 export const sessionStatusAtom = atom<SessionStatus>('checking')
-/**
- * Profile of the signed-in user. Only known after a fresh sign-in: it stays null
- * after a page reload, even though the session itself is valid.
- */
+/** Profile of the signed-in user, set on sign-in and restored from `/auth/verify` after a reload. */
 export const currentUserAtom = atom<CurrentUser | null>(null)

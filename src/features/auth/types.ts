@@ -43,21 +43,24 @@ export interface CurrentUser {
 }
 
 /** Login response when no second factor is needed: includes the session id and user profile. */
+/** Signed-in user's profile as the API sends it, in both the login and `/auth/verify` responses. */
+export interface RawSessionProfile {
+  user_id: number
+  organization_id: string
+  permissions: string[]
+  tags: number[]
+  user_name: string
+  display_name: string
+  organization_name: string
+  primary_email: string
+  is_email_verified: boolean
+}
+
 export interface LoginSuccessResponse {
   message: string
   is_2fa_required: false
   session_id: string
-  data: {
-    user_id: number
-    organization_id: string
-    permissions: string[]
-    tags: number[]
-    user_name: string
-    display_name: string
-    organization_name: string
-    primary_email: string
-    is_email_verified: boolean
-  }
+  data: RawSessionProfile
 }
 
 /** Login response when a second factor is required: includes a temporary token for the 2FA step. */
@@ -95,3 +98,16 @@ export interface TwoFactorContext {
 /** Supported second factors: authenticator app code or emailed code. */
 export type TwoFactorMethod = 'totp' | 'email'
 
+
+/** Converts the API's session profile into the CurrentUser shape the app uses. */
+export const toCurrentUser = (p: RawSessionProfile): CurrentUser => ({
+  userId: p.user_id,
+  organizationId: p.organization_id,
+  permissions: p.permissions,
+  tags: p.tags,
+  userName: p.user_name,
+  displayName: p.display_name,
+  organizationName: p.organization_name,
+  primaryEmail: p.primary_email,
+  isEmailVerified: p.is_email_verified,
+})

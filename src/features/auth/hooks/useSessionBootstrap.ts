@@ -20,12 +20,13 @@
 import { useSetAtom } from 'jotai'
 import { useEffect } from 'react'
 import { verifySession } from '../api/session'
-import { sessionStatusAtom } from '../store/session'
+import { currentUserAtom, sessionStatusAtom } from '../store/session'
 import { clearSessionToken, getSessionToken } from '../store/sessionToken'
 
-/** Confirms a persisted session cookie is still valid with the API on app load. */
+/** Confirms a persisted session cookie is still valid on app load and restores the signed-in user's profile. */
 export const useSessionBootstrap = (): void => {
   const setStatus = useSetAtom(sessionStatusAtom)
+  const setCurrentUser = useSetAtom(currentUserAtom)
 
   useEffect(() => {
     /** Nothing saved: go straight to the signed-out state without calling the API. */
@@ -35,10 +36,13 @@ export const useSessionBootstrap = (): void => {
     }
 
     verifySession()
-      .then(() => setStatus('authenticated'))
+      .then((user) => {
+        setCurrentUser(user)
+        setStatus('authenticated')
+      })
       .catch(() => {
         clearSessionToken()
         setStatus('unauthenticated')
       })
-  }, [setStatus])
+  }, [setStatus, setCurrentUser])
 }

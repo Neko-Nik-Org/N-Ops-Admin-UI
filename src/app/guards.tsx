@@ -18,22 +18,46 @@
 /** Route guards that gate pages on the current session status. */
 
 import { useAtomValue } from 'jotai'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { ScreenLoader } from '@/components/loading'
+import { useAppBootstrap } from '@/features/account/hooks/useAppBootstrap'
 import { sessionStatusAtom } from '@/features/auth/store/session'
 import { ROUTES } from '@/constants/routes'
 
 /** Full-screen loader shown while the saved session is still being verified. */
 const SessionCheck = () => <ScreenLoader messages={['Checking your session']} />
 
-/** Renders its children only for signed-in users; everyone else is redirected to /login. */
+/**
+ * Renders its children only for signed-in users; everyone else is redirected to /login.
+ *
+ * One ScreenLoader covers both the saved-session check and the startup data load
+ * (useAppBootstrap), so it runs straight through from sign-in to the dashboard. The pages
+ * mount once the data is in, while the loader fades out on top of them.
+ */
 export const RequireAuth = ({ children }: { children: ReactNode }) => {
   const status = useAtomValue(sessionStatusAtom)
+  const bootstrap = useAppBootstrap(status === 'authenticated')
+  const [loaderGone, setLoaderGone] = useState(false)
 
-  if (status === 'checking') return <SessionCheck />
   if (status === 'unauthenticated') return <Navigate to={ROUTES.login} replace />
-  return <>{children}</>
+
+  const checking = status === 'checking'
+  const ready = !checking && bootstrap.ready
+
+  return (
+    <>
+      {ready && children}
+      {!loaderGone && (
+        <ScreenLoader
+          visible={!ready}
+          messages={checking ? ['Checking your session'] : bootstrap.pendingLabels}
+          progress={checking ? undefined : bootstrap.progress}
+          onHidden={() => setLoaderGone(true)}
+        />
+      )}
+    </>
+  )
 }
 
 /**

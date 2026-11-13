@@ -17,19 +17,31 @@
 
 /** React Query hooks for account data. */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getOrgInfo, getUiInfo, saveUiInfo } from '../api/account'
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { getOrgInfo, getUiInfo, getUserDetails, saveUiInfo } from '../api/account'
 import type { JsonObject } from '../types'
 
 /** Query cache keys for the signed-in user's data. */
 const UI_INFO_KEY = ['user-self', 'ui-info'] as const
 const ORG_INFO_KEY = ['user-self', 'org-info'] as const
+const USER_DETAILS_KEY = ['user-self', 'details'] as const
+
+/**
+ * Shared query definitions. The post-login bootstrap (useAppBootstrap) loads these up front,
+ * and the hooks below read the same cache entries, so pages render without a second request.
+ */
+export const orgInfoQuery = queryOptions({ queryKey: ORG_INFO_KEY, queryFn: getOrgInfo, retry: false })
+export const uiInfoQuery = queryOptions({ queryKey: UI_INFO_KEY, queryFn: getUiInfo, retry: false, staleTime: Infinity })
+export const userDetailsQuery = queryOptions({ queryKey: USER_DETAILS_KEY, queryFn: getUserDetails, retry: false })
 
 /** Organization name, quotas and usage for the Account page. */
-export const useOrgInfo = () => useQuery({ queryKey: ORG_INFO_KEY, queryFn: getOrgInfo, retry: false })
+export const useOrgInfo = () => useQuery(orgInfoQuery)
 
 /** Saved UI preferences. Loaded once per session and only changed through useSaveUiInfo. */
-export const useUiInfo = () => useQuery({ queryKey: UI_INFO_KEY, queryFn: getUiInfo, retry: false, staleTime: Infinity })
+export const useUiInfo = () => useQuery(uiInfoQuery)
+
+/** The user's free-form extra profile info (`/user/self/details`). */
+export const useUserDetails = () => useQuery(userDetailsQuery)
 
 /** Saves UI preferences and updates the cache directly, so no refetch is needed. */
 export const useSaveUiInfo = () => {
