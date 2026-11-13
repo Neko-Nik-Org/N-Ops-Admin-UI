@@ -64,5 +64,8 @@ export default defineConfig(({ mode }) => ({
     globals: true,
     // all tests live in /test, mirroring the src/ structure
     include: ['test/**/*.test.{ts,tsx}'],
+    setupFiles: ['test/setup.ts'],
+    // https so the session cookies (Secure) behave as in production
+    environmentOptions: { jsdom: { url: 'https://localhost/' } },
   },
 }))

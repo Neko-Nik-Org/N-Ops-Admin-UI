@@ -22,7 +22,8 @@ import * as yup from 'yup'
 /** A full name and a password of at least 8 characters are required. */
 export const inviteSchema = yup.object({
   fullName: yup.string().trim().required('Enter your full name.'),
-  password: yup.string().trim().min(8, 'Use at least 8 characters.').required('Create a password.'),
+  // required() before min(): yup reports the first failing rule, so an empty field gets "Create a password."
+  password: yup.string().trim().required('Create a password.').min(8, 'Use at least 8 characters.'),
 })
 
 /** Values produced by the invite form after validation. */

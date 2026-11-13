@@ -80,12 +80,14 @@ export const LoginForm = () => {
   return (
     <>
       <form onSubmit={handleSubmit(onSubmit)} className="flex w-full flex-col gap-5">
-        <FormField id="userName" label="Email" error={errors.userName?.message}>
+        <FormField id="userName" label="Username" error={errors.userName?.message}>
           <Input
             id="userName"
-            type="email"
-            placeholder="you@company.com"
+            type="text"
+            placeholder="your-username"
             autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
             hasError={!!errors.userName}
             {...register('userName')}
           />
