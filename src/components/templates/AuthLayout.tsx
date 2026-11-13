@@ -1,3 +1,22 @@
+/*
+ * Copyright (C) 2026 Neko Nik <nikhil@nekonik.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * version 3 along with this program. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/** Layout for signed-out pages (sign in, 2FA, invite): a brand panel next to the form. */
+
 import type { ReactNode } from 'react'
 import { NLogo } from '@/components/loading'
 import { Logo } from '@/components/atoms/Logo'
@@ -11,12 +30,14 @@ const NETWORK_POINTS: Array<[number, number]> = [
   [15, 330], [120, 350], [260, 340], [345, 310],
   [200, 230], [70, 110],
 ]
+/** Lines between NETWORK_POINTS, given as pairs of point indexes. */
 const NETWORK_EDGES: Array<[number, number]> = [
   [0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [4, 8], [5, 19],
   [6, 10], [10, 11], [11, 18], [18, 12], [12, 8], [10, 14], [14, 15], [15, 16], [16, 17], [17, 12],
   [19, 0], [9, 8], [7, 3], [11, 15],
 ]
 
+/** Decorative SVG network drawn on the brand panel. */
 const NetworkGraphic = () => (
   <svg viewBox="0 0 360 380" className="absolute inset-0 h-full w-full text-text-muted" aria-hidden>
     <g className="animate-network-drift">
@@ -58,12 +79,16 @@ const NetworkGraphic = () => (
   </svg>
 )
 
+/** Props for AuthLayout. */
 interface AuthLayoutProps {
   children: ReactNode
+  /** Brand-panel heading; defaults to the product tagline. */
   headline?: string
+  /** Line shown under the headline. */
   subtext?: string
 }
 
+/** Two-column layout: brand panel with headline (hidden on small screens) and the page's form. */
 export const AuthLayout = ({
   children,
   headline = 'One platform. Complete infrastructure control.',

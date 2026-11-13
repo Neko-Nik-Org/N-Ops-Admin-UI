@@ -1,3 +1,25 @@
+/*
+ * Copyright (C) 2026 Neko Nik <nikhil@nekonik.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * version 3 along with this program. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/**
+ * Tests for src/config/env.ts: runtime config wins over build-time config,
+ * and a missing setting fails with a clear message.
+ */
+
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // env.ts reads its config once at import, so each case sets things up and re-imports it fresh

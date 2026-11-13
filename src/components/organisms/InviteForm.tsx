@@ -1,3 +1,22 @@
+/*
+ * Copyright (C) 2026 Neko Nik <nikhil@nekonik.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * version 3 along with this program. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/** Create-account form shown on the invite page. */
+
 import { yupResolver } from '@hookform/resolvers/yup'
 import { ShieldCheck } from 'lucide-react'
 import { useForm } from 'react-hook-form'
@@ -10,9 +29,14 @@ import { PasswordInput } from '@/components/molecules/PasswordInput'
 import { useAcceptInvite } from '@/features/invite/hooks/useAcceptInvite'
 import { inviteSchema, type InviteFormValues } from '@/features/invite/schema/inviteSchema'
 import type { InviteDetails } from '@/features/invite/types'
+import { NAVIGATE_DELAY_MS } from '@/constants/config'
+import { ROUTES } from '@/constants/routes'
 
-const NAVIGATE_DELAY_MS = 500
 
+/**
+ * Shows who invited the user and with what access, then collects their name and
+ * password. On success the user is signed in and sent to the dashboard.
+ */
 export const InviteForm = ({ token, details }: { token: string; details: InviteDetails }) => {
   const [acceptState, accept] = useAcceptInvite(token)
   const navigate = useNavigate()
@@ -29,7 +53,7 @@ export const InviteForm = ({ token, details }: { token: string; details: InviteD
   const onSubmit = (values: InviteFormValues) => {
     accept(values)
       .then(() => {
-        setTimeout(() => navigate('/', { replace: true }), NAVIGATE_DELAY_MS)
+        setTimeout(() => navigate(ROUTES.overview, { replace: true }), NAVIGATE_DELAY_MS)
       })
       .catch(() => toast.error("Accepting invites isn't available on the server yet — ask an admin to create your account for you."))
   }

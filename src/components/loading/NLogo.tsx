@@ -1,3 +1,22 @@
+/*
+ * Copyright (C) 2026 Neko Nik <nikhil@nekonik.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * version 3 along with this program. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/** The N-Ops logo mark and the shared SVG geometry used by every loader. */
+
 import { useId, type CSSProperties, type SVGProps } from 'react';
 
 /** The N mark drawn on a 160 × 160 grid: bottom-left → top-left → bottom-right → top-right. */
@@ -16,8 +35,6 @@ export const N_VIEWBOX_TIGHT = '34 34 92 92';
 /** viewBox for the full app icon, frame included. */
 export const N_VIEWBOX_FRAMED = '0 0 160 160';
 
-export const cx = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ');
-
 /** A unique, url()-safe id for SVG gradients (React's useId contains colons). */
 export function useSvgId(prefix: string): string {
   return `${prefix}-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
@@ -35,6 +52,7 @@ export function NGradient({ id }: { id: string }) {
   );
 }
 
+/** Props for NLogo; other SVG attributes are passed through. */
 export interface NLogoProps extends Omit<SVGProps<SVGSVGElement>, 'children' | 'width' | 'height'> {
   /** Pixel size or any CSS length. Default 32. */
   size?: number | string;

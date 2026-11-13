@@ -1,22 +1,30 @@
-import {
-  Boxes,
-  CheckCircle2,
-  ChevronsUpDown,
-  LayoutGrid,
-  LineChart,
-  Lock,
-  LogOut,
-  ScrollText,
-  Server,
-  Users,
-  Workflow,
-  Wrench,
-} from 'lucide-react'
+/*
+ * Copyright (C) 2026 Neko Nik <nikhil@nekonik.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * version 3 along with this program. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/** Main navigation sidebar with section links and the signed-in profile section (theme, account, sign out). */
+
+import { ChevronsUpDown, LogOut, UserCircle } from 'lucide-react'
 import { useAtomValue } from 'jotai'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { LoadingButton } from '@/components/loading'
 import { Logo } from '@/components/atoms/Logo'
 import { NavItem } from '@/components/molecules/NavItem'
+import { ThemeToggle } from '@/components/molecules/ThemeToggle'
+import { APP_SECTIONS, ROUTES } from '@/constants/routes'
 import { currentUserAtom } from '@/features/auth/store/session'
 import { useOverview } from '@/features/dashboard/hooks/useOverview'
 import { useLogout } from '@/features/auth/hooks/useLogout'
@@ -25,19 +33,30 @@ import { cn } from '@/utils/cn'
 interface SidebarProps {
   /** Renders as a fixed overlay drawer (mobile nav) instead of the permanent desktop rail. */
   variant?: 'desktop' | 'mobile'
+  /** Called after a link is clicked, so the mobile drawer can close itself. */
   onNavigate?: () => void
 }
 
+/**
+ * Section links, organization name and the sign-out control.
+ * Used as a fixed rail on desktop and inside the slide-over drawer on mobile.
+ */
 export const Sidebar = ({ variant = 'desktop', onNavigate }: SidebarProps) => {
   const currentUser = useAtomValue(currentUserAtom)
   const orgName = currentUser?.organizationName ?? 'Your organization'
   // Shares the Overview page's cached query — no extra request, just the counts once they land.
   const { data: overview } = useOverview()
+  /** Live counts shown next to some links: a number is a muted count, a string an accented badge. */
+  const badges: Partial<Record<string, number | string>> = {
+    [ROUTES.servers]: overview?.serversTotal,
+    [ROUTES.approvals]: overview?.pendingApprovalsCount ? String(overview.pendingApprovalsCount) : undefined,
+  }
   const [logoutState, logout] = useLogout()
   const navigate = useNavigate()
 
+  /** Signs out, then returns to the login page once the button has shown success. */
   const handleLogout = () => {
-    logout().then(() => navigate('/login', { replace: true }))
+    logout().then(() => navigate(ROUTES.login, { replace: true }))
   }
 
   return (
@@ -65,33 +84,36 @@ export const Sidebar = ({ variant = 'desktop', onNavigate }: SidebarProps) => {
       </button>
 
       <nav className="flex flex-1 flex-col gap-0.5">
-        <NavItem to="/" end icon={LayoutGrid} label="Overview" />
-        <NavItem to="/admin" icon={Users} label="Admin" />
-        <NavItem to="/servers" icon={Server} label="Servers" badge={overview?.serversTotal} />
-        <NavItem to="/tools" icon={Wrench} label="Tools" />
-        <NavItem to="/service-management" icon={Boxes} label="Service management" />
-        <NavItem to="/vault" icon={Lock} label="Vault" />
-        <NavItem
-          to="/approvals"
-          icon={CheckCircle2}
-          label="Approvals"
-          badge={overview?.pendingApprovalsCount ? String(overview.pendingApprovalsCount) : undefined}
-        />
-        <NavItem to="/metrics" icon={LineChart} label="Metrics" />
-        <NavItem to="/workflows" icon={Workflow} label="Workflows" />
-        <NavItem to="/service-logs" icon={ScrollText} label="Service logs" />
+        {APP_SECTIONS.map(({ path, title, icon }) => (
+          <NavItem key={path} to={path} end={path === ROUTES.overview} icon={icon} label={title} badge={badges[path]} />
+        ))}
       </nav>
 
-      <div className="flex items-center gap-2.5 border-t border-border px-1 pt-4">
-        <span className="flex-1 truncate text-sm text-text-muted">{currentUser?.displayName ?? 'Signed in'}</span>
-        <LoadingButton
-          variant="ghost"
-          size="sm"
-          state={logoutState}
-          icon={<LogOut size={15} />}
-          aria-label="Sign out"
-          onClick={handleLogout}
-        />
+      <div className="flex flex-col gap-3 border-t border-border px-1 pt-4">
+        {/* stopPropagation: picking a theme shouldn't close the mobile drawer (the <aside> closes it on click) */}
+        <div className="flex items-center justify-between gap-2 text-sm text-text-muted" onClick={(e) => e.stopPropagation()}>
+          <span>Theme</span>
+          <ThemeToggle />
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <Link
+            to={ROUTES.account}
+            className="flex flex-1 items-center gap-2 truncate text-sm text-text-muted hover:text-text"
+            title="Account"
+          >
+            <UserCircle size={16} className="shrink-0" />
+            <span className="truncate">{currentUser?.displayName ?? 'Account'}</span>
+          </Link>
+          <LoadingButton
+            variant="ghost"
+            size="sm"
+            state={logoutState}
+            icon={<LogOut size={15} />}
+            aria-label="Sign out"
+            onClick={handleLogout}
+          />
+        </div>
       </div>
     </aside>
   )

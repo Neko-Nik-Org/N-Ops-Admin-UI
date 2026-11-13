@@ -1,7 +1,27 @@
+/*
+ * Copyright (C) 2026 Neko Nik <nikhil@nekonik.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * version 3 along with this program. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/** Full-screen and per-panel loaders built on NLoader. */
+
 import { useEffect, useState, type ReactNode } from 'react';
 import { NLoader, type NLoaderVariant } from './NLoader';
-import { cx } from './NLogo';
+import { cn } from '@/utils/cn';
 
+/** Props for ScreenLoader. */
 export interface ScreenLoaderProps {
   /** Show or hide. When it turns false the loader fades out, then unmounts. Default true. */
   visible?: boolean;
@@ -17,6 +37,7 @@ export interface ScreenLoaderProps {
   messageInterval?: number;
 }
 
+/** Fade-out duration before the loader unmounts; keep in sync with n-loading.css. */
 const FADE_MS = 400;
 
 /** Full-screen loader for app start, sign-in and page changes that take a while. */
@@ -61,7 +82,7 @@ export function ScreenLoader({
 
   return (
     <div
-      className={cx('n-screen', contained && 'n-screen--contained', leaving && 'is-leaving')}
+      className={cn('n-screen', contained && 'n-screen--contained', leaving && 'is-leaving')}
       role="status"
       aria-live="polite"
       aria-busy={!leaving}
@@ -88,6 +109,7 @@ export function ScreenLoader({
   );
 }
 
+/** Props for PanelLoader. */
 export interface PanelLoaderProps {
   /** Short text under the mark, e.g. "Refreshing servers". */
   label?: ReactNode;

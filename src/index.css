@@ -1,5 +1,31 @@
+/*
+ * Copyright (C) 2026 Neko Nik <nikhil@nekonik.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * version 3 along with this program. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/*
+ * Global styles: Tailwind, the app's color and font tokens, base element styles
+ * and the decorative animations used on the auth screens.
+ */
+
 @import "tailwindcss";
 
+/*
+ * Design tokens. Tailwind turns each --color-* / --font-* into utilities
+ * (bg-signal, text-text-muted, font-mono, ...). These defaults are the dark theme.
+ */
 @theme {
   --font-sans: "IBM Plex Sans", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -18,10 +44,12 @@
   --color-warning: #f2a94c;
 }
 
+/* Dark theme (the default): set on <html> by AppProviders. */
 :root[data-theme='dark'] {
   color-scheme: dark;
 }
 
+/* Light theme: overrides the color tokens above. */
 :root[data-theme='light'] {
   color-scheme: light;
   --color-ink: #f4f6f8;
@@ -38,6 +66,7 @@
   --color-warning: #b87412;
 }
 
+/* Base element styles. */
 @layer base {
   * {
     @apply border-border;
@@ -53,6 +82,7 @@
   }
 }
 
+/* Content entrance: fade in while sliding up slightly. */
 @keyframes fade-up {
   from {
     opacity: 0;
@@ -68,6 +98,7 @@
   animation: fade-up 0.5s ease-out;
 }
 
+/* Animations for the network graphic on the auth screens' brand panel. */
 @keyframes node-pulse {
   0%,
   100% {
@@ -140,6 +171,7 @@
   animation: network-drift 16s ease-in-out infinite;
 }
 
+/* Respect the OS "reduce motion" setting: stop decorative animations. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

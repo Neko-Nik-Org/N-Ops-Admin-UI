@@ -1,9 +1,30 @@
+/*
+ * Copyright (C) 2026 Neko Nik <nikhil@nekonik.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * version 3 along with this program. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/** Button that shows a spinner while working and a check mark when done. */
+
 import { forwardRef, type ButtonHTMLAttributes, type MouseEvent, type ReactNode } from 'react';
 import { NSpinner } from './NSpinner';
-import { cx } from './NLogo';
+import { cn } from '@/utils/cn';
 
+/** Visual state of a LoadingButton. */
 export type ButtonState = 'idle' | 'loading' | 'success';
 
+/** Props for LoadingButton; every native <button> prop is passed through. */
 export interface LoadingButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
@@ -58,7 +79,7 @@ export const LoadingButton = forwardRef<HTMLButtonElement, LoadingButtonProps>(f
     <button
       ref={ref}
       type={type}
-      className={cx('n-btn', `n-btn--${variant}`, `n-btn--${size}`, className)}
+      className={cn('n-btn', `n-btn--${variant}`, `n-btn--${size}`, className)}
       data-state={s}
       aria-busy={s === 'loading' || undefined}
       aria-disabled={busy || undefined}

@@ -1,9 +1,30 @@
+/*
+ * Copyright (C) 2026 Neko Nik <nikhil@nekonik.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * version 3 along with this program. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/** Skeleton placeholders that match the shapes of real content while it loads. */
+
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 import { NLoader } from './NLoader';
-import { cx } from './NLogo';
+import { cn } from '@/utils/cn';
 
+/** A size in px (number) or any CSS length (string). */
 type Len = number | string;
 
+/** Props for Skeleton: size and corner radius of the placeholder block. */
 export interface SkeletonProps extends HTMLAttributes<HTMLSpanElement> {
   width?: Len;
   height?: Len;
@@ -17,7 +38,7 @@ export function Skeleton({ width = '100%', height = 12, radius = 6, circle, clas
   const s: CSSProperties = circle
     ? { width, height: width, borderRadius: '50%', ...style }
     : { width, height, borderRadius: radius, ...style };
-  return <span aria-hidden="true" className={cx('n-sk', className)} style={s} {...rest} />;
+  return <span aria-hidden="true" className={cn('n-sk', className)} style={s} {...rest} />;
 }
 
 /** Lines of placeholder text; the last line is shorter, like a real paragraph. */

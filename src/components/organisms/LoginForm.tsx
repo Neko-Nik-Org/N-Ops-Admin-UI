@@ -1,3 +1,22 @@
+/*
+ * Copyright (C) 2026 Neko Nik <nikhil@nekonik.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * version 3 along with this program. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/** Sign-in form: username, password, "Keep me signed in" and the Turnstile check. */
+
 import { yupResolver } from '@hookform/resolvers/yup'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -11,9 +30,11 @@ import { PasswordInput } from '@/components/molecules/PasswordInput'
 import { TurnstileWidget } from '@/components/molecules/TurnstileWidget'
 import { useLogin } from '@/features/auth/hooks/useLogin'
 import { loginSchema, type LoginFormValues } from '@/features/auth/schema/loginSchema'
+import { NAVIGATE_DELAY_MS } from '@/constants/config'
+import { ROUTES } from '@/constants/routes'
 
-const NAVIGATE_DELAY_MS = 500
 
+/** Signs the user in, or forwards them to the 2FA page when a second factor is required. */
 export const LoginForm = () => {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const [turnstileResetKey, setTurnstileResetKey] = useState(0)
@@ -41,9 +62,9 @@ export const LoginForm = () => {
       .then((outcome) => {
         setTimeout(() => {
           if (outcome.kind === 'two-factor') {
-            navigate('/login/verify-2fa', { state: outcome.context, replace: true })
+            navigate(ROUTES.twoFactor, { state: outcome.context, replace: true })
           } else {
-            navigate('/', { replace: true })
+            navigate(ROUTES.overview, { replace: true })
           }
         }, NAVIGATE_DELAY_MS)
       })

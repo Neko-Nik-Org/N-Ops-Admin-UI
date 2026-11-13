@@ -1,8 +1,30 @@
-import type { CSSProperties } from 'react';
-import { N_NODES, N_PATH, N_VIEWBOX_FRAMED, N_VIEWBOX_TIGHT, NGradient, cx, useSvgId } from './NLogo';
+/*
+ * Copyright (C) 2026 Neko Nik <nikhil@nekonik.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * version 3 along with this program. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
 
+/** Animated N-Ops logo loader in three styles (draw, trace, pulse). */
+
+import type { CSSProperties } from 'react';
+import { N_NODES, N_PATH, N_VIEWBOX_FRAMED, N_VIEWBOX_TIGHT, NGradient, useSvgId } from './NLogo';
+import { cn } from '@/utils/cn';
+
+/** Animation style; see NLoaderProps.variant. */
 export type NLoaderVariant = 'draw' | 'trace' | 'pulse';
 
+/** Props for NLoader. */
 export interface NLoaderProps {
   /** Pixel size of the square. Default 64. */
   size?: number;
@@ -24,6 +46,7 @@ export interface NLoaderProps {
   style?: CSSProperties;
 }
 
+/** Default seconds per loop for each variant. */
 const DEFAULT_SPEED: Record<NLoaderVariant, number> = { draw: 1.8, trace: 1.4, pulse: 1.6 };
 
 /** The animated N-Ops mark. */
@@ -43,7 +66,7 @@ export function NLoader({
 
   return (
     <span
-      className={cx('n-loader', `n-loader--${variant}`, className)}
+      className={cn('n-loader', `n-loader--${variant}`, className)}
       style={vars}
       role={decorative ? undefined : 'status'}
       aria-live={decorative ? undefined : 'polite'}

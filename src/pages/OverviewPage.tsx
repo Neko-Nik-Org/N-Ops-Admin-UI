@@ -1,3 +1,22 @@
+/*
+ * Copyright (C) 2026 Neko Nik <nikhil@nekonik.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * version 3 along with this program. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/** Overview dashboard (/): fleet status, pending approvals and workflow activity. */
+
 import { useState } from 'react'
 import { DashboardSkeleton } from '@/components/loading'
 import { ApprovalsPanel } from '@/components/organisms/ApprovalsPanel'
@@ -7,6 +26,7 @@ import { useOverview } from '@/features/dashboard/hooks/useOverview'
 import { useTags } from '@/features/tags/hooks/useTags'
 import { cn } from '@/utils/cn'
 
+/** Shown instead of the stats while the dashboard endpoint is not available on the API. */
 const NotConnected = () => (
   <div className="flex flex-col items-center gap-2 rounded-xl border border-border bg-surface-raised p-10 text-center">
     <h2 className="font-semibold text-text">Live fleet data isn't connected yet</h2>
@@ -18,6 +38,7 @@ const NotConnected = () => (
   </div>
 )
 
+/** Dashboard home page. The tag pills filter the fleet table by tag. */
 export const OverviewPage = () => {
   const { data: overview, isLoading, isError } = useOverview()
   const { data: tags } = useTags()
@@ -25,6 +46,7 @@ export const OverviewPage = () => {
 
   if (isLoading) return <DashboardSkeleton />
 
+  /** Servers for the selected tag, or all of them when "All tags" is selected. */
   const filteredFleet = overview && activeTagId !== null ? overview.fleet.filter((s) => s.tagId === activeTagId) : overview?.fleet
 
   return (

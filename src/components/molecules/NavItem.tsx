@@ -1,16 +1,38 @@
+/*
+ * Copyright (C) 2026 Neko Nik <nikhil@nekonik.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * version 3 along with this program. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/** Sidebar navigation link. */
+
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/utils/cn'
 import type { LucideIcon } from 'lucide-react'
 
+/** Props for NavItem. */
 interface NavItemProps {
   to: string
   icon: LucideIcon
   label: string
   /** Shown right-aligned — e.g. a live count. Pass a number for a muted count, a string for an accented badge. */
   badge?: number | string
+  /** Only highlight on an exact path match (needed for "/"). */
   end?: boolean
 }
 
+/** Router link with an icon that highlights itself while its route is active. */
 export const NavItem = ({ to, icon: Icon, label, badge, end }: NavItemProps) => (
   <NavLink
     to={to}

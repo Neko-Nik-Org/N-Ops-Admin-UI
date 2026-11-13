@@ -1,3 +1,22 @@
+/*
+ * Copyright (C) 2026 Neko Nik <nikhil@nekonik.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * version 3 along with this program. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/** Two-factor sign-in API calls (TOTP or emailed code). */
+
 import { apiClient } from '@/lib/axios'
 import type { LoginSuccessResponse, TwoFactorMethod } from '../types'
 
@@ -7,6 +26,7 @@ import type { LoginSuccessResponse, TwoFactorMethod } from '../types'
  * best guess at the contract, kept here as the integration point to adjust once the backend lands.
  */
 
+/** Exchanges the temporary token from the login step plus a one-time code for a full session. */
 export const verifyOtp = async (
   temporaryAuthToken: string,
   method: TwoFactorMethod,
@@ -20,6 +40,7 @@ export const verifyOtp = async (
   return data
 }
 
+/** Asks the API to send a new code for the chosen method. */
 export const resendOtp = async (temporaryAuthToken: string, method: TwoFactorMethod): Promise<void> => {
   await apiClient.post('/auth/resend-otp', { temporary_auth_token: temporaryAuthToken, method })
 }

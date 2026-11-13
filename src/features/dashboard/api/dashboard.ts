@@ -1,3 +1,22 @@
+/*
+ * Copyright (C) 2026 Neko Nik <nikhil@nekonik.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 3
+ * as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * version 3 along with this program. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+/** API call behind the Overview dashboard. */
+
 import { apiClient } from '@/lib/axios'
 import type { DashboardOverview } from '../types'
 
@@ -7,6 +26,7 @@ import type { DashboardOverview } from '../types'
  * snake_case) response into this app's domain shape; adjust once the real endpoint lands.
  */
 
+/** One server row as the API is expected to send it. */
 interface RawFleetServer {
   server_id: string
   server_name: string
@@ -19,6 +39,7 @@ interface RawFleetServer {
   offline_minutes: number | null
 }
 
+/** One pending approval as the API is expected to send it. */
 interface RawApproval {
   approval_id: string
   code: string
@@ -27,6 +48,7 @@ interface RawApproval {
   expires_label: string
 }
 
+/** Full `/dashboard/overview` response as the API is expected to send it. */
 interface RawOverview {
   servers_online: number
   servers_total: number
@@ -44,6 +66,7 @@ interface RawOverview {
   approvals: RawApproval[]
 }
 
+/** `GET /dashboard/overview`, mapped to the app's camelCase DashboardOverview. */
 export const getOverview = async (): Promise<DashboardOverview> => {
   const { data } = await apiClient.get<RawOverview>('/dashboard/overview')
   return {
