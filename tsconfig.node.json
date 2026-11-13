@@ -14,6 +14,9 @@
     "noEmit": true,
 
     /* Linting */
+    // explicit: TS 7 (the CLI) defaults to strict, but older editor TS versions do not,
+    // and yup's InferType needs strictNullChecks to type form values correctly
+    "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
