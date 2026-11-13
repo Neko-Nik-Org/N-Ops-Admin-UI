@@ -4,10 +4,12 @@ import { env } from '@/config/env'
 interface TurnstileWidgetProps {
   onVerify: (token: string) => void
   onExpire?: () => void
+  /** Change this number to get a fresh token. Tokens are single-use, so reset after every failed submit. */
+  resetKey?: number
 }
 
 /** Renders the Cloudflare Turnstile widget via the global script tag loaded in index.html. */
-export const TurnstileWidget = ({ onVerify, onExpire }: TurnstileWidgetProps) => {
+export const TurnstileWidget = ({ onVerify, onExpire, resetKey = 0 }: TurnstileWidgetProps) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const widgetIdRef = useRef<string | undefined>(undefined)
   const callbacksRef = useRef({ onVerify, onExpire })
@@ -40,6 +42,13 @@ export const TurnstileWidget = ({ onVerify, onExpire }: TurnstileWidgetProps) =>
       }
     }
   }, [])
+
+  // a used token can't be verified again: when the parent bumps resetKey, run a new challenge
+  useEffect(() => {
+    if (resetKey > 0 && widgetIdRef.current) {
+      window.turnstile?.reset(widgetIdRef.current)
+    }
+  }, [resetKey])
 
   return <div ref={containerRef} />
 }

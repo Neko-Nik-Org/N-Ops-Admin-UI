@@ -16,6 +16,7 @@ const NAVIGATE_DELAY_MS = 500
 
 export const LoginForm = () => {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0)
   const [loginState, login] = useLogin()
   const navigate = useNavigate()
 
@@ -46,7 +47,13 @@ export const LoginForm = () => {
           }
         }, NAVIGATE_DELAY_MS)
       })
-      .catch((error: Error) => toast.error(error.message))
+      .catch((error: Error) => {
+        toast.error(error.message)
+        // the backend has spent this token (Turnstile tokens are single-use): get a fresh one
+        // before the next attempt, otherwise every retry fails with "Failed to verify CAPTCHA"
+        setTurnstileToken(null)
+        setTurnstileResetKey((k) => k + 1)
+      })
   }
 
   return (
@@ -90,7 +97,11 @@ export const LoginForm = () => {
           Keep me signed in on this device
         </label>
 
-        <TurnstileWidget onVerify={setTurnstileToken} onExpire={() => setTurnstileToken(null)} />
+        <TurnstileWidget
+          onVerify={setTurnstileToken}
+          onExpire={() => setTurnstileToken(null)}
+          resetKey={turnstileResetKey}
+        />
 
         <LoadingButton type="submit" className="w-full" state={loginState} loadingText="Signing in" successText="Verified">
           Sign in
