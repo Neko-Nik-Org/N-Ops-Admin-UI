@@ -27,8 +27,8 @@ describe('loginSchema', () => {
     ).resolves.toMatchObject({ userName: 'admin', password: 'secret' })
   })
 
-  it('rejects an empty email', async () => {
-    await expect(loginSchema.validate({ userName: '', password: 'secret' })).rejects.toThrow('Enter your email.')
+  it('rejects an empty username', async () => {
+    await expect(loginSchema.validate({ userName: '', password: 'secret' })).rejects.toThrow('Enter your username.')
   })
 
   it('rejects an empty password', async () => {
