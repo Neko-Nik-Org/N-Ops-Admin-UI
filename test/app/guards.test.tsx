@@ -20,7 +20,7 @@ import { act, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { RequireAuth, RequireGuest } from '@/app/guards'
 import { sessionStatusAtom } from '@/features/auth/store/session'
-import { makeUser, renderWithProviders } from '../testUtils'
+import { api, makeUser, renderWithProviders } from '../testUtils'
 
 describe('RequireAuth', () => {
   it('shows a loader while the saved session is being checked', async () => {
@@ -36,9 +36,13 @@ describe('RequireAuth', () => {
     expect(screen.queryByText('secret dashboard')).not.toBeInTheDocument()
   })
 
-  it('renders the page for signed-in users', () => {
+  it('renders the page for signed-in users once the startup data has loaded', async () => {
+    api.get.mockResolvedValue({ data: {} })
     renderWithProviders(<RequireAuth>secret dashboard</RequireAuth>, { route: '/tags', user: makeUser() })
-    expect(screen.getByText('secret dashboard')).toBeInTheDocument()
+    expect(screen.getByText('Loading your preferences')).toBeInTheDocument()
+    expect(screen.queryByText('secret dashboard')).not.toBeInTheDocument()
+    expect(await screen.findByText('secret dashboard')).toBeInTheDocument()
+    expect(api.get).toHaveBeenCalledWith('/user/self/ui-info')
   })
 })
 
