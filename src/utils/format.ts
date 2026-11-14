@@ -37,3 +37,16 @@ export const formatDate = (iso: string): string => {
   const date = moment(iso, moment.ISO_8601)
   return date.isValid() ? date.format('ll') : '—'
 }
+
+/** Date and time from an ISO string, e.g. "Nov 13, 2026 9:41 AM"; "—" for invalid input. */
+export const formatDateTime = (iso: string): string => {
+  const date = moment(iso, moment.ISO_8601)
+  return date.isValid() ? date.format('lll') : '—'
+}
+
+/** Relative time from an ISO string, e.g. "3 hours ago" or "in 6 days"; `fallback` for null/invalid. */
+export const formatRelative = (iso: string | null | undefined, fallback = 'Never'): string => {
+  if (!iso) return fallback
+  const date = moment(iso, moment.ISO_8601)
+  return date.isValid() ? date.fromNow() : fallback
+}

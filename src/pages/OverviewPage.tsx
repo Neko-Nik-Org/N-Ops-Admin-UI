@@ -17,14 +17,12 @@
 
 /** Overview dashboard (/): fleet status, pending approvals and workflow activity. */
 
-import { useState } from 'react'
 import { DashboardSkeleton } from '@/components/loading'
 import { ApprovalsPanel } from '@/components/organisms/ApprovalsPanel'
 import { FleetTable } from '@/components/organisms/FleetTable'
 import { OverviewStats } from '@/components/organisms/OverviewStats'
 import { useOverview } from '@/features/dashboard/hooks/useOverview'
-import { useTags } from '@/features/tags/hooks/useTags'
-import { cn } from '@/utils/cn'
+import { useSelectedTag } from '@/features/tags/hooks/useTags'
 
 /** Shown instead of the stats while the dashboard endpoint is not available on the API. */
 const NotConnected = () => (
@@ -38,58 +36,27 @@ const NotConnected = () => (
   </div>
 )
 
-/** Dashboard home page. The tag pills filter the fleet table by tag. */
+/** Dashboard home page, scoped to the tag picked in the Topbar. */
 export const OverviewPage = () => {
   const { data: overview, isLoading, isError } = useOverview()
-  const { data: tags } = useTags()
-  const [activeTagId, setActiveTagId] = useState<number | null>(null)
+  const { selectedTag } = useSelectedTag()
 
   if (isLoading) return <DashboardSkeleton />
 
   /** Servers for the selected tag, or all of them when "All tags" is selected. */
-  const filteredFleet = overview && activeTagId !== null ? overview.fleet.filter((s) => s.tagId === activeTagId) : overview?.fleet
+  const filteredFleet = overview && selectedTag ? overview.fleet.filter((s) => s.tagId === selectedTag.tagId) : overview?.fleet
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text">Overview</h1>
-          <p className="text-sm text-text-muted">
-            {overview
-              ? `${overview.serversTotal} servers across ${new Set(overview.fleet.map((s) => s.tagId)).size} tags, updated ${overview.updatedLabel}`
-              : 'Fleet, approvals and workflow activity, all in one place.'}
-          </p>
-        </div>
-
-        {tags && tags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveTagId(null)}
-              className={cn(
-                'rounded-full border px-3 py-1.5 text-sm',
-                activeTagId === null ? 'border-text bg-text text-ink' : 'border-border text-text-muted hover:border-border-strong',
-              )}
-            >
-              All tags
-            </button>
-            {tags.map((tag) => (
-              <button
-                key={tag.tagId}
-                type="button"
-                onClick={() => setActiveTagId(tag.tagId)}
-                className={cn(
-                  'rounded-full border px-3 py-1.5 text-sm',
-                  activeTagId === tag.tagId
-                    ? 'border-text bg-text text-ink'
-                    : 'border-border text-text-muted hover:border-border-strong',
-                )}
-              >
-                {tag.tagName}
-              </button>
-            ))}
-          </div>
-        )}
+      <div>
+        <h1 className="text-2xl font-bold text-text">Overview</h1>
+        <p className="text-sm text-text-muted">
+          {overview
+            ? selectedTag
+              ? `${filteredFleet?.length ?? 0} of ${overview.serversTotal} servers tagged ${selectedTag.tagName}, updated ${overview.updatedLabel}`
+              : `${overview.serversTotal} servers across ${new Set(overview.fleet.map((s) => s.tagId)).size} tags, updated ${overview.updatedLabel}`
+            : 'Fleet, approvals and workflow activity, all in one place.'}
+        </p>
       </div>
 
       {isError || !overview ? (

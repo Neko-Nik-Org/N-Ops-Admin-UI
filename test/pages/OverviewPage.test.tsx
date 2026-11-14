@@ -16,8 +16,9 @@
  */
 /** Tests for src/pages/OverviewPage.tsx (with OverviewStats, FleetTable and ApprovalsPanel). */
 
-import { fireEvent, screen, within } from '@testing-library/react'
+import { act, fireEvent, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { selectedTagIdAtom } from '@/features/tags/store/selectedTag'
 import { OverviewPage } from '@/pages/OverviewPage'
 import { api, makeUser, renderWithProviders } from '../testUtils'
 
@@ -92,18 +93,18 @@ describe('OverviewPage', () => {
     expect(screen.getByText('#R-7')).toBeInTheDocument()
   })
 
-  it('filters the fleet by tag', async () => {
+  it('scopes the fleet to the tag selected in the top bar', async () => {
     mockApi('ok')
-    renderOverview()
+    const { store } = renderOverview()
     await screen.findByText('2 of 2 servers')
 
-    const pills = screen.getByRole('button', { name: 'All tags' }).parentElement as HTMLElement
-    fireEvent.click(within(pills).getByRole('button', { name: 'staging' }))
-    expect(screen.getByText('1 of 2 servers')).toBeInTheDocument()
+    act(() => store.set(selectedTagIdAtom, 2))
+    expect(await screen.findByText('1 of 2 servers')).toBeInTheDocument()
+    expect(screen.getByText(/servers tagged staging/)).toBeInTheDocument()
     expect(screen.queryByText('web-1')).not.toBeInTheDocument()
     expect(screen.getByText('db-1', { selector: 'p' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'All tags' }))
+    act(() => store.set(selectedTagIdAtom, null))
     expect(screen.getByText('2 of 2 servers')).toBeInTheDocument()
   })
 

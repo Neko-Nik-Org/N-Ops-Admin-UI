@@ -17,11 +17,13 @@
 
 /** Main navigation sidebar with section links and the signed-in profile section (theme, account, sign out). */
 
-import { ChevronsUpDown, LogOut, UserCircle } from 'lucide-react'
-import { useAtomValue } from 'jotai'
+import { LogOut, PanelLeftClose, PanelLeftOpen, UserCircle, X } from 'lucide-react'
+import { useAtom, useAtomValue } from 'jotai'
 import { Link, useNavigate } from 'react-router-dom'
-import { LoadingButton } from '@/components/loading'
+import { sidebarCollapsedAtom } from '@/app/sidebar'
+import { LoadingButton, NLogo } from '@/components/loading'
 import { Logo } from '@/components/atoms/Logo'
+import { NavGroup } from '@/components/molecules/NavGroup'
 import { NavItem } from '@/components/molecules/NavItem'
 import { ThemeToggle } from '@/components/molecules/ThemeToggle'
 import { APP_SECTIONS, ROUTES } from '@/constants/routes'
@@ -35,15 +37,19 @@ interface SidebarProps {
   variant?: 'desktop' | 'mobile'
   /** Called after a link is clicked, so the mobile drawer can close itself. */
   onNavigate?: () => void
+  /** Mobile drawer only: shows a close button in the header. */
+  onClose?: () => void
 }
 
 /**
- * Section links, organization name and the sign-out control.
- * Used as a fixed rail on desktop and inside the slide-over drawer on mobile.
+ * Section links and the sign-out control.
+ * Used as a fixed rail on desktop (collapsible to icons, remembered per browser) and inside the
+ * slide-over drawer on mobile (always expanded).
  */
-export const Sidebar = ({ variant = 'desktop', onNavigate }: SidebarProps) => {
+export const Sidebar = ({ variant = 'desktop', onNavigate, onClose }: SidebarProps) => {
   const currentUser = useAtomValue(currentUserAtom)
-  const orgName = currentUser?.organizationName ?? 'Your organization'
+  const [collapsedPref, setCollapsed] = useAtom(sidebarCollapsedAtom)
+  const collapsed = variant === 'desktop' && collapsedPref
   // Shares the Overview page's cached query — no extra request, just the counts once they land.
   const { data: overview } = useOverview()
   /** Live counts shown next to some links: a number is a muted count, a string an accented badge. */
@@ -61,49 +67,85 @@ export const Sidebar = ({ variant = 'desktop', onNavigate }: SidebarProps) => {
 
   return (
     <aside
+      aria-label="Main navigation"
       className={cn(
-        'w-60 shrink-0 flex-col gap-6 bg-surface p-4',
-        variant === 'desktop' ? 'hidden border-r border-border lg:flex' : 'flex h-full',
+        'shrink-0 flex-col gap-6 bg-surface py-4 transition-[width] duration-200',
+        collapsed ? 'w-16 px-2' : 'w-60 px-4',
+        // Header and footer stay put; only the <nav> between them scrolls
+        variant === 'desktop' ? 'sticky top-0 hidden h-screen border-r border-border lg:flex' : 'flex h-full',
       )}
-      onClick={onNavigate}
+      // Close the mobile drawer once a link is followed (not when a group is toggled)
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest('a')) onNavigate?.()
+      }}
     >
-      <Logo iconSize={26} className="px-1" />
+      <div className={cn('flex items-center gap-2', collapsed ? 'flex-col' : 'justify-between')}>
+        {collapsed ? <NLogo size={26} /> : <Logo iconSize={26} className="px-1" />}
+        {variant === 'desktop' && (
+          <button
+            type="button"
+            onClick={() => setCollapsed(!collapsed)}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="rounded-md p-1.5 text-text-muted hover:bg-surface-raised hover:text-text"
+          >
+            {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+          </button>
+        )}
+        {variant === 'mobile' && onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close menu"
+            className="rounded-md p-1.5 text-text-muted hover:bg-surface-raised hover:text-text"
+          >
+            <X size={18} />
+          </button>
+        )}
+      </div>
 
-      <button
-        type="button"
-        className="flex items-center gap-2.5 rounded-lg border border-border bg-surface-raised px-3 py-2.5 text-left hover:border-border-strong"
-      >
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent-secondary/20 text-sm font-semibold text-accent-secondary">
-          {orgName.charAt(0).toUpperCase()}
-        </span>
-        <span className="flex-1 overflow-hidden">
-          <span className="block truncate text-sm font-semibold text-text">{orgName}</span>
-          <span className="block text-xs text-text-muted">Self-hosted</span>
-        </span>
-        <ChevronsUpDown size={15} className="shrink-0 text-text-muted" />
-      </button>
-
-      <nav className="flex flex-1 flex-col gap-0.5">
-        {APP_SECTIONS.map(({ path, title, icon }) => (
-          <NavItem key={path} to={path} end={path === ROUTES.overview} icon={icon} label={title} badge={badges[path]} />
-        ))}
+      <nav className="-mx-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain px-2 [scrollbar-width:thin]">
+        {APP_SECTIONS.map(({ path, title, icon, children }) =>
+          children ? (
+            <NavGroup
+              key={path}
+              label={title}
+              icon={icon}
+              items={children}
+              collapsed={collapsed}
+              onExpandRail={() => setCollapsed(false)}
+            />
+          ) : (
+            <NavItem
+              key={path}
+              to={path}
+              end={path === ROUTES.overview}
+              icon={icon}
+              label={title}
+              badge={badges[path]}
+              collapsed={collapsed}
+            />
+          ),
+        )}
       </nav>
 
-      <div className="flex flex-col gap-3 border-t border-border px-1 pt-4">
-        {/* stopPropagation: picking a theme shouldn't close the mobile drawer (the <aside> closes it on click) */}
-        <div className="flex items-center justify-between gap-2 text-sm text-text-muted" onClick={(e) => e.stopPropagation()}>
-          <span>Theme</span>
-          <ThemeToggle />
-        </div>
+      <div className={cn('flex shrink-0 flex-col gap-3 border-t border-border pt-4', collapsed ? 'items-center' : 'px-1')}>
+        {!collapsed && (
+          <div className="flex items-center justify-between gap-2 text-sm text-text-muted">
+            <span>Theme</span>
+            <ThemeToggle />
+          </div>
+        )}
 
-        <div className="flex items-center gap-2.5">
+        <div className={cn('flex items-center gap-2.5', collapsed && 'flex-col')}>
           <Link
             to={ROUTES.account}
             className="flex flex-1 items-center gap-2 truncate text-sm text-text-muted hover:text-text"
             title="Account"
+            aria-label={collapsed ? 'Account' : undefined}
           >
             <UserCircle size={16} className="shrink-0" />
-            <span className="truncate">{currentUser?.displayName ?? 'Account'}</span>
+            {!collapsed && <span className="truncate">{currentUser?.displayName ?? 'Account'}</span>}
           </Link>
           <LoadingButton
             variant="ghost"

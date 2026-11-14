@@ -28,10 +28,12 @@ interface DialogProps {
   /** Called on Escape, backdrop click or the close button; the parent should set `open` to false. */
   onClose: () => void
   children: ReactNode
+  /** 'lg' for forms with many fields (e.g. the role editor). Default 'md'. */
+  size?: 'md' | 'lg'
 }
 
 /** Modal built on the native <dialog>: focus trap, Escape-to-close and the top layer come for free. */
-export const Dialog = ({ open, title, description, onClose, children }: DialogProps) => {
+export const Dialog = ({ open, title, description, onClose, children, size = 'md' }: DialogProps) => {
   const ref = useRef<HTMLDialogElement>(null)
 
   /** Mirror the `open` prop onto the native dialog element. */
@@ -50,7 +52,7 @@ export const Dialog = ({ open, title, description, onClose, children }: DialogPr
         if (e.target === e.currentTarget) onClose() // backdrop click
       }}
       aria-labelledby="dialog-title"
-      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-border bg-surface p-0 text-text backdrop:bg-ink/70"
+      className={`m-auto w-[calc(100%-2rem)] ${size === 'lg' ? 'max-w-2xl' : 'max-w-md'} max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain rounded-xl border border-border bg-surface p-0 text-text backdrop:bg-ink/70`}
     >
       {/* Only render the content while open, so forms inside reset each time the dialog opens */}
       {open && (

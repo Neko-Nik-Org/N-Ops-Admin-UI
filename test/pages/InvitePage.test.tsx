@@ -37,7 +37,7 @@ describe('InvitePage', () => {
     api.get.mockResolvedValue({ data: details })
     renderInvite()
 
-    expect(await screen.findByRole('heading', { name: 'Join Acme on N-Ops' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Join Acme' })).toBeInTheDocument()
     expect(api.get).toHaveBeenCalledWith('/invite/abc123')
     expect(screen.getByText('Operator')).toBeInTheDocument()
     expect(screen.getByText('production')).toBeInTheDocument()

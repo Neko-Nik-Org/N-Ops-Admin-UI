@@ -14,30 +14,31 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-
-/** Sign-in form: username, password, "Keep me signed in" and the Turnstile check. */
+/** Sign-in card: username, password, "Keep me signed in" and the Turnstile check. */
 
 import { yupResolver } from '@hookform/resolvers/yup'
+import { Lock, ShieldCheck, User } from 'lucide-react'
+import { useAtomValue } from 'jotai'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
-import { toast } from 'react-toastify'
-import { Checkbox } from '@/components/atoms/Checkbox'
-import { Input } from '@/components/atoms/Input'
+import { Link, useNavigate } from 'react-router-dom'
+import { resolvedThemeAtom } from '@/app/theme'
+import { AuthBanner, AuthField } from '@/components/auth/AuthField'
+import { AuthCard } from '@/components/auth/AuthShell'
 import { LoadingButton } from '@/components/loading'
-import { FormField } from '@/components/molecules/FormField'
-import { PasswordInput } from '@/components/molecules/PasswordInput'
 import { TurnstileWidget } from '@/components/molecules/TurnstileWidget'
 import { useLogin } from '@/features/auth/hooks/useLogin'
 import { loginSchema, type LoginFormValues } from '@/features/auth/schema/loginSchema'
 import { NAVIGATE_DELAY_MS } from '@/constants/config'
 import { ROUTES } from '@/constants/routes'
 
-
 /** Signs the user in, or forwards them to the 2FA page when a second factor is required. */
 export const LoginForm = () => {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
   const [turnstileResetKey, setTurnstileResetKey] = useState(0)
+  /** Server or Turnstile error, shown in the banner above the fields. */
+  const [formError, setFormError] = useState<string | null>(null)
+  const theme = useAtomValue(resolvedThemeAtom)
   const [loginState, login] = useLogin()
   const navigate = useNavigate()
 
@@ -51,8 +52,9 @@ export const LoginForm = () => {
   })
 
   const onSubmit = (values: LoginFormValues) => {
+    setFormError(null)
     if (!turnstileToken) {
-      toast.error('Complete the verification check before signing in.')
+      setFormError('Complete the verification check before signing in.')
       return
     }
 
@@ -69,7 +71,7 @@ export const LoginForm = () => {
         }, NAVIGATE_DELAY_MS)
       })
       .catch((error: Error) => {
-        toast.error(error.message)
+        setFormError(error.message || 'Sign-in failed. Try again.')
         // the backend has spent this token (Turnstile tokens are single-use): get a fresh one
         // before the next attempt, otherwise every retry fails with "Failed to verify CAPTCHA"
         setTurnstileToken(null)
@@ -78,62 +80,83 @@ export const LoginForm = () => {
   }
 
   return (
-    <>
-      <form onSubmit={handleSubmit(onSubmit)} className="flex w-full flex-col gap-5">
-        <FormField id="userName" label="Username" error={errors.userName?.message}>
-          <Input
-            id="userName"
-            type="text"
-            placeholder="your-username"
-            autoComplete="username"
-            autoCapitalize="none"
-            spellCheck={false}
-            hasError={!!errors.userName}
-            {...register('userName')}
-          />
-        </FormField>
+    <AuthCard title="Welcome back" subtitle="Sign in to N-Ops to manage your infrastructure.">
+      <form className="n-auth-form" onSubmit={handleSubmit(onSubmit)} noValidate>
+        {/* key: a new error re-mounts the banner so it shakes again */}
+        {formError && <AuthBanner key={formError + turnstileResetKey}>{formError}</AuthBanner>}
 
-        <FormField
-          id="password"
-          label="Password"
-          error={errors.password?.message}
-          labelExtra={
-            <button
-              type="button"
-              className="text-sm text-signal hover:text-signal-strong"
-              onClick={() => toast.info("Password reset isn't available yet — ask an admin to reset it for you.")}
-            >
-              Forgot password?
-            </button>
-          }
-        >
-          <PasswordInput
-            id="password"
-            autoComplete="current-password"
-            hasError={!!errors.password}
-            {...register('password')}
-          />
-        </FormField>
-
-        <label className="flex items-center gap-2 text-sm text-text-muted">
-          <Checkbox {...register('rememberMe')} />
-          Keep me signed in on this device
-        </label>
-
-        <TurnstileWidget
-          onVerify={setTurnstileToken}
-          onExpire={() => setTurnstileToken(null)}
-          resetKey={turnstileResetKey}
+        <AuthField
+          id="userName"
+          label="Username"
+          icon={<User size={18} />}
+          placeholder="your-username"
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          autoFocus
+          error={errors.userName?.message}
+          {...register('userName')}
         />
 
-        <LoadingButton type="submit" className="w-full" state={loginState} loadingText="Signing in" successText="Verified">
+        <AuthField
+          id="password"
+          label="Password"
+          type="password"
+          icon={<Lock size={18} />}
+          placeholder="Your password"
+          autoComplete="current-password"
+          error={errors.password?.message}
+          aside={
+            <Link to={ROUTES.forgotPassword} className="n-auth-link">
+              Forgot password?
+            </Link>
+          }
+          {...register('password')}
+        />
+
+        <label className="n-auth-check">
+          <input type="checkbox" {...register('rememberMe')} />
+          <span>Keep me signed in on this device</span>
+        </label>
+
+        <div className="n-auth-turnstile">
+          <TurnstileWidget
+            onVerify={setTurnstileToken}
+            onExpire={() => setTurnstileToken(null)}
+            resetKey={turnstileResetKey}
+            theme={theme}
+          />
+        </div>
+
+        <LoadingButton
+          type="submit"
+          size="lg"
+          className="n-auth-submit"
+          state={loginState}
+          loadingText="Signing in"
+          successText="Verified"
+        >
           Sign in
         </LoadingButton>
       </form>
 
-      <div className="mt-6 border-t border-border pt-6 text-sm text-text-muted">
-        Don't have an account? Ask an admin in your organization to create one for you.
+      <div className="n-auth-note">
+        <p>
+          New here? Ask an admin in your organization to{' '}
+          <a href="https://nops.app/contact" target="_blank" rel="noreferrer">
+            invite you
+          </a>
+          , or{' '}
+          <a href="https://nops.app/waitlist" target="_blank" rel="noreferrer">
+            join the waitlist
+          </a>
+          .
+        </p>
+        <p className="n-auth-note__audit">
+          <ShieldCheck size={15} />
+          Sign-ins are protected by Cloudflare Turnstile.
+        </p>
       </div>
-    </>
+    </AuthCard>
   )
 }

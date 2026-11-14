@@ -28,10 +28,12 @@ interface TurnstileWidgetProps {
   onExpire?: () => void
   /** Change this number to get a fresh token. Tokens are single-use, so reset after every failed submit. */
   resetKey?: number
+  /** Widget color scheme. Changing it re-renders the widget. Default 'auto' (follows the OS). */
+  theme?: 'light' | 'dark' | 'auto'
 }
 
 /** Renders the Cloudflare Turnstile widget via the global script tag loaded in index.html. */
-export const TurnstileWidget = ({ onVerify, onExpire, resetKey = 0 }: TurnstileWidgetProps) => {
+export const TurnstileWidget = ({ onVerify, onExpire, resetKey = 0, theme = 'auto' }: TurnstileWidgetProps) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const widgetIdRef = useRef<string | undefined>(undefined)
   const callbacksRef = useRef({ onVerify, onExpire })
@@ -48,7 +50,7 @@ export const TurnstileWidget = ({ onVerify, onExpire, resetKey = 0 }: TurnstileW
       if (!window.turnstile || !containerRef.current) return
       widgetIdRef.current = window.turnstile.render(containerRef.current, {
         sitekey: env.turnstileSiteKey,
-        theme: 'dark',
+        theme,
         callback: (token) => callbacksRef.current.onVerify(token),
         'expired-callback': () => callbacksRef.current.onExpire?.(),
       })
@@ -63,9 +65,10 @@ export const TurnstileWidget = ({ onVerify, onExpire, resetKey = 0 }: TurnstileW
       clearInterval(pollId)
       if (widgetIdRef.current) {
         window.turnstile?.remove(widgetIdRef.current)
+        widgetIdRef.current = undefined
       }
     }
-  }, [])
+  }, [theme])
 
   // a used token can't be verified again: when the parent bumps resetKey, run a new challenge
   useEffect(() => {

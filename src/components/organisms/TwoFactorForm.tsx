@@ -14,176 +14,236 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
+/** Two-step card: 6-digit code from an authenticator app or email, then a "You're in" state. */
 
-/** Second-factor form: enter a 6-digit code from an authenticator app or email. */
-
-import { ChevronLeft, Mail, Smartphone } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ArrowLeft, Check, CircleAlert, Mail, Smartphone } from 'lucide-react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { toast } from 'react-toastify'
-import { LoadingButton } from '@/components/loading'
-import { OtpInput } from '@/components/molecules/OtpInput'
+import { AuthCard } from '@/components/auth/AuthShell'
+import { OtpInput } from '@/components/auth/OtpInput'
+import { LoadingButton, NSpinner } from '@/components/loading'
 import { resendOtp } from '@/features/auth/api/twoFactor'
 import { useVerifyOtp } from '@/features/auth/hooks/useVerifyOtp'
 import type { TwoFactorContext, TwoFactorMethod } from '@/features/auth/types'
 import { maskEmail } from '@/utils/maskEmail'
-import { NAVIGATE_DELAY_MS } from '@/constants/config'
 import { ROUTES } from '@/constants/routes'
 
 /** Digits in a one-time code. */
 const CODE_LENGTH = 6
-/** Seconds to wait before another code can be requested. */
+/** Authenticator apps roll their code over every this many seconds. */
+const TOTP_PERIOD_S = 30
+/** Seconds to wait before another email code can be requested. */
 const RESEND_COOLDOWN_S = 30
+/** How long the "You're in" card shows before the dashboard opens. */
+const SUCCESS_HOLD_MS = 1200
 
-/** Icon and help text for each 2FA method. */
-const METHOD_COPY: Record<TwoFactorMethod, { icon: typeof Smartphone; subtext: (email: string) => string }> = {
-  totp: {
-    icon: Smartphone,
-    subtext: (email) => `Enter the 6-digit code from your authenticator app for ${email}.`,
-  },
-  email: {
-    icon: Mail,
-    subtext: (email) => `Enter the 6-digit code we emailed to ${email}.`,
-  },
+/** Seconds left in the current authenticator window, ticking every second. */
+const useCodeWindow = (period: number) => {
+  const left = () => period - (Math.floor(Date.now() / 1000) % period)
+  const [seconds, setSeconds] = useState(left)
+  useEffect(() => {
+    const t = setInterval(() => setSeconds(period - (Math.floor(Date.now() / 1000) % period)), 1000)
+    return () => clearInterval(t)
+  }, [period])
+  return seconds
+}
+
+/** Ring that empties as the authenticator code's 30 seconds run out. */
+const CodeTimer = ({ left }: { left: number }) => {
+  const ring = 2 * Math.PI * 9
+  return (
+    <p className="n-auth-timer" aria-live="off">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="var(--n-auth-field-line)" strokeWidth="2.5" />
+        <circle
+          cx="12"
+          cy="12"
+          r="9"
+          fill="none"
+          stroke="var(--n-mint)"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeDasharray={ring}
+          strokeDashoffset={ring * (1 - left / TOTP_PERIOD_S)}
+          transform="rotate(-90 12 12)"
+          style={{ transition: 'stroke-dashoffset 1s linear' }}
+        />
+      </svg>
+      New code in {left}s
+    </p>
+  )
 }
 
 /**
- * Verifies the code for the challenge in `context`. Offers switching methods only when the
- * account has both TOTP and email codes enabled.
+ * Verifies the code for the challenge in `context`. The code submits itself once all six digits
+ * are in. Offers the other method only when the account has both TOTP and email codes enabled.
  */
 export const TwoFactorForm = ({ context }: { context: TwoFactorContext }) => {
   const [method, setMethod] = useState<TwoFactorMethod>(context.hasTotp ? 'totp' : 'email')
   const [code, setCode] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState(false)
   const [cooldown, setCooldown] = useState(0)
+  const [sending, setSending] = useState(false)
   const [verifyState, verify] = useVerifyOtp()
   const navigate = useNavigate()
+  const left = useCodeWindow(TOTP_PERIOD_S)
 
   useEffect(() => {
     if (cooldown <= 0) return
-    const t = setInterval(() => setCooldown((s) => Math.max(0, s - 1)), 1000)
-    return () => clearInterval(t)
+    const t = setTimeout(() => setCooldown((s) => s - 1), 1000)
+    return () => clearTimeout(t)
   }, [cooldown])
 
   useEffect(() => {
-    if (verifyState !== 'success') return
-    const t = setTimeout(() => navigate(ROUTES.overview, { replace: true }), NAVIGATE_DELAY_MS)
+    if (!done) return
+    const t = setTimeout(() => navigate(ROUTES.overview, { replace: true }), SUCCESS_HOLD_MS)
     return () => clearTimeout(t)
-  }, [verifyState, navigate])
+  }, [done, navigate])
 
-  /** Checks the code; on success the session is stored and the user goes to the dashboard. */
-  const handleSubmit = () => {
-    if (code.length < CODE_LENGTH) {
-      toast.error('Enter the full 6-digit code.')
+  /** Checks the code; on success the session is stored and the "You're in" card shows. */
+  const check = (value: string) => {
+    if (verifyState !== 'idle') return
+    if (value.length < CODE_LENGTH) {
+      setError('Enter the full 6-digit code.')
       return
     }
-    // TODO: drop this catch once /auth/verify-otp is real — right now any failure means "doesn't exist yet".
-    verify({ temporaryAuthToken: context.temporaryAuthToken, method, code, rememberMe: context.rememberMe }).catch(
-      () => toast.error("Two-factor verification isn't available on the server yet."),
-    )
+    setError(null)
+    // TODO: show the server's message once /auth/verify-otp is real — right now any failure means "doesn't exist yet".
+    verify({ temporaryAuthToken: context.temporaryAuthToken, method, code: value, rememberMe: context.rememberMe })
+      .then(() => setDone(true))
+      .catch(() => {
+        setError("Two-factor verification isn't available on the server yet.")
+        setCode('')
+      })
   }
 
-  /** Requests a new code, then starts the resend cooldown. */
-  const handleResend = async () => {
-    setCooldown(RESEND_COOLDOWN_S)
+  /** Emails a new code, then starts the resend cooldown. */
+  const sendEmailCode = async () => {
+    setSending(true)
+    setError(null)
     try {
-      await resendOtp(context.temporaryAuthToken, method)
-      toast.success('Code sent.')
+      await resendOtp(context.temporaryAuthToken, 'email')
+      setCooldown(RESEND_COOLDOWN_S)
     } catch {
-      toast.info("Resending codes isn't available yet — ask an admin if you didn't get one.")
+      setError("Sending codes by email isn't available yet. Ask an admin if you didn't get one.")
+    } finally {
+      setSending(false)
     }
   }
 
-  /** Switches between TOTP and email codes and clears what was typed. */
+  /** Switches between TOTP and email codes; switching to email sends a code right away. */
   const switchMethod = (next: TwoFactorMethod) => {
     setMethod(next)
     setCode('')
+    setError(null)
+    if (next === 'email') void sendEmailCode()
   }
 
-  const { icon: Icon, subtext } = METHOD_COPY[method]
+  if (done) {
+    return (
+      <AuthCard
+        title="You're in"
+        subtitle="Two-step verification complete."
+        icon={
+          <span className="n-auth-done" aria-hidden="true">
+            <Check size={30} strokeWidth={2.6} />
+          </span>
+        }
+      >
+        <p className="n-auth-progress" role="status">
+          <NSpinner size="1.1em" />
+          Opening your dashboard
+        </p>
+      </AuthCard>
+    )
+  }
+
   /** The other method the user can switch to, or null when only one is enabled. */
-  const alternate: TwoFactorMethod | null = method === 'totp' && context.hasEmail ? 'email' : method === 'email' && context.hasTotp ? 'totp' : null
+  const alternate: TwoFactorMethod | null =
+    method === 'totp' && context.hasEmail ? 'email' : method === 'email' && context.hasTotp ? 'totp' : null
+  const masked = maskEmail(context.email)
+
+  const onSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    check(code)
+  }
 
   return (
-    <div className="flex w-full flex-col gap-6">
-      <button
-        type="button"
-        onClick={() => navigate(ROUTES.login, { replace: true })}
-        className="flex items-center gap-1 text-sm text-text-muted hover:text-text"
-      >
-        <ChevronLeft size={16} />
-        Back to sign in
-      </button>
-
-      <div className="flex size-11 items-center justify-center rounded-lg border border-signal text-signal">
-        <Icon size={20} />
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <h1 className="text-2xl font-bold text-text">Two-step verification</h1>
-        <p className="text-sm text-text-muted">
-          {subtext(method === 'email' ? maskEmail(context.email) : context.email)}
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <span className="text-sm text-text-muted">Verification code</span>
-        <OtpInput value={code} onChange={setCode} disabled={verifyState !== 'idle'} />
-        {method === 'totp' ? (
-          <p className="text-xs text-text-muted">Codes refresh every 30 seconds.</p>
+    <AuthCard
+      title="Two-step verification"
+      subtitle={
+        method === 'totp' ? (
+          <>
+            Enter the 6-digit code from your authenticator app for <b>{context.email}</b>.
+          </>
         ) : (
-          <button
-            type="button"
-            disabled={cooldown > 0}
-            onClick={handleResend}
-            className="w-fit text-xs text-signal hover:text-signal-strong disabled:text-text-muted"
-          >
-            {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
-          </button>
-        )}
-      </div>
-
-      <LoadingButton
-        type="button"
-        className="w-full"
-        state={verifyState}
-        loadingText="Verifying"
-        successText="Verified"
-        onClick={handleSubmit}
-      >
-        Verify and continue
-      </LoadingButton>
+          <>
+            Enter the 6-digit code we emailed to <b>{masked}</b>.
+          </>
+        )
+      }
+      icon={method === 'totp' ? <Smartphone size={26} /> : <Mail size={26} />}
+    >
+      <form className="n-auth-form" onSubmit={onSubmit} noValidate>
+        <OtpInput
+          // a new method starts with fresh, focused boxes
+          key={method}
+          value={code}
+          onChange={(v) => {
+            setCode(v)
+            if (error) setError(null)
+          }}
+          onComplete={check}
+          state={error ? 'error' : 'idle'}
+          disabled={verifyState !== 'idle'}
+        />
+        <div className="n-auth-otp-meta">
+          {error ? (
+            <p className="n-auth-error" role="alert">
+              <CircleAlert size={15} />
+              {error}
+            </p>
+          ) : method === 'totp' ? (
+            <CodeTimer left={left} />
+          ) : (
+            <button type="button" className="n-auth-resend" disabled={cooldown > 0 || sending} onClick={sendEmailCode}>
+              {sending ? 'Sending…' : cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+            </button>
+          )}
+        </div>
+        <LoadingButton type="submit" size="lg" className="n-auth-submit" state={verifyState} loadingText="Verifying" successText="Verified">
+          Verify
+        </LoadingButton>
+      </form>
 
       {alternate && (
         <>
-          <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-border" />
-            <span className="text-xs text-text-muted">Other ways to verify</span>
-            <div className="h-px flex-1 bg-border" />
+          <div className="n-auth-or">
+            <span>Other ways to verify</span>
           </div>
-
-          <button
-            type="button"
-            onClick={() => switchMethod(alternate)}
-            className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised p-3 text-left hover:border-border-strong"
-          >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-ink text-accent-secondary">
-              {alternate === 'email' ? <Mail size={16} /> : <Smartphone size={16} />}
-            </span>
-            <span className="flex flex-col">
-              <span className="text-sm font-medium text-text">
-                {alternate === 'email' ? 'Email me a code' : 'Use your authenticator app'}
+          <div className="n-auth-alts">
+            <button type="button" className="n-auth-alt" onClick={() => switchMethod(alternate)}>
+              <span className={alternate === 'email' ? 'n-auth-alt__icon is-amber' : 'n-auth-alt__icon is-violet'}>
+                {alternate === 'email' ? <Mail size={18} /> : <Smartphone size={18} />}
               </span>
-              <span className="text-xs text-text-muted">
-                {alternate === 'email' ? `We'll send it to ${maskEmail(context.email)}` : 'Enter the code from your app instead'}
+              <span className="n-auth-alt__text">
+                <b>{alternate === 'email' ? 'Email me a code' : 'Use your authenticator app'}</b>
+                <span>{alternate === 'email' ? `We'll send it to ${masked}` : 'Enter the code from your app instead'}</span>
               </span>
-            </span>
-          </button>
+            </button>
+          </div>
         </>
       )}
 
-      <p className="text-xs text-text-muted">
-        Your admin requires two-step verification for everyone in {context.organizationName}.
-      </p>
-    </div>
+      <div className="n-auth-note">
+        <p>Your admin requires two-step verification for everyone in {context.organizationName}.</p>
+      </div>
+
+      <button type="button" className="n-auth-back" onClick={() => navigate(ROUTES.login, { replace: true })}>
+        <ArrowLeft size={16} />
+        Use a different account
+      </button>
+    </AuthCard>
   )
 }

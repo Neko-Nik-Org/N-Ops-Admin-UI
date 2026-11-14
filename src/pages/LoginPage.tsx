@@ -14,19 +14,14 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-
 /** Sign-in page (/login). */
 
-import { AuthLayout } from '@/components/templates/AuthLayout'
+import { AuthShell } from '@/components/auth/AuthShell'
 import { LoginForm } from '@/components/organisms/LoginForm'
 
-/** Sign-in heading and form inside the shared auth layout. */
+/** The sign-in card on the animated auth background. */
 export const LoginPage = () => (
-  <AuthLayout>
-    <div className="mb-8 flex flex-col gap-1.5">
-      <h1 className="text-3xl font-bold text-text">Sign in</h1>
-      <p className="text-sm text-text-muted">Welcome back. Sign in to manage your infrastructure.</p>
-    </div>
+  <AuthShell>
     <LoginForm />
-  </AuthLayout>
+  </AuthShell>
 )

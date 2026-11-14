@@ -18,7 +18,7 @@
 /** Two-factor sign-in page (/login/verify-2fa). */
 
 import { Navigate, useLocation } from 'react-router-dom'
-import { AuthLayout } from '@/components/templates/AuthLayout'
+import { AuthShell } from '@/components/auth/AuthShell'
 import { TwoFactorForm } from '@/components/organisms/TwoFactorForm'
 import type { TwoFactorContext } from '@/features/auth/types'
 import { ROUTES } from '@/constants/routes'
@@ -36,11 +36,8 @@ export const TwoFactorPage = () => {
   }
 
   return (
-    <AuthLayout
-      headline="One more step, then you're in."
-      subtext="A second check keeps production safe, even if a password leaks."
-    >
+    <AuthShell org={{ name: context.organizationName }}>
       <TwoFactorForm context={context} />
-    </AuthLayout>
+    </AuthShell>
   )
 }

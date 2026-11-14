@@ -17,7 +17,6 @@
 
 /** Layout for every signed-in page: sidebar, top bar and the routed page content. */
 
-import { X } from 'lucide-react'
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from '@/components/organisms/Sidebar'
@@ -43,15 +42,7 @@ export const AppShell = () => {
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div className="absolute inset-0 bg-ink/70" onClick={() => setMobileNavOpen(false)} />
           <div className="relative">
-            <Sidebar variant="mobile" onNavigate={() => setMobileNavOpen(false)} />
-            <button
-              type="button"
-              aria-label="Close menu"
-              onClick={() => setMobileNavOpen(false)}
-              className="absolute top-4 -right-10 text-text"
-            >
-              <X size={20} />
-            </button>
+            <Sidebar variant="mobile" onNavigate={() => setMobileNavOpen(false)} onClose={() => setMobileNavOpen(false)} />
           </div>
         </div>
       )}

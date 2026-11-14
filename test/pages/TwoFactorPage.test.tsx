@@ -36,6 +36,9 @@ const renderTwoFactor = (state: TwoFactorContext | null = context) =>
   renderWithProviders(<TwoFactorPage />, { route: '/login/verify-2fa', state })
 
 /** Pastes a whole code into the first digit box. */
+/** The card's subtitle line (its text is split by <b>). */
+const subtitle = () => document.querySelector('.n-auth-sub')?.textContent
+
 const pasteCode = (code: string) =>
   fireEvent.paste(screen.getByLabelText('Digit 1 of 6'), { clipboardData: { getData: () => code } })
 
@@ -48,7 +51,8 @@ describe('TwoFactorPage', () => {
   it('asks for the authenticator code first when TOTP is enabled', () => {
     renderTwoFactor()
     expect(screen.getByRole('heading', { name: 'Two-step verification' })).toBeInTheDocument()
-    expect(screen.getByText(/authenticator app for priya@acme.dev/)).toBeInTheDocument()
+    expect(subtitle()).toBe('Enter the 6-digit code from your authenticator app for priya@acme.dev.')
+    expect(screen.getByText(/New code in \d+s/)).toBeInTheDocument()
     expect(screen.getAllByLabelText(/Digit \d of 6/)).toHaveLength(6)
     expect(screen.getByText(/everyone in Acme/)).toBeInTheDocument()
   })
@@ -62,42 +66,42 @@ describe('TwoFactorPage', () => {
   it('rejects an incomplete code without calling the API', async () => {
     renderTwoFactor()
     pasteCode('123')
-    fireEvent.click(screen.getByRole('button', { name: 'Verify and continue' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Verify' }))
     expect(await screen.findByText('Enter the full 6-digit code.')).toBeInTheDocument()
     expect(api.post).not.toHaveBeenCalled()
   })
 
-  it('verifies the code, signs in and goes to the dashboard', async () => {
+  it('verifies a complete code on its own, shows "You\'re in", then opens the dashboard', async () => {
     api.post.mockResolvedValue({
       data: { is_2fa_required: false, session_id: 'session-2fa', data: { permissions: [], tags: [] } },
     })
     renderTwoFactor()
     pasteCode('123456')
-    fireEvent.click(screen.getByRole('button', { name: 'Verify and continue' }))
 
-    expect(await screen.findByTestId('location', {}, { timeout: 2000 })).toHaveTextContent(/^\/$/)
+    expect(await screen.findByRole('heading', { name: "You're in" })).toBeInTheDocument()
     expect(api.post).toHaveBeenCalledWith('/auth/verify-otp', { temporary_auth_token: 'tmp-token', method: 'totp', otp: '123456' })
     expect(getSessionToken()).toBe('session-2fa')
+    expect(await screen.findByTestId('location', {}, { timeout: 2500 })).toHaveTextContent(/^\/$/)
   })
 
   it('explains when the server does not support 2FA yet', async () => {
     api.post.mockRejectedValue(new Error('Not Found'))
     renderTwoFactor()
     pasteCode('123456')
-    fireEvent.click(screen.getByRole('button', { name: 'Verify and continue' }))
     expect(await screen.findByText("Two-factor verification isn't available on the server yet.")).toBeInTheDocument()
+    // the boxes are cleared for another try
+    expect(screen.getAllByLabelText(/Digit \d of 6/).map((i) => (i as HTMLInputElement).value).join('')).toBe('')
   })
 
-  it('switches to an emailed code with a masked address and a resend cooldown', async () => {
+  it('switches to an emailed code: sends it, masks the address and starts a resend cooldown', async () => {
     api.post.mockResolvedValue({ data: {} })
     renderTwoFactor()
     fireEvent.click(screen.getByRole('button', { name: /Email me a code/ }))
 
-    expect(screen.getByText('Enter the 6-digit code we emailed to p•••@acme.dev.')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Resend code' }))
-    expect(await screen.findByText('Code sent.')).toBeInTheDocument()
+    expect(subtitle()).toBe('Enter the 6-digit code we emailed to p•••@acme.dev.')
+    expect(await screen.findByRole('button', { name: /Resend code in \d+s/ })).toBeDisabled()
     expect(api.post).toHaveBeenCalledWith('/auth/resend-otp', { temporary_auth_token: 'tmp-token', method: 'email' })
-    expect(screen.getByRole('button', { name: /Resend code in \d+s/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Use your authenticator app/ })).toBeInTheDocument()
   })
 
   it('offers no other method when only one is enabled', () => {

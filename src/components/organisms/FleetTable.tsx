@@ -53,7 +53,7 @@ export const FleetTable = ({ servers, total }: { servers: FleetServer[]; total: 
     </div>
 
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[560px] border-collapse text-left">
+      <table className="w-full min-w-[35rem] border-collapse text-left">
         <thead>
           <tr className="text-xs tracking-wide text-text-muted uppercase">
             <th className="pb-2 font-medium">Server</th>

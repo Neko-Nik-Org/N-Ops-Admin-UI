@@ -17,9 +17,9 @@
 
 /** Light / dark / system theme switch. */
 
-import { useAtom } from 'jotai'
+import { useAtomValue, useSetAtom } from 'jotai'
 import { Monitor, Moon, Sun } from 'lucide-react'
-import { themeAtom, type Theme } from '@/app/theme'
+import { chooseThemeAtom, themeAtom, type Theme } from '@/app/theme'
 import { cn } from '@/utils/cn'
 
 /** The three theme buttons, in display order. */
@@ -29,9 +29,10 @@ const OPTIONS: Array<{ value: Theme; icon: typeof Sun; label: string }> = [
   { value: 'system', icon: Monitor, label: 'Match system theme' },
 ]
 
-/** Segmented control that sets the theme; the choice is saved and synced to the account. */
+/** Segmented control that sets the theme for the whole app; the choice is saved and synced to the account. */
 export const ThemeToggle = () => {
-  const [theme, setTheme] = useAtom(themeAtom)
+  const theme = useAtomValue(themeAtom)
+  const setTheme = useSetAtom(chooseThemeAtom)
 
   return (
     <div className="inline-flex items-center gap-0.5 rounded-md border border-border bg-surface-raised p-0.5">

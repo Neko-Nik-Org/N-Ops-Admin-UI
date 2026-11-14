@@ -17,24 +17,35 @@
 
 /** Invite page (/invite/:token): lets an invited person create their account. */
 
+import { CircleAlert } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { PanelLoader } from '@/components/loading'
-import { AuthLayout } from '@/components/templates/AuthLayout'
+import { AuthCard, AuthShell } from '@/components/auth/AuthShell'
+import { NSpinner } from '@/components/loading'
 import { InviteForm } from '@/components/organisms/InviteForm'
 import { useInviteDetails } from '@/features/invite/hooks/useInviteDetails'
 import { ROUTES } from '@/constants/routes'
 
 /** Shown when the invite link is invalid, expired or not supported by the server. */
 const InviteUnavailable = () => (
-  <div className="flex flex-col gap-3 text-center">
-    <h1 className="text-2xl font-bold text-text">This invite isn't available</h1>
-    <p className="text-sm text-text-muted">
-      The link may be invalid or expired, or invites aren't supported on this server yet. Ask whoever invited you to send a new link.
-    </p>
-    <Link to={ROUTES.login} className="text-sm text-signal hover:text-signal-strong">
+  <AuthCard
+    title="This invite isn't available"
+    subtitle="The link may be invalid or expired, or invites aren't supported on this server yet. Ask whoever invited you to send a new link."
+    icon={<CircleAlert size={26} />}
+  >
+    <Link to={ROUTES.login} replace className="n-btn n-btn--secondary n-btn--lg n-auth-submit n-auth-cta">
       Back to sign in
     </Link>
-  </div>
+  </AuthCard>
+)
+
+/** Card shown while the invite is being looked up. */
+const InviteLoading = () => (
+  <AuthCard title="Opening your invite">
+    <p className="n-auth-loading" role="status">
+      <NSpinner size="1.6em" />
+      Loading your invite
+    </p>
+  </AuthCard>
 )
 
 /** Loads the invite from the URL token, then shows the create-account form or an error. */
@@ -45,19 +56,8 @@ export const InvitePage = () => {
   if (!token) return <Navigate to={ROUTES.login} replace />
 
   return (
-    <AuthLayout
-      headline="Your team runs its infrastructure here."
-      subtext="Servers, secrets, containers, approvals and workflows for your whole team, in one place."
-    >
-      {isLoading ? (
-        <div className="relative flex min-h-[320px] items-center justify-center">
-          <PanelLoader label="Loading your invite" />
-        </div>
-      ) : isError || !data ? (
-        <InviteUnavailable />
-      ) : (
-        <InviteForm token={token} details={data} />
-      )}
-    </AuthLayout>
+    <AuthShell org={data ? { name: data.organizationName } : undefined}>
+      {isLoading ? <InviteLoading /> : isError || !data ? <InviteUnavailable /> : <InviteForm token={token} details={data} />}
+    </AuthShell>
   )
 }

@@ -18,7 +18,7 @@
 
 import { act, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { themeAtom } from '@/app/theme'
+import { chooseThemeAtom, themeAtom, themeUnsyncedAtom } from '@/app/theme'
 import { useUiInfoSync } from '@/features/account/hooks/useUiInfoSync'
 import { api, makeUser, renderHookWithProviders } from '../../../testUtils'
 
@@ -52,5 +52,25 @@ describe('useUiInfoSync', () => {
 
     act(() => store.set(themeAtom, 'light'))
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/user/self/ui-info', { theme: 'light' }))
+  })
+
+  it('keeps a theme picked before signing in and saves it to the account', async () => {
+    api.get.mockResolvedValue({ data: { theme: 'dark', other: 1 } })
+    api.post.mockResolvedValue({ data: {} })
+    // picked on the sign-in page, before the account's preferences were known
+    localStorage.setItem('nops-theme', '"light"')
+    localStorage.setItem('nops-theme-unsynced', 'true')
+    const { store } = renderHookWithProviders(() => useUiInfoSync(), { user: makeUser() })
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/user/self/ui-info', { theme: 'light', other: 1 }))
+    expect(store.get(themeAtom)).toBe('light')
+    await waitFor(() => expect(store.get(themeUnsyncedAtom)).toBe(false))
+  })
+
+  it('marks a theme switch as the newest choice', () => {
+    const { store } = renderHookWithProviders(() => null)
+    act(() => store.set(chooseThemeAtom, 'dark'))
+    expect(store.get(themeAtom)).toBe('dark')
+    expect(store.get(themeUnsyncedAtom)).toBe(true)
   })
 })

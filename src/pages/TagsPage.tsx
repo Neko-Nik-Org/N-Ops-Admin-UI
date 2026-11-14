@@ -15,7 +15,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Tags page (/tags): list, create, edit and delete tags. */
+/** Tags page (/admin/tags): list, create, edit and delete tags. */
 
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
@@ -107,7 +107,7 @@ export const TagsPage = () => {
             <p className="py-8 text-center text-sm text-text-muted">No tags yet.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] border-collapse text-left">
+              <table className="w-full min-w-[32.5rem] border-collapse text-left">
                 <thead>
                   <tr className="text-xs tracking-wide text-text-muted uppercase">
                     <th className="pb-2 font-medium">Name</th>

@@ -50,7 +50,7 @@ const loginSuccess = {
 describe('LoginPage', () => {
   it('shows the sign-in form', () => {
     renderLogin()
-    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
     // a plain text field: usernames don't need an @, so the browser must not demand an email address
     expect(screen.getByLabelText('Username')).toHaveAttribute('type', 'text')
     expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password')
@@ -114,7 +114,21 @@ describe('LoginPage', () => {
     renderLogin()
     fillAndSubmit()
 
-    expect(await screen.findByText('Invalid username or password')).toBeInTheDocument()
+    // shown in the form's error banner, not a toast
+    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid username or password')
     await waitFor(() => expect(turnstile.reset).toHaveBeenCalledWith('widget-1'))
+  })
+
+  it('links "Forgot password?" to the reset page', () => {
+    renderLogin()
+    expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute('href', '/login/forgot-password')
+  })
+
+  it('links new people to contact and the waitlist in a new tab', () => {
+    renderLogin()
+    const link = screen.getByRole('link', { name: 'join the waitlist' })
+    expect(link).toHaveAttribute('href', 'https://nops.app/waitlist')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(screen.getByRole('link', { name: 'invite you' })).toHaveAttribute('href', 'https://nops.app/contact')
   })
 })

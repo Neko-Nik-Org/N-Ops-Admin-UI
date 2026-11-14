@@ -18,27 +18,9 @@
 /** Organization card on the Account page: usage meters and plan limits. */
 
 import { SkeletonText } from '@/components/loading'
+import { Meter } from '@/components/molecules/Meter'
 import { useOrgInfo } from '@/features/account/hooks/useAccount'
-import { cn } from '@/utils/cn'
 import { formatBytes, formatDate, formatNumber } from '@/utils/format'
-
-/** Usage bar with "used / total" text. `format` controls how the numbers are shown (e.g. bytes). */
-const Meter = ({ label, used, total, format = formatNumber }: { label: string; used: number; total: number; format?: (n: number) => string }) => {
-  const percent = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between gap-2 text-sm">
-        <span className="text-text-muted">{label}</span>
-        <span className="text-text">
-          {format(used)} <span className="text-text-muted">/ {format(total)}</span>
-        </span>
-      </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-ink" role="meter" aria-label={label} aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
-        <div className={cn('h-full rounded-full', percent > 85 ? 'bg-warning' : 'bg-signal')} style={{ width: `${percent}%` }} />
-      </div>
-    </div>
-  )
-}
 
 /** One label / value row for a plan limit. */
 const Limit = ({ label, value }: { label: string; value: number }) => (

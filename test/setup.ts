@@ -19,7 +19,7 @@
  *
  * - jest-dom matchers (toBeInTheDocument, ...)
  * - runtime config, so src/config/env.ts can load
- * - small stand-ins for browser APIs jsdom lacks (<dialog> modals, matchMedia, ResizeObserver)
+ * - small stand-ins for browser APIs jsdom lacks (<dialog> modals, matchMedia, ResizeObserver, canvas)
  * - a mocked API client: every test controls responses via `api.get/post/put/delete` (see testUtils.tsx)
  * - a clean slate after each test: DOM, cookies, localStorage and mocks
  */
@@ -66,6 +66,9 @@ globalThis.ResizeObserver ??= class {
   unobserve() {}
   disconnect() {}
 }
+
+// jsdom has no 2D canvas: the sign-in background (AuthBackground) skips drawing when this returns null
+HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext
 
 afterEach(() => {
   cleanup()

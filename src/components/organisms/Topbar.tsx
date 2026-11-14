@@ -15,20 +15,18 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Top bar of the dashboard: breadcrumb, centered search, quick actions and notifications. */
+/** Top bar of the dashboard: tag selector, breadcrumb, centered search, quick actions and notifications. */
 
 import { Bell, Menu, Plus, Search } from 'lucide-react'
-import { useAtomValue } from 'jotai'
 import { useLocation } from 'react-router-dom'
 import { toast } from 'react-toastify'
+import { TagSelect } from '@/components/molecules/TagSelect'
 import { PAGE_TITLES } from '@/constants/routes'
-import { currentUserAtom } from '@/features/auth/store/session'
 
 /** Sticky header above every authenticated page. `onMenuClick` opens the mobile nav drawer. */
 export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
   const { pathname } = useLocation()
-  const currentUser = useAtomValue(currentUserAtom)
-  const pageTitle = PAGE_TITLES[pathname] ?? 'N-Ops'
+  const trail = PAGE_TITLES[pathname] ?? ['N-Ops']
 
   return (
     <header className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3.5 sm:gap-4 sm:px-6">
@@ -38,14 +36,20 @@ export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
           <Menu size={20} />
         </button>
 
-        <p className="hidden truncate text-sm sm:block">
-          <span className="text-text-muted">{currentUser?.organizationName ?? 'N-Ops'}</span>
-          <span className="mx-2 text-text-muted">/</span>
-          <span className="font-medium text-text">{pageTitle}</span>
-        </p>
+        {/* Every page is scoped to this tag */}
+        <TagSelect />
+
+        <nav aria-label="Breadcrumb" className="hidden min-w-0 truncate text-sm sm:block">
+          {trail.map((crumb, i) => (
+            <span key={crumb}>
+              {i > 0 && <span className="mx-2 text-text-muted">/</span>}
+              <span className={i === trail.length - 1 ? 'font-medium text-text' : 'text-text-muted'}>{crumb}</span>
+            </span>
+          ))}
+        </nav>
       </div>
 
-      <div className="hidden w-full max-w-md shrink md:block">
+      <div className="hidden w-full max-w-sm shrink md:block">
         <div className="relative">
           <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-text-muted" />
           <input
