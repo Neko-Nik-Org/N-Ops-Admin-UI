@@ -25,7 +25,7 @@ import { currentUserAtom } from './store/session'
 
 /**
  * Whether the signed-in user holds every listed permission (see N-Ops-Main-API docs/Permissions.md).
- * The user profile is only known after a fresh sign-in, not after a page reload — in that case this returns
+ * If the profile is unknown (e.g. storage was blocked, so it didn't survive a reload) this returns
  * true and the API's own 403 is the final word.
  */
 export const useHasPermissions = (...permissions: string[]): boolean => {

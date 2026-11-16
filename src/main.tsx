@@ -18,16 +18,16 @@
 /**
  * Application entry point.
  *
- * Loads the global stylesheets (Tailwind theme tokens, toast styles and the
- * loading kit and the sign-in screens) and mounts <App /> into #root inside React StrictMode.
+ * Loads the global stylesheets (Tailwind theme tokens, toast styles, and src/styles/ for the
+ * loaders and the sign-in screens) and mounts <App /> into #root inside React StrictMode.
  */
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import 'react-toastify/dist/ReactToastify.css'
 import './index.css'
-import './components/loading/n-loading.css'
-import './components/auth/n-auth.css'
+import './styles/n-loading.css'
+import './styles/n-auth.css'
 import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(

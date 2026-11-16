@@ -16,10 +16,13 @@
  */
 /** Tests for src/pages/AccountPage.tsx (with UserDetailsCard, OrgInfoCard and the theme preference). */
 
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { themeAtom } from '@/app/theme'
+import { currentUserAtom, sessionStatusAtom } from '@/features/auth/store/session'
+import { clearSessionToken, getSessionToken, setSessionToken } from '@/features/auth/store/sessionToken'
 import { AccountPage } from '@/pages/AccountPage'
+import { ApiError } from '@/types/api'
 import { api, makeUser, renderWithProviders } from '../testUtils'
 
 const orgInfo = {
@@ -41,9 +44,20 @@ const orgInfo = {
   created_at: '2026-01-02T00:00:00Z',
 }
 
+/**
+ * Answers each GET by URL: org info, the given profile `details`, and username checks
+ * with `usernameStatus` (200 free, 409 taken).
+ */
+const mockGets = (usernameStatus = 200, details: object = {}) =>
+  api.get.mockImplementation((url: string) => {
+    if (url.startsWith('/user/self/user-name/check/')) return Promise.resolve({ status: usernameStatus, data: '' })
+    if (url === '/user/self/details') return Promise.resolve({ data: details })
+    return Promise.resolve({ data: orgInfo })
+  })
+
 describe('AccountPage', () => {
   it("shows the signed-in user's profile", () => {
-    api.get.mockResolvedValue({ data: orgInfo })
+    mockGets()
     renderWithProviders(<AccountPage />, { route: '/account', user: makeUser({ isEmailVerified: false }) })
     expect(screen.getByText('Priya Rao')).toBeInTheDocument()
     expect(screen.getByText('priya')).toBeInTheDocument()
@@ -52,13 +66,13 @@ describe('AccountPage', () => {
   })
 
   it('hides the profile when it is unknown (after a page reload)', () => {
-    api.get.mockResolvedValue({ data: orgInfo })
+    mockGets()
     renderWithProviders(<AccountPage />, { route: '/account' })
     expect(screen.queryByRole('heading', { name: 'Profile' })).not.toBeInTheDocument()
   })
 
   it("shows the organization's details, usage and limits", async () => {
-    api.get.mockResolvedValue({ data: orgInfo })
+    mockGets()
     renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
 
     expect(await screen.findByText('org-123')).toBeInTheDocument()
@@ -78,10 +92,260 @@ describe('AccountPage', () => {
   })
 
   it('changes the theme preference', () => {
-    api.get.mockResolvedValue({ data: orgInfo })
+    mockGets()
     const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
     fireEvent.click(screen.getByRole('button', { name: 'Light theme' }))
     expect(store.get(themeAtom)).toBe('light')
     expect(screen.getByRole('button', { name: 'Light theme' })).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+/** Types a code into the OTP boxes (pasting fills them all). */
+const typeCode = (code: string) =>
+  fireEvent.paste(screen.getByLabelText('Character 1 of 7'), { clipboardData: { getData: () => code } })
+
+describe('AccountPage — email verification', () => {
+  it('only offers verification for an unverified email', () => {
+    mockGets()
+    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    expect(screen.queryByRole('button', { name: 'Verify email' })).not.toBeInTheDocument()
+  })
+
+  it('sends a code, verifies it and refreshes a remembered session', async () => {
+    mockGets()
+    setSessionToken('old', true)
+    api.post.mockImplementation((url: string) =>
+      Promise.resolve(url === '/auth/refresh' ? { data: { session_id: 'new' } } : { data: '' }),
+    )
+    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser({ isEmailVerified: false }) })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Verify email' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+    expect(await screen.findByRole('group', { name: 'Email verification code' })).toBeInTheDocument()
+    expect(api.post).toHaveBeenCalledWith('/user/self/verify-email/send')
+
+    typeCode('1234567')
+    await waitFor(() => expect(store.get(currentUserAtom)?.isEmailVerified).toBe(true))
+    expect(api.post).toHaveBeenCalledWith('/user/self/verify-email/validate', '"1234567"', expect.anything())
+    expect(api.post).toHaveBeenCalledWith('/auth/refresh')
+    expect(getSessionToken()).toBe('new')
+    expect(await screen.findByText('Email verified.')).toBeInTheDocument()
+  })
+
+  it('does not refresh a session without "Keep me signed in"', async () => {
+    mockGets()
+    setSessionToken('s1', false)
+    api.post.mockResolvedValue({ data: '' })
+    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser({ isEmailVerified: false }) })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Verify email' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+    await screen.findByRole('group', { name: 'Email verification code' })
+    typeCode('7654321')
+
+    await waitFor(() => expect(store.get(currentUserAtom)?.isEmailVerified).toBe(true))
+    expect(api.post).not.toHaveBeenCalledWith('/auth/refresh')
+  })
+
+  it('asks for a new code after a wrong one', async () => {
+    mockGets()
+    api.post.mockImplementation((url: string) =>
+      url.endsWith('/validate')
+        ? Promise.reject(new ApiError('Verification code is incorrect, request a new one', 400))
+        : Promise.resolve({ data: '' }),
+    )
+    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser({ isEmailVerified: false }) })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Verify email' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+    await screen.findByRole('group', { name: 'Email verification code' })
+    typeCode('0000000')
+
+    expect(await screen.findByText('That code is wrong. Send a new one and try again.')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Send a new code' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Verify' })).toBeDisabled()
+  })
+
+  it('treats "already verified" as done', async () => {
+    mockGets()
+    api.post.mockRejectedValue(new ApiError('Email is already verified', 409))
+    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser({ isEmailVerified: false }) })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Verify email' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+    await waitFor(() => expect(store.get(currentUserAtom)?.isEmailVerified).toBe(true))
+  })
+})
+
+describe('AccountPage — username', () => {
+  it('shows live availability and blocks a taken name', async () => {
+    mockGets(409)
+    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change username' }))
+    fireEvent.change(screen.getByLabelText('New username'), { target: { value: 'taken_name' } })
+
+    expect(await screen.findByText('This username is already taken.')).toBeInTheDocument()
+    expect(api.get).toHaveBeenCalledWith('/user/self/user-name/check/taken_name', expect.anything())
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: 'Change username' })).toBeDisabled()
+  })
+
+  it('renames, then refreshes a remembered session', async () => {
+    mockGets(200)
+    setSessionToken('old', true)
+    api.post.mockImplementation((url: string) =>
+      Promise.resolve(url === '/auth/refresh' ? { data: { session_id: 'new' } } : { data: '' }),
+    )
+    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change username' }))
+    fireEvent.change(screen.getByLabelText('New username'), { target: { value: 'priya_r' } })
+    expect(await screen.findByText('This username is available.')).toBeInTheDocument()
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Change username' }))
+
+    await waitFor(() => expect(store.get(currentUserAtom)?.userName).toBe('priya_r'))
+    expect(api.post).toHaveBeenCalledWith('/user/self/change-username', '"priya_r"', expect.anything())
+    expect(api.post).toHaveBeenCalledWith('/auth/refresh')
+  })
+
+  it('signs out when the session cannot be refreshed after the rename', async () => {
+    mockGets(200)
+    setSessionToken('old', true)
+    api.post.mockImplementation((url: string) =>
+      url === '/auth/refresh'
+        ? (clearSessionToken(), Promise.reject(new ApiError('Invalid session', 401))) // the axios interceptor clears the token on 401
+        : Promise.resolve({ data: '' }),
+    )
+    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change username' }))
+    fireEvent.change(screen.getByLabelText('New username'), { target: { value: 'priya_r' } })
+    await screen.findByText('This username is available.')
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Change username' }))
+
+    await waitFor(() => expect(store.get(sessionStatusAtom)).toBe('unauthenticated'))
+    expect(getSessionToken()).toBeUndefined()
+  })
+})
+
+describe('AccountPage — security', () => {
+  it('is shown even when the profile is unknown', () => {
+    mockGets()
+    renderWithProviders(<AccountPage />, { route: '/account' })
+    expect(screen.getByRole('heading', { name: 'Security' })).toBeInTheDocument()
+  })
+
+  it('validates and changes the password', async () => {
+    mockGets()
+    api.post.mockResolvedValue({ data: '' })
+    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change password' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('New password'), { target: { value: 'weakpass' } })
+    fireEvent.change(within(dialog).getByLabelText('Confirm new password'), { target: { value: 'weakpass' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Change password' }))
+    expect(await screen.findByText('Add at least one uppercase letter.')).toBeInTheDocument()
+    expect(api.post).not.toHaveBeenCalled()
+
+    fireEvent.change(within(dialog).getByLabelText('New password'), { target: { value: 'Str0ng!pass' } })
+    fireEvent.change(within(dialog).getByLabelText('Confirm new password'), { target: { value: 'Str0ng!pass' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Change password' }))
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/user/self/change-password', JSON.stringify(btoa('Str0ng!pass')), expect.anything()),
+    )
+  })
+
+  it('deactivates the account and signs out', async () => {
+    mockGets()
+    setSessionToken('s1', false)
+    api.delete.mockResolvedValue({ data: '' })
+    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Deactivate' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Deactivate my account' }))
+
+    await waitFor(() => expect(store.get(sessionStatusAtom)).toBe('unauthenticated'))
+    expect(api.delete).toHaveBeenCalledWith('/user/self/deactivate')
+    expect(getSessionToken()).toBeUndefined()
+  })
+})
+
+describe('AccountPage — profile details', () => {
+  it('lists saved details, including non-text values', async () => {
+    mockGets(200, { Team: 'SRE', 'On call': '', shifts: [1, 2] })
+    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    expect(await screen.findByText('SRE')).toBeInTheDocument()
+    expect(screen.getByText('On call')).toBeInTheDocument()
+    expect(screen.getByText('[1,2]')).toBeInTheDocument()
+  })
+
+  it('shows an empty state', async () => {
+    mockGets()
+    renderWithProviders(<AccountPage />, { route: '/account' })
+    expect(await screen.findByText('No extra details yet. Add things like your job title or team.')).toBeInTheDocument()
+  })
+
+  it('edits, adds and removes fields, keeping non-text values', async () => {
+    mockGets(200, { Team: 'SRE', Location: 'Pune', shifts: [1, 2] })
+    api.post.mockResolvedValue({ data: '' })
+    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('1 non-text value is kept as they are.')).toBeInTheDocument()
+    fireEvent.change(within(dialog).getByLabelText('Value 1'), { target: { value: ' Platform ' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove field 2' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add field' }))
+    fireEvent.change(within(dialog).getByLabelText('Label 2'), { target: { value: 'Pronouns' } })
+    fireEvent.change(within(dialog).getByLabelText('Value 2'), { target: { value: 'they/them' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save details' }))
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/user/self/details', { shifts: [1, 2], Team: 'Platform', Pronouns: 'they/them' }),
+    )
+    expect(await screen.findByText('they/them')).toBeInTheDocument()
+  })
+
+  it('rejects duplicate and empty labels', async () => {
+    mockGets(200, { Team: 'SRE' })
+    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add field' }))
+    fireEvent.change(within(dialog).getByLabelText('Label 2'), { target: { value: 'team' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save details' }))
+    expect(await within(dialog).findByText('This label is already used.')).toBeInTheDocument()
+
+    fireEvent.change(within(dialog).getByLabelText('Label 2'), { target: { value: '' } })
+    fireEvent.change(within(dialog).getByLabelText('Value 2'), { target: { value: 'orphan' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save details' }))
+    expect(await within(dialog).findByText('Enter a label.')).toBeInTheDocument()
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('offers starter fields when there are no details', async () => {
+    mockGets()
+    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    expect(screen.getByLabelText('Label 1')).toHaveValue('Job title')
+    expect(screen.getByLabelText('Label 2')).toHaveValue('Team')
+  })
+})
+
+describe('AccountPage — email code characters', () => {
+  it('accepts letters in the code (the API charset is configurable)', async () => {
+    mockGets()
+    api.post.mockResolvedValue({ data: '' })
+    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser({ isEmailVerified: false }) })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Verify email' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
+    await screen.findByRole('group', { name: 'Email verification code' })
+    typeCode('aB3-xY9z')
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/user/self/verify-email/validate', '"aB3xY9z"', expect.anything()))
   })
 })

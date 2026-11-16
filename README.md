@@ -16,15 +16,15 @@ N-Ops is an evolving project, and this UI changes along with the
 backend, and others are placeholders for planned features. Each one says so in the UI and never
 shows invented data. Check the table below and the source for what works today.
 
-| Area | Status |
-|---|---|
-| Sign in (username + password, Cloudflare Turnstile, remember me) | ✅ Live (`/auth/login`, `/auth/verify`, `/auth/refresh`, `/auth/logout`) |
-| Two-factor sign-in (TOTP / email code) | 🚧 UI ready, backend endpoints not released yet |
-| Tags (list, create, edit, delete, permission-aware) | ✅ Live (`/tag/*`) |
-| Account (profile, preferences, organization quotas) | ✅ Live (`/user/self/*`) |
-| Invite acceptance | 🚧 UI ready, backend not built yet |
-| Overview dashboard (fleet, approvals, alerts) | 🚧 Layout ready, waiting on backend |
-| Servers, Vault, Tools, Approvals, Metrics, Workflows, Service management/logs | 📋 Planned ("Coming soon" pages) |
+| Area                                                                                                              | Status                                                                   |
+| ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Sign in (username + password, Cloudflare Turnstile, remember me)                                                  | ✅ Live (`/auth/login`, `/auth/verify`, `/auth/refresh`, `/auth/logout`) |
+| Two-factor sign-in (TOTP / email code)                                                                            | 🚧 UI ready, backend endpoints not released yet                          |
+| Tags (list, create, edit, delete, permission-aware)                                                               | ✅ Live (`/tag/*`)                                                       |
+| Account (profile, profile details, organization quotas, email verification, change username/password, deactivate) | ✅ Live (`/user/self/*`)                                                 |
+| Invite acceptance                                                                                                 | 🚧 UI ready, backend not built yet                                       |
+| Overview dashboard (fleet, approvals, alerts)                                                                     | 🚧 Layout ready, waiting on backend                                      |
+| Servers, Vault, Tools, Approvals, Metrics, Workflows, Service management/logs                                     | 📋 Planned ("Coming soon" pages)                                         |
 
 ## Features
 
@@ -57,14 +57,14 @@ npm install
 npm run dev             # http://localhost:5173
 ```
 
-| Script | What it does |
-|---|---|
-| `npm run dev` | Start the Vite dev server |
-| `npm run build` | Type-check and build for production into `dist/` |
-| `npm run preview` | Serve the production build locally |
-| `npm run lint` | Lint with oxlint |
-| `npm run typecheck` | Run the TypeScript checks |
-| `npm run test` | Run the test suite (Vitest) |
+| Script              | What it does                                     |
+| ------------------- | ------------------------------------------------ |
+| `npm run dev`       | Start the Vite dev server                        |
+| `npm run build`     | Type-check and build for production into `dist/` |
+| `npm run preview`   | Serve the production build locally               |
+| `npm run lint`      | Lint with oxlint                                 |
+| `npm run typecheck` | Run the TypeScript checks                        |
+| `npm run test`      | Run the test suite (Vitest)                      |
 
 ### Docker
 
@@ -85,11 +85,11 @@ Cloudflare Tunnel, …) in front of it to handle TLS.
 
 The container reads its settings **when it starts**; none are baked into the build:
 
-| Docker (`.env` / compose) | Local dev (`.env`, Vite) | Description |
-|---|---|---|
-| `API_BASE_URL` | `VITE_API_BASE_URL` | Main API base URL, no trailing slash. **Required.** |
-| `TURNSTILE_SITE_KEY` | `VITE_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key for the login widget. **Required.** |
-| — | `DEV_ALLOWED_HOSTS` | Optional. Extra dev-server hostnames, comma-separated (e.g. when tunnelling). |
+| Docker (`.env` / compose) | Local dev (`.env`, Vite)  | Description                                                                   |
+| ------------------------- | ------------------------- | ----------------------------------------------------------------------------- |
+| `API_BASE_URL`            | `VITE_API_BASE_URL`       | Main API base URL, no trailing slash. **Required.**                           |
+| `TURNSTILE_SITE_KEY`      | `VITE_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key for the login widget. **Required.**             |
+| —                         | `DEV_ALLOWED_HOSTS`       | Optional. Extra dev-server hostnames, comma-separated (e.g. when tunnelling). |
 
 The container won't start if a required value is missing. `.env.example` uses Cloudflare's
 always-pass **test** Turnstile key. For production, get a real site key scoped to your admin domain.
@@ -107,26 +107,15 @@ This UI is the front door to infrastructure credentials and privileged operation
 review and production-readiness statement are published, evaluate it carefully before using it
 for production infrastructure.
 
-- Report security vulnerabilities privately through
-  [GitHub Security Advisories](https://github.com/Neko-Nik-Org/N-Ops-Admin-UI/security/advisories/new),
-  not in public issues.
-- **Never post real production secrets, session tokens, private keys, or credentials in issues,
-  pull requests, or public discussions.**
+Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md), not in public issues.
+**Never post real production secrets, session tokens, private keys, or credentials** in issues,
+pull requests, or public discussions.
 
 ## Contributing
 
-Contributions, bug reports, feature proposals, and documentation improvements are welcome.
-
-1. Check the existing issues first. For larger changes, open an issue to discuss the approach.
-2. Fork the repo and create a branch from `main`.
-3. Follow the project layout in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). Tests go in `test/`,
-   mirroring `src/`.
-4. Make sure `npm run lint && npm run typecheck && npm run test && npm run build` passes. CI runs
-   the same checks on every pull request.
-5. Open a pull request with a clear description and, for UI changes, screenshots.
-
-When reporting a bug, include reproduction steps, your browser, the UI version or commit, and any
-relevant console or network output **with secrets removed**.
+Contributions, bug reports, feature proposals, and documentation improvements are welcome. See
+[CONTRIBUTING.md](CONTRIBUTING.md) to get started, and please follow the
+[Code of Conduct](CODE_OF_CONDUCT.md). Notable changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 ## Community
 

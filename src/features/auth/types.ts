@@ -98,7 +98,6 @@ export interface TwoFactorContext {
 /** Supported second factors: authenticator app code or emailed code. */
 export type TwoFactorMethod = 'totp' | 'email'
 
-
 /** Converts the API's session profile into the CurrentUser shape the app uses. */
 export const toCurrentUser = (p: RawSessionProfile): CurrentUser => ({
   userId: p.user_id,

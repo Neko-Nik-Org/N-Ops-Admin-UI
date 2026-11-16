@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/Neko-Nik-Org/N-Ops-Admin-UI/security/advisories/new
+    about: Please report security issues privately, never in a public issue.
+  - name: Backend (Main API) issues
+    url: https://github.com/Neko-Nik-Org/N-Ops-Main-API/issues
+    about: Problems with API endpoints, permissions, or data belong in the Main API repository.

@@ -36,8 +36,6 @@ describe('inviteSchema', () => {
   })
 
   it('rejects passwords shorter than 8 characters', async () => {
-    await expect(inviteSchema.validate({ fullName: 'Priya', password: '1234567' })).rejects.toThrow(
-      'Use at least 8 characters.',
-    )
+    await expect(inviteSchema.validate({ fullName: 'Priya', password: '1234567' })).rejects.toThrow('Use at least 8 characters.')
   })
 })

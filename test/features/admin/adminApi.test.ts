@@ -23,7 +23,7 @@ import { exportAuditLogs, listAuditLogs, retentionStart } from '@/features/admin
 import { getOrganization, updateOrganization } from '@/features/admin/api/organization'
 import { deleteRole, listRoles } from '@/features/admin/api/roles'
 import { createUser, deleteUser, listUsers, updateUser } from '@/features/admin/api/users'
-import { db, resetAdminMock } from '@/features/admin/mock/db'
+import { db, resetAdminMock } from '@/mocks/adminDb'
 import type { AdminUserInput } from '@/features/admin/types'
 
 const newUser: AdminUserInput = {
@@ -78,7 +78,14 @@ describe('roles', () => {
 
 describe('API keys', () => {
   it('returns the secret once, in the nk-{id}_ format, and keeps only its prefix', async () => {
-    const { apiKey, secret } = await createApiKey({ keyName: 'ci', keyDescription: 'CI', roleId: 6, tagId: 1, isActive: true, expiresAt: null })
+    const { apiKey, secret } = await createApiKey({
+      keyName: 'ci',
+      keyDescription: 'CI',
+      roleId: 6,
+      tagId: 1,
+      isActive: true,
+      expiresAt: null,
+    })
 
     expect(secret).toMatch(new RegExp(`^nk-${apiKey.apiKeyId}_[A-Za-z0-9]{40}$`))
     expect(secret.startsWith(apiKey.keyPrefix)).toBe(true)

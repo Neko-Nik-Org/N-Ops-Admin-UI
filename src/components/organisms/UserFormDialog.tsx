@@ -23,7 +23,8 @@ import { Input } from '@/components/atoms/Input'
 import { Select } from '@/components/atoms/Select'
 import { Switch } from '@/components/atoms/Switch'
 import { Textarea } from '@/components/atoms/Textarea'
-import { LoadingButton, useAsyncAction } from '@/components/loading'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { Dialog } from '@/components/molecules/Dialog'
 import { FormField } from '@/components/molecules/FormField'
 import { useCreateUser, useRoles, useUpdateUser } from '@/features/admin/hooks/useAdmin'
@@ -74,7 +75,13 @@ const UserForm = ({ user, onClose }: { user?: AdminUser; onClose: () => void }) 
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField id="displayName" label="Name" error={errors.displayName?.message}>
-          <Input id="displayName" placeholder="Priya Rao" autoComplete="off" hasError={!!errors.displayName} {...register('displayName')} />
+          <Input
+            id="displayName"
+            placeholder="Priya Rao"
+            autoComplete="off"
+            hasError={!!errors.displayName}
+            {...register('displayName')}
+          />
         </FormField>
         <FormField id="userName" label="Username" error={errors.userName?.message}>
           <Input
@@ -89,7 +96,13 @@ const UserForm = ({ user, onClose }: { user?: AdminUser; onClose: () => void }) 
         </FormField>
       </div>
       <FormField id="primaryEmail" label="Email" error={errors.primaryEmail?.message}>
-        <Input id="primaryEmail" type="email" placeholder="priya@company.com" hasError={!!errors.primaryEmail} {...register('primaryEmail')} />
+        <Input
+          id="primaryEmail"
+          type="email"
+          placeholder="priya@company.com"
+          hasError={!!errors.primaryEmail}
+          {...register('primaryEmail')}
+        />
       </FormField>
       <FormField id="roleId" label="Role" error={errors.roleId?.message}>
         <Select id="roleId" hasError={!!errors.roleId} {...register('roleId')}>
@@ -106,7 +119,11 @@ const UserForm = ({ user, onClose }: { user?: AdminUser; onClose: () => void }) 
 
       <div className="flex flex-col gap-4 rounded-lg border border-border p-4">
         <Switch label="Active" description="Inactive users can't sign in. Their history is kept." {...register('isActive')} />
-        <Switch label="Restrict by IP address" description="Only allow sign-in from the addresses below." {...register('hasIpRestriction')} />
+        <Switch
+          label="Restrict by IP address"
+          description="Only allow sign-in from the addresses below."
+          {...register('hasIpRestriction')}
+        />
         {hasIpRestriction && (
           <FormField id="allowedIps" label="Allowed IP addresses" error={errors.allowedIps?.message}>
             <Textarea
@@ -125,7 +142,12 @@ const UserForm = ({ user, onClose }: { user?: AdminUser; onClose: () => void }) 
         <LoadingButton variant="ghost" onClick={onClose}>
           Cancel
         </LoadingButton>
-        <LoadingButton type="submit" state={state} loadingText={user ? 'Saving' : 'Adding'} successText={user ? 'Saved' : 'Added'}>
+        <LoadingButton
+          type="submit"
+          state={state}
+          loadingText={user ? 'Saving' : 'Adding'}
+          successText={user ? 'Saved' : 'Added'}
+        >
           {user ? 'Save changes' : 'Add user'}
         </LoadingButton>
       </div>

@@ -16,7 +16,8 @@
  */
 /** Roles (CRUD). Mock until `/user/roles/*` is live. */
 
-import { clone, db, mockDelay, notFound, recordAudit } from '../mock/db'
+import { db, recordAudit } from '@/mocks/adminDb'
+import { clone, mockDelay, notFound } from '@/mocks/helpers'
 import type { Role, RoleInput } from '../types'
 
 const findRole = (roleId: number) => db.roles.find((r) => r.roleId === roleId) ?? notFound('role')
@@ -64,7 +65,9 @@ export const deleteRole = async (roleId: number): Promise<void> => {
   const users = db.users.filter((u) => u.roleId === roleId).length
   const keys = db.apiKeys.filter((k) => k.roleId === roleId).length
   if (users || keys) {
-    const parts = [users && `${users} user${users === 1 ? '' : 's'}`, keys && `${keys} API key${keys === 1 ? '' : 's'}`].filter(Boolean)
+    const parts = [users && `${users} user${users === 1 ? '' : 's'}`, keys && `${keys} API key${keys === 1 ? '' : 's'}`].filter(
+      Boolean,
+    )
     throw new Error(`${parts.join(' and ')} still use "${role.roleName}". Move them to another role first.`)
   }
   db.roles = db.roles.filter((r) => r.roleId !== roleId)

@@ -18,7 +18,7 @@
 
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { resetAdminMock } from '@/features/admin/mock/db'
+import { resetAdminMock } from '@/mocks/adminDb'
 import { AdminApiKeysPage } from '@/pages/admin/AdminApiKeysPage'
 import { AdminAuditLogsPage } from '@/pages/admin/AdminAuditLogsPage'
 import { AdminOrganizationPage } from '@/pages/admin/AdminOrganizationPage'

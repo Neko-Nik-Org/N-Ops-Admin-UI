@@ -17,7 +17,7 @@
 
 /** Organization card on the Account page: usage meters and plan limits. */
 
-import { SkeletonText } from '@/components/loading'
+import { SkeletonText } from '@/components/molecules/Skeleton'
 import { Meter } from '@/components/molecules/Meter'
 import { useOrgInfo } from '@/features/account/hooks/useAccount'
 import { formatBytes, formatDate, formatNumber } from '@/utils/format'

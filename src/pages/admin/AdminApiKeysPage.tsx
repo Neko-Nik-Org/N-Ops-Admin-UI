@@ -20,7 +20,8 @@ import { KeyRound, Pencil, Plus, Trash2 } from 'lucide-react'
 import moment from 'moment'
 import { useMemo, useState } from 'react'
 import { Badge } from '@/components/atoms/Badge'
-import { LoadingButton, TableSkeleton } from '@/components/loading'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { TableSkeleton } from '@/components/molecules/Skeleton'
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'
@@ -161,8 +162,8 @@ export const AdminApiKeysPage = () => {
       >
         {dialog.kind === 'delete' && (
           <p>
-            Delete <span className="font-medium text-text">{dialog.apiKey.keyName}</span>? Anything using it stops working immediately. To
-            pause it instead, edit the key and turn off Active.
+            Delete <span className="font-medium text-text">{dialog.apiKey.keyName}</span>? Anything using it stops working
+            immediately. To pause it instead, edit the key and turn off Active.
           </p>
         )}
       </ConfirmDialog>

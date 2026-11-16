@@ -16,11 +16,12 @@
  */
 
 /**
- * API calls for the signed-in user's own account: UI preferences, profile details
- * and organization quotas (`/user/self/*`).
+ * API calls for the signed-in user's own account (`/user/self/*`): UI preferences, profile details,
+ * organization quotas, email verification, username/password changes and deactivation.
  */
 
 import { apiClient } from '@/lib/axios'
+import { toBase64 } from '@/utils/base64'
 import type { JsonObject, OrgInfo } from '../types'
 
 /** `/user/self/org-info` response as sent by the API (`ss_*` fields are the Vault / secure-storage quotas). */
@@ -89,4 +90,64 @@ export const getOrgInfo = async (): Promise<OrgInfo> => {
     vaultKeysPerProjectLimit: o.ss_keys_limit,
     vaultNotesPerProjectLimit: o.ss_notes_limit,
   }
+}
+
+/**
+ * Several `/user/self/*` routes take a bare JSON string as the body (`web::Json<String>`).
+ * Axios would send a plain string as form data, so serialize it and set the JSON content type explicitly.
+ */
+const postJsonString = (url: string, value: string) =>
+  apiClient.post(url, JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } })
+
+/**
+ * Length of the email verification code the API generates. Its characters come from the API's
+ * OTP_CHARSET setting, so they may include letters as well as digits.
+ */
+export const EMAIL_CODE_LENGTH = 7
+
+/**
+ * `POST /user/self/verify-email/send` — emails a new verification code to the primary email.
+ * Calling it again replaces the previous code. Codes expire after 5 minutes.
+ * Rejects with status 409 when the session already shows the email as verified.
+ */
+export const sendEmailVerification = async (): Promise<void> => {
+  await apiClient.post('/user/self/verify-email/send')
+}
+
+/**
+ * `POST /user/self/verify-email/validate` — checks the emailed code and marks the email verified.
+ * Rejects with 400 for a wrong code (the API then discards it, so a new one must be sent),
+ * 410 when it expired, and 409 when already verified.
+ */
+export const verifyEmailCode = async (code: string): Promise<void> => {
+  await postJsonString('/user/self/verify-email/validate', code)
+}
+
+/**
+ * `GET /user/self/user-name/check/:username` — true when nobody has the username yet.
+ * The API answers 200 for available and 409 for taken; both are normal answers here, not errors.
+ */
+export const isUsernameAvailable = async (username: string): Promise<boolean> => {
+  const { status } = await apiClient.get(`/user/self/user-name/check/${encodeURIComponent(username)}`, {
+    validateStatus: (code) => code === 200 || code === 409,
+  })
+  return status === 200
+}
+
+/** `POST /user/self/change-username` — renames the signed-in user. The API re-checks policy and availability. */
+export const changeUsername = async (username: string): Promise<void> => {
+  await postJsonString('/user/self/change-username', username)
+}
+
+/** `POST /user/self/change-password` — sets a new password (sent base64-encoded, like at sign-in). */
+export const changePassword = async (newPassword: string): Promise<void> => {
+  await postJsonString('/user/self/change-password', toBase64(newPassword))
+}
+
+/**
+ * `DELETE /user/self/deactivate` — deactivates the signed-in user's account and ends this session.
+ * Only an admin can reactivate it.
+ */
+export const deactivateAccount = async (): Promise<void> => {
+  await apiClient.delete('/user/self/deactivate')
 }

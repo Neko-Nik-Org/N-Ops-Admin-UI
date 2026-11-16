@@ -17,7 +17,7 @@
 
 /** Overview dashboard (/): fleet status, pending approvals and workflow activity. */
 
-import { DashboardSkeleton } from '@/components/loading'
+import { DashboardSkeleton } from '@/components/molecules/Skeleton'
 import { ApprovalsPanel } from '@/components/organisms/ApprovalsPanel'
 import { FleetTable } from '@/components/organisms/FleetTable'
 import { OverviewStats } from '@/components/organisms/OverviewStats'

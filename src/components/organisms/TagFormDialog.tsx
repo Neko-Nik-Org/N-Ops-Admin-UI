@@ -22,7 +22,8 @@ import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'react-toastify'
 import { Input } from '@/components/atoms/Input'
-import { LoadingButton, useAsyncAction } from '@/components/loading'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { Dialog } from '@/components/molecules/Dialog'
 import { FormField } from '@/components/molecules/FormField'
 import { useCreateTag, useTag, useUpdateTag } from '@/features/tags/hooks/useTags'
@@ -61,8 +62,7 @@ export const TagFormDialog = ({ open, tag, onClose }: TagFormDialogProps) => {
   }, [open, latest, isDirty, reset])
 
   const [saveState, save] = useAsyncAction(
-    (values: TagFormValues) =>
-      tag ? update({ tagId: tag.tagId, input: values }) : create(values),
+    (values: TagFormValues) => (tag ? update({ tagId: tag.tagId, input: values }) : create(values)),
     { successMs: 500 },
   )
 

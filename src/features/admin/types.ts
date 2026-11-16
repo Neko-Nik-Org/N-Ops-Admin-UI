@@ -27,7 +27,14 @@ export interface Organization {
   info: OrganizationProfile
   isActive: boolean
   createdAt: string
-  limits: { users: number; servers: number; workflows: number; vaultProjects: number; vaultKeysPerProject: number; vaultNotesPerProject: number }
+  limits: {
+    users: number
+    servers: number
+    workflows: number
+    vaultProjects: number
+    vaultKeysPerProject: number
+    vaultNotesPerProject: number
+  }
   usage: { users: number; servers: number; workflows: number; vaultProjects: number }
   aiCredit: { used: number; allocated: number }
   storageBytes: { used: number; allocated: number }

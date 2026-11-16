@@ -20,7 +20,8 @@ import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Badge } from '@/components/atoms/Badge'
 import { Select } from '@/components/atoms/Select'
-import { LoadingButton, TableSkeleton } from '@/components/loading'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { TableSkeleton } from '@/components/molecules/Skeleton'
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'
@@ -30,7 +31,8 @@ import type { AdminUser } from '@/features/admin/types'
 import { formatRelative } from '@/utils/format'
 
 /** Which dialog is open, and for which user. */
-type DialogState = { kind: 'closed' } | { kind: 'create' } | { kind: 'edit'; user: AdminUser } | { kind: 'delete'; user: AdminUser }
+type DialogState =
+  { kind: 'closed' } | { kind: 'create' } | { kind: 'edit'; user: AdminUser } | { kind: 'delete'; user: AdminUser }
 
 /** Initials for the avatar, e.g. "Priya Rao" → "PR". */
 const initials = (name: string) =>
@@ -77,7 +79,9 @@ export const AdminUsersPage = () => {
       <PageHeader
         title="Users"
         description={
-          users && org ? `${users.length} of ${org.limits.users} seats used. Each person signs in with one role.` : 'People in your organization and their roles.'
+          users && org
+            ? `${users.length} of ${org.limits.users} seats used. Each person signs in with one role.`
+            : 'People in your organization and their roles.'
         }
         mock
         actions={
@@ -99,7 +103,12 @@ export const AdminUsersPage = () => {
       ) : (
         <section className="rounded-xl border border-border bg-surface-raised p-5">
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <SearchInput value={search} onChange={setSearch} placeholder="Search name, username or email" className="min-w-56 flex-1" />
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search name, username or email"
+              className="min-w-56 flex-1"
+            />
             <Select aria-label="Role" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="w-40">
               <option value="all">All roles</option>
               {roles?.map((r) => (
@@ -116,7 +125,9 @@ export const AdminUsersPage = () => {
           </div>
 
           {!visible.length ? (
-            <p className="py-10 text-center text-sm text-text-muted">{users?.length ? 'No users match these filters.' : 'No users yet.'}</p>
+            <p className="py-10 text-center text-sm text-text-muted">
+              {users?.length ? 'No users match these filters.' : 'No users yet.'}
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[45rem] border-collapse text-left">
@@ -202,8 +213,8 @@ export const AdminUsersPage = () => {
       >
         {dialog.kind === 'delete' && (
           <p>
-            Remove <span className="font-medium text-text">{dialog.user.displayName}</span> from the organization? They're signed out
-            right away. Their past actions stay in the audit log. To pause access instead, edit them and turn off Active.
+            Remove <span className="font-medium text-text">{dialog.user.displayName}</span> from the organization? They're signed
+            out right away. Their past actions stay in the audit log. To pause access instead, edit them and turn off Active.
           </p>
         )}
       </ConfirmDialog>

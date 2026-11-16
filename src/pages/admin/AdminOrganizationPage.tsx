@@ -25,7 +25,9 @@ import { Badge } from '@/components/atoms/Badge'
 import { Input } from '@/components/atoms/Input'
 import { Select } from '@/components/atoms/Select'
 import { Textarea } from '@/components/atoms/Textarea'
-import { LoadingButton, SkeletonText, useAsyncAction } from '@/components/loading'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { SkeletonText } from '@/components/molecules/Skeleton'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { FormField } from '@/components/molecules/FormField'
 import { Meter } from '@/components/molecules/Meter'
 import { PageHeader } from '@/components/molecules/PageHeader'
@@ -39,7 +41,16 @@ const TIME_ZONES: readonly string[] = (() => {
   try {
     return Intl.supportedValuesOf('timeZone')
   } catch {
-    return ['UTC', 'Asia/Kolkata', 'Europe/London', 'Europe/Berlin', 'America/New_York', 'America/Los_Angeles', 'Asia/Singapore', 'Australia/Sydney']
+    return [
+      'UTC',
+      'Asia/Kolkata',
+      'Europe/London',
+      'Europe/Berlin',
+      'America/New_York',
+      'America/Los_Angeles',
+      'Asia/Singapore',
+      'Australia/Sydney',
+    ]
   }
 })()
 
@@ -198,7 +209,11 @@ export const AdminOrganizationPage = () => {
       ) : (
         <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
           <section className="rounded-xl border border-border bg-surface-raised p-5">
-            {editing ? <ProfileForm org={org} onDone={() => setEditing(false)} /> : <ProfileView org={org} onEdit={() => setEditing(true)} />}
+            {editing ? (
+              <ProfileForm org={org} onDone={() => setEditing(false)} />
+            ) : (
+              <ProfileView org={org} onEdit={() => setEditing(true)} />
+            )}
           </section>
           <PlanCard org={org} />
         </div>

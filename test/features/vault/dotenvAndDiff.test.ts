@@ -23,7 +23,16 @@ import { diffLines } from '@/utils/diff'
 describe('parseDotenv', () => {
   it('reads plain, quoted, exported and commented lines', () => {
     const { entries, errors } = parseDotenv(
-      ['# comment', '', 'A=1', 'export B = two', 'C="multi\\nline \\"q\\""', "D='keep $raw'", 'E=value # trailing', 'A=again'].join('\n'),
+      [
+        '# comment',
+        '',
+        'A=1',
+        'export B = two',
+        'C="multi\\nline \\"q\\""',
+        "D='keep $raw'",
+        'E=value # trailing',
+        'A=again',
+      ].join('\n'),
     )
     expect(errors).toEqual([])
     expect(entries).toEqual([

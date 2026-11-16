@@ -20,7 +20,7 @@
 import axios, { type AxiosError } from 'axios'
 import { env } from '@/config/env'
 import { clearSessionToken, getSessionToken } from '@/features/auth/store/sessionToken'
-import type { ApiErrorBody } from '@/types/api'
+import { ApiError, type ApiErrorBody } from '@/types/api'
 
 /** Axios instance pointed at the configured Main API base URL. Use this for every API call. */
 export const apiClient = axios.create({
@@ -36,17 +36,32 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
+/** Longest plain-text body shown as an error message; anything longer is likely an HTML error page. */
+const MAX_TEXT_MESSAGE = 200
+
 /**
- * Normalizes errors to a plain Error carrying the API's `error` message, and drops
+ * The API's message for a failed response. Service errors send `{ error, code }` JSON, but some
+ * routes (e.g. `/user/self/verify-email/*`) answer with a short plain-text body instead.
+ */
+const messageOf = (error: AxiosError<ApiErrorBody | string>): string => {
+  const data = error.response?.data
+  if (data && typeof data === 'object' && typeof data.error === 'string') return data.error
+  if (typeof data === 'string' && data.trim() && data.length <= MAX_TEXT_MESSAGE && !data.trimStart().startsWith('<')) {
+    return data.trim()
+  }
+  return error.message
+}
+
+/**
+ * Normalizes errors to an ApiError carrying the API's message and HTTP status, and drops
  * the stored session on 401 so the route guards send the user back to login.
  */
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<ApiErrorBody>) => {
+  (error: AxiosError<ApiErrorBody | string>) => {
     if (error.response?.status === 401) {
       clearSessionToken()
     }
-    const message = error.response?.data?.error ?? error.message
-    return Promise.reject(new Error(message))
+    return Promise.reject(new ApiError(messageOf(error), error.response?.status))
   },
 )

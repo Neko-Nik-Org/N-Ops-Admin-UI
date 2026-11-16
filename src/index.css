@@ -20,15 +20,15 @@
  * and the decorative animations used on the auth screens.
  */
 
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /*
  * Design tokens. Tailwind turns each --color-* / --font-* into utilities
  * (bg-signal, text-text-muted, font-mono, ...). These defaults are the dark theme.
  */
 @theme {
-  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
   --color-ink: #06080c;
   --color-surface: #0b1118;

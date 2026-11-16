@@ -33,7 +33,7 @@ const details = {
 const renderInvite = () => renderWithProviders(<InvitePage />, { route: '/invite/abc123', path: '/invite/:token' })
 
 describe('InvitePage', () => {
-  it("shows the invite: who, where, role, tags and email", async () => {
+  it('shows the invite: who, where, role, tags and email', async () => {
     api.get.mockResolvedValue({ data: details })
     renderInvite()
 
@@ -63,7 +63,9 @@ describe('InvitePage', () => {
 
   it('creates the account, signs in and goes to the dashboard', async () => {
     api.get.mockResolvedValue({ data: details })
-    api.post.mockResolvedValue({ data: { is_2fa_required: false, session_id: 'new-session', data: { permissions: [], tags: [] } } })
+    api.post.mockResolvedValue({
+      data: { is_2fa_required: false, session_id: 'new-session', data: { permissions: [], tags: [] } },
+    })
     renderInvite()
 
     fireEvent.change(await screen.findByLabelText('Full name'), { target: { value: 'New Person' } })

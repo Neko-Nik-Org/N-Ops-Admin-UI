@@ -22,9 +22,10 @@ import { loginSchema } from '@/features/auth/schema/loginSchema'
 
 describe('loginSchema', () => {
   it('accepts valid credentials', async () => {
-    await expect(
-      loginSchema.validate({ userName: 'admin', password: 'secret', rememberMe: true }),
-    ).resolves.toMatchObject({ userName: 'admin', password: 'secret' })
+    await expect(loginSchema.validate({ userName: 'admin', password: 'secret', rememberMe: true })).resolves.toMatchObject({
+      userName: 'admin',
+      password: 'secret',
+    })
   })
 
   it('rejects an empty username', async () => {
@@ -32,14 +33,12 @@ describe('loginSchema', () => {
   })
 
   it('rejects an empty password', async () => {
-    await expect(loginSchema.validate({ userName: 'admin', password: '' })).rejects.toThrow(
-      'Enter your password.',
-    )
+    await expect(loginSchema.validate({ userName: 'admin', password: '' })).rejects.toThrow('Enter your password.')
   })
 
   it('trims whitespace from the username', async () => {
-    await expect(
-      loginSchema.validate({ userName: '  admin  ', password: 'secret' }),
-    ).resolves.toMatchObject({ userName: 'admin' })
+    await expect(loginSchema.validate({ userName: '  admin  ', password: 'secret' })).resolves.toMatchObject({
+      userName: 'admin',
+    })
   })
 })

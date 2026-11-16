@@ -17,7 +17,7 @@
 
 /** N-Ops brand mark. */
 
-import { NLogo } from '@/components/loading'
+import { NLogo } from '@/components/atoms/NLogo'
 import { cn } from '@/utils/cn'
 
 /** The N icon followed by the "N-Ops" wordmark. `iconSize` sets the icon size in px. */

@@ -20,7 +20,7 @@
 import { useAtomValue } from 'jotai'
 import { useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
-import { ScreenLoader } from '@/components/loading'
+import { ScreenLoader } from '@/components/organisms/ScreenLoader'
 import { useAppBootstrap } from '@/features/account/hooks/useAppBootstrap'
 import { sessionStatusAtom } from '@/features/auth/store/session'
 import { ROUTES } from '@/constants/routes'

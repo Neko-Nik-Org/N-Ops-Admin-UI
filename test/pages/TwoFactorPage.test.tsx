@@ -60,7 +60,12 @@ describe('TwoFactorPage', () => {
   it('fills every box from a pasted code', () => {
     renderTwoFactor()
     pasteCode('12a3456')
-    expect(screen.getAllByLabelText(/Digit \d of 6/).map((i) => (i as HTMLInputElement).value).join('')).toBe('123456')
+    expect(
+      screen
+        .getAllByLabelText(/Digit \d of 6/)
+        .map((i) => (i as HTMLInputElement).value)
+        .join(''),
+    ).toBe('123456')
   })
 
   it('rejects an incomplete code without calling the API', async () => {
@@ -79,7 +84,11 @@ describe('TwoFactorPage', () => {
     pasteCode('123456')
 
     expect(await screen.findByRole('heading', { name: "You're in" })).toBeInTheDocument()
-    expect(api.post).toHaveBeenCalledWith('/auth/verify-otp', { temporary_auth_token: 'tmp-token', method: 'totp', otp: '123456' })
+    expect(api.post).toHaveBeenCalledWith('/auth/verify-otp', {
+      temporary_auth_token: 'tmp-token',
+      method: 'totp',
+      otp: '123456',
+    })
     expect(getSessionToken()).toBe('session-2fa')
     expect(await screen.findByTestId('location', {}, { timeout: 2500 })).toHaveTextContent(/^\/$/)
   })
@@ -90,7 +99,12 @@ describe('TwoFactorPage', () => {
     pasteCode('123456')
     expect(await screen.findByText("Two-factor verification isn't available on the server yet.")).toBeInTheDocument()
     // the boxes are cleared for another try
-    expect(screen.getAllByLabelText(/Digit \d of 6/).map((i) => (i as HTMLInputElement).value).join('')).toBe('')
+    expect(
+      screen
+        .getAllByLabelText(/Digit \d of 6/)
+        .map((i) => (i as HTMLInputElement).value)
+        .join(''),
+    ).toBe('')
   })
 
   it('switches to an emailed code: sends it, masks the address and starts a resend cooldown', async () => {

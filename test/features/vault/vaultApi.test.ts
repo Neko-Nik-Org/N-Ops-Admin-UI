@@ -17,7 +17,7 @@
 /** Tests for the mock-backed Vault API (src/features/vault/api/*). */
 
 import { beforeEach, describe, expect, it } from 'vitest'
-import { db as adminDb, resetAdminMock } from '@/features/admin/mock/db'
+import { db as adminDb, resetAdminMock } from '@/mocks/adminDb'
 import { getConfigVersion, listConfigVersions, rollbackConfig, saveConfigVersion } from '@/features/vault/api/configs'
 import { createNote, createNoteLink, listNotes, NoteLockedError, openNote, updateNote } from '@/features/vault/api/notes'
 import { createProject, deleteProject, listProjects } from '@/features/vault/api/projects'
@@ -31,7 +31,7 @@ import {
   revealSecret,
   rollbackSecret,
 } from '@/features/vault/api/secrets'
-import { resetVaultMock, vaultDb } from '@/features/vault/mock/db'
+import { resetVaultMock, vaultDb } from '@/mocks/vaultDb'
 
 beforeEach(() => {
   resetAdminMock()
@@ -46,12 +46,20 @@ describe('secret keys', () => {
     const keys = await listSecrets(1)
     expect(JSON.stringify(keys)).not.toContain('postgres://')
     expect(await revealSecret(dbUrlProd().secretId)).toContain('sslmode=require')
-    expect(adminDb.auditLogs[0]).toMatchObject({ action: 'vault.secret_reveal', resourceName: 'payments-api / api / DATABASE_URL', details: 'v3' })
+    expect(adminDb.auditLogs[0]).toMatchObject({
+      action: 'vault.secret_reveal',
+      resourceName: 'payments-api / api / DATABASE_URL',
+      details: 'v3',
+    })
   })
 
   it('allows the same name once per tag', async () => {
-    await expect(createSecret(1, { name: 'DATABASE_URL', tagId: 1, value: 'x', note: '' })).rejects.toThrow('already exists for this tag')
-    await expect(createSecret(1, { name: 'DATABASE_URL', tagId: 4, value: 'x', note: '' })).resolves.toMatchObject({ currentVersion: 1 })
+    await expect(createSecret(1, { name: 'DATABASE_URL', tagId: 1, value: 'x', note: '' })).rejects.toThrow(
+      'already exists for this tag',
+    )
+    await expect(createSecret(1, { name: 'DATABASE_URL', tagId: 4, value: 'x', note: '' })).resolves.toMatchObject({
+      currentVersion: 1,
+    })
     await expect(createSecret(1, { name: '1BAD', tagId: 4, value: 'x', note: '' })).rejects.toThrow('not starting with a number')
   })
 
@@ -67,7 +75,12 @@ describe('secret keys', () => {
   })
 
   it('imports a .env: new keys, new versions for changed values, skips unchanged ones', async () => {
-    const result = await importDotenv(1, 2, 'DATABASE_URL=postgres://payments:staging-pass@db-staging.internal:5432/payments\nLOG_LEVEL=warn\nNEW_ONE=1', '')
+    const result = await importDotenv(
+      1,
+      2,
+      'DATABASE_URL=postgres://payments:staging-pass@db-staging.internal:5432/payments\nLOG_LEVEL=warn\nNEW_ONE=1',
+      '',
+    )
     expect(result).toEqual({ created: 1, updated: 1, unchanged: 1 })
     expect(adminDb.auditLogs[0]).toMatchObject({ action: 'vault.env_import', details: '1 new, 1 changed' })
 
@@ -110,7 +123,9 @@ describe('secure notes', () => {
   it('creates notes and public links', async () => {
     const note = await createNote(3, { title: 'Bank details', content: 'IBAN …', password: 'longpassword' })
     expect(note).toMatchObject({ isProtected: true, ownerName: 'Neko Nik', latestVersion: 1 })
-    await expect(createNote(3, { title: 'Bank details', content: '' })).rejects.toThrow('You already have a note called "Bank details"')
+    await expect(createNote(3, { title: 'Bank details', content: '' })).rejects.toThrow(
+      'You already have a note called "Bank details"',
+    )
 
     const link = await createNoteLink(note.noteId, { password: 'x', expiresInDays: 7 })
     expect(link.url).toMatch(/\/s\/[A-Za-z0-9]{8}$/)

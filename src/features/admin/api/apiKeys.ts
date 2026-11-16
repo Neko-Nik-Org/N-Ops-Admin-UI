@@ -16,7 +16,8 @@
  */
 /** API keys (CRUD). Mock until `/api-keys/*` is live. */
 
-import { clone, db, mockDelay, notFound, recordAudit } from '../mock/db'
+import { db, recordAudit } from '@/mocks/adminDb'
+import { clone, mockDelay, notFound } from '@/mocks/helpers'
 import type { ApiKey, ApiKeyInput, CreatedApiKey } from '../types'
 
 const findKey = (apiKeyId: number) => db.apiKeys.find((k) => k.apiKeyId === apiKeyId) ?? notFound('API key')
@@ -52,7 +53,14 @@ export const createApiKey = async (input: ApiKeyInput): Promise<CreatedApiKey> =
   const apiKeyId = db.nextId.apiKey++
   const secret = `nk-${apiKeyId}_${randomChars(40)}`
   const now = new Date().toISOString()
-  const apiKey: ApiKey = { ...input, apiKeyId, keyPrefix: secret.slice(0, secret.indexOf('_') + 5), createdAt: now, updatedAt: now, lastUsedAt: null }
+  const apiKey: ApiKey = {
+    ...input,
+    apiKeyId,
+    keyPrefix: secret.slice(0, secret.indexOf('_') + 5),
+    createdAt: now,
+    updatedAt: now,
+    lastUsedAt: null,
+  }
   db.apiKeys.push(apiKey)
   recordAudit('api_key.create', 'api_key', apiKey.keyName, `Role: ${db.roles.find((r) => r.roleId === input.roleId)?.roleName}`)
   return { apiKey: clone(apiKey), secret }

@@ -17,7 +17,7 @@
 
 /** Hook that accepts an invite and signs the new user in. */
 
-import { useAsyncAction } from '@/components/loading'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { useApplySession } from '@/features/auth/hooks/useApplySession'
 import { acceptInvite } from '../api/invite'
 import type { AcceptInvitePayload } from '../types'

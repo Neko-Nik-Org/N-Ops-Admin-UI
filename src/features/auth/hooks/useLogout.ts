@@ -18,7 +18,7 @@
 /** Sign-out hook used by the sidebar account row. */
 
 import { useSetAtom } from 'jotai'
-import { useAsyncAction } from '@/components/loading'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { logout } from '../api/session'
 import { currentUserAtom, sessionStatusAtom } from '../store/session'
 import { clearSessionToken } from '../store/sessionToken'

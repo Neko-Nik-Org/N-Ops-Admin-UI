@@ -16,7 +16,8 @@
  */
 /** Users in the organization (CRUD). Mock until `/user/admin/*` is live. */
 
-import { clone, db, mockDelay, notFound, recordAudit } from '../mock/db'
+import { db, recordAudit } from '@/mocks/adminDb'
+import { clone, mockDelay, notFound } from '@/mocks/helpers'
 import type { AdminUser, AdminUserInput } from '../types'
 
 const findUser = (userId: number) => db.users.find((u) => u.userId === userId) ?? notFound('user')

@@ -16,8 +16,9 @@
  */
 /** Vault projects and their services. Mock until `/vault/project/*` is live. */
 
-import { db as adminDb, clone, mockDelay, notFound, recordAudit } from '@/features/admin/mock/db'
-import { me, vaultDb } from '../mock/db'
+import { db as adminDb, recordAudit } from '@/mocks/adminDb'
+import { clone, mockDelay, notFound } from '@/mocks/helpers'
+import { me, vaultDb } from '@/mocks/vaultDb'
 import type { VaultContainerInput, VaultProject, VaultService } from '../types'
 
 const findProject = (projectId: number) => vaultDb.projects.find((p) => p.projectId === projectId) ?? notFound('project')

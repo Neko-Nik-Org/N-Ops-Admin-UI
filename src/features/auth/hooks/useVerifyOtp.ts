@@ -17,7 +17,7 @@
 
 /** Two-factor verification hook used by the 2FA form. */
 
-import { useAsyncAction } from '@/components/loading'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { verifyOtp } from '../api/twoFactor'
 import { useApplySession } from './useApplySession'
 import type { TwoFactorMethod } from '../types'

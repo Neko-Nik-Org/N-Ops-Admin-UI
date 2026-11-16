@@ -16,7 +16,8 @@
  */
 /** Organization profile (read + update). Mock until the API has an org update endpoint. */
 
-import { clone, db, mockDelay, recordAudit } from '../mock/db'
+import { db, recordAudit } from '@/mocks/adminDb'
+import { clone, mockDelay } from '@/mocks/helpers'
 import type { Organization, OrganizationInput } from '../types'
 
 /** Future: `GET /user/self/org-info` (already live, read-only) plus the profile in `organization_info`. */

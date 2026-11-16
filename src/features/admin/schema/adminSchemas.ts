@@ -57,7 +57,9 @@ export const userSchema = yup.object({
       then: (s) =>
         s
           .test('has-ips', 'Add at least one IP address.', (v) => splitList(v).length > 0)
-          .test('valid-ips', 'Use IPv4 addresses or ranges, like 203.0.113.0/24.', (v) => splitList(v).every((ip) => IPV4_CIDR.test(ip))),
+          .test('valid-ips', 'Use IPv4 addresses or ranges, like 203.0.113.0/24.', (v) =>
+            splitList(v).every((ip) => IPV4_CIDR.test(ip)),
+          ),
     }),
 })
 export type UserFormValues = yup.InferType<typeof userSchema>
@@ -104,7 +106,9 @@ export const exportScheduleSchema = yup.object({
     .string()
     .default('')
     .test('has', 'Add at least one email address.', (v) => splitList(v).length > 0)
-    .test('emails', 'One of those isn’t a valid email address.', (v) => splitList(v).every((e) => yup.string().email().isValidSync(e))),
+    .test('emails', 'One of those isn’t a valid email address.', (v) =>
+      splitList(v).every((e) => yup.string().email().isValidSync(e)),
+    ),
   enabled: yup.boolean().default(true),
 })
 export type ExportScheduleFormValues = yup.InferType<typeof exportScheduleSchema>

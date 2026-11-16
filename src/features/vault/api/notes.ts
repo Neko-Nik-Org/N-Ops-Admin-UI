@@ -19,9 +19,10 @@
  * the org or by public link. Mock until `/vault/note/*` is live.
  */
 
-import { db as adminDb, clone, mockDelay, notFound, recordAudit } from '@/features/admin/mock/db'
+import { db as adminDb, recordAudit } from '@/mocks/adminDb'
+import { clone, mockDelay, notFound } from '@/mocks/helpers'
 import moment from 'moment'
-import { me, vaultDb, type StoredNote } from '../mock/db'
+import { me, vaultDb, type StoredNote } from '@/mocks/vaultDb'
 import type { NoteInput, NoteLink, NoteLinkInput, NoteShare, NoteVersion, SecureNote } from '../types'
 
 /** Thrown when a locked note is opened without the right password. */

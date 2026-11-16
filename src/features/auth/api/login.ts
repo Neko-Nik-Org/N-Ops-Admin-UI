@@ -18,10 +18,8 @@
 /** Sign-in API call. */
 
 import { apiClient } from '@/lib/axios'
+import { toBase64 } from '@/utils/base64'
 import type { LoginCredentials, LoginResponse } from '../types'
-
-// btoa() only handles Latin1; passwords may contain unicode, so encode via bytes.
-const toBase64 = (value: string): string => btoa(Array.from(new TextEncoder().encode(value), (b) => String.fromCharCode(b)).join(''))
 
 /**
  * `POST /auth/login`. Sends the password base64-encoded and the Turnstile token as the

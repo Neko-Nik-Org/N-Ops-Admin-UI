@@ -19,7 +19,7 @@
 import { Check, Copy } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'react-toastify'
-import { LoadingButton } from '@/components/loading'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
 
 /** Icon button that copies `text` (or the result of `getText`) and briefly shows a check mark. */
 export const CopyButton = ({

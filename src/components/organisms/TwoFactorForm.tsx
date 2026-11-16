@@ -19,9 +19,10 @@
 import { ArrowLeft, Check, CircleAlert, Mail, Smartphone } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AuthCard } from '@/components/auth/AuthShell'
-import { OtpInput } from '@/components/auth/OtpInput'
-import { LoadingButton, NSpinner } from '@/components/loading'
+import { AuthCard } from '@/components/molecules/AuthCard'
+import { OtpInput } from '@/components/molecules/OtpInput'
+import { NSpinner } from '@/components/atoms/NSpinner'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { resendOtp } from '@/features/auth/api/twoFactor'
 import { useVerifyOtp } from '@/features/auth/hooks/useVerifyOtp'
 import type { TwoFactorContext, TwoFactorMethod } from '@/features/auth/types'
@@ -212,7 +213,14 @@ export const TwoFactorForm = ({ context }: { context: TwoFactorContext }) => {
             </button>
           )}
         </div>
-        <LoadingButton type="submit" size="lg" className="n-auth-submit" state={verifyState} loadingText="Verifying" successText="Verified">
+        <LoadingButton
+          type="submit"
+          size="lg"
+          className="n-auth-submit"
+          state={verifyState}
+          loadingText="Verifying"
+          successText="Verified"
+        >
           Verify
         </LoadingButton>
       </form>

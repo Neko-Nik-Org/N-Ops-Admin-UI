@@ -26,7 +26,8 @@ import { Input } from '@/components/atoms/Input'
 import { Select } from '@/components/atoms/Select'
 import { Switch } from '@/components/atoms/Switch'
 import { Textarea } from '@/components/atoms/Textarea'
-import { LoadingButton, useAsyncAction } from '@/components/loading'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { Dialog } from '@/components/molecules/Dialog'
 import { FormField } from '@/components/molecules/FormField'
 import { useCreateApiKey, useRoles, useUpdateApiKey } from '@/features/admin/hooks/useAdmin'
@@ -44,7 +45,15 @@ const EXPIRY_PRESETS: Array<[string, number | null]> = [
 ]
 
 /** The form; mounted only while the dialog is open. `onCreated` receives the new key and its secret. */
-const ApiKeyForm = ({ apiKey, onClose, onCreated }: { apiKey?: ApiKey; onClose: () => void; onCreated: (created: CreatedApiKey) => void }) => {
+const ApiKeyForm = ({
+  apiKey,
+  onClose,
+  onCreated,
+}: {
+  apiKey?: ApiKey
+  onClose: () => void
+  onCreated: (created: CreatedApiKey) => void
+}) => {
   const { data: roles } = useRoles()
   const { options: tags } = useTagOptions()
   const { mutateAsync: create } = useCreateApiKey()
@@ -74,7 +83,11 @@ const ApiKeyForm = ({ apiKey, onClose, onCreated }: { apiKey?: ApiKey; onClose: 
       roleId: apiKey?.roleId ?? 0,
       tagId: apiKey?.tagId ?? 0,
       isActive: apiKey?.isActive ?? true,
-      expiresOn: apiKey ? (apiKey.expiresAt ? moment(apiKey.expiresAt).format('YYYY-MM-DD') : '') : moment().add(90, 'days').format('YYYY-MM-DD'),
+      expiresOn: apiKey
+        ? apiKey.expiresAt
+          ? moment(apiKey.expiresAt).format('YYYY-MM-DD')
+          : ''
+        : moment().add(90, 'days').format('YYYY-MM-DD'),
     },
   })
   const expiresOn = useWatch({ control, name: 'expiresOn' })
@@ -103,10 +116,23 @@ const ApiKeyForm = ({ apiKey, onClose, onCreated }: { apiKey?: ApiKey; onClose: 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
       <FormField id="keyName" label="Name" error={errors.keyName?.message}>
-        <Input id="keyName" placeholder="github-actions-prod" autoComplete="off" spellCheck={false} hasError={!!errors.keyName} {...register('keyName')} />
+        <Input
+          id="keyName"
+          placeholder="github-actions-prod"
+          autoComplete="off"
+          spellCheck={false}
+          hasError={!!errors.keyName}
+          {...register('keyName')}
+        />
       </FormField>
       <FormField id="keyDescription" label="What is it for?" error={errors.keyDescription?.message}>
-        <Textarea id="keyDescription" rows={2} placeholder="Production deploys read secrets at release time." hasError={!!errors.keyDescription} {...register('keyDescription')} />
+        <Textarea
+          id="keyDescription"
+          rows={2}
+          placeholder="Production deploys read secrets at release time."
+          hasError={!!errors.keyDescription}
+          {...register('keyDescription')}
+        />
       </FormField>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField id="roleId" label="Role" error={errors.roleId?.message}>
@@ -154,7 +180,11 @@ const ApiKeyForm = ({ apiKey, onClose, onCreated }: { apiKey?: ApiKey; onClose: 
             <button
               key={label}
               type="button"
-              onClick={() => setValue('expiresOn', days === null ? '' : moment().add(days, 'days').format('YYYY-MM-DD'), { shouldValidate: true })}
+              onClick={() =>
+                setValue('expiresOn', days === null ? '' : moment().add(days, 'days').format('YYYY-MM-DD'), {
+                  shouldValidate: true,
+                })
+              }
               className="rounded-full border border-border px-2.5 py-1 text-xs text-text-muted hover:border-border-strong hover:text-text"
             >
               {label}
@@ -162,17 +192,30 @@ const ApiKeyForm = ({ apiKey, onClose, onCreated }: { apiKey?: ApiKey; onClose: 
           ))}
         </div>
         {!errors.expiresOn && (
-          <p className="text-xs text-text-muted">{expiresOn ? `Stops working ${moment(expiresOn).endOf('day').fromNow()}.` : 'Never expires. Rotate it by hand.'}</p>
+          <p className="text-xs text-text-muted">
+            {expiresOn ? `Stops working ${moment(expiresOn).endOf('day').fromNow()}.` : 'Never expires. Rotate it by hand.'}
+          </p>
         )}
       </FormField>
 
-      {apiKey && <Switch label="Active" description="A disabled key is rejected but kept, so you can turn it back on." {...register('isActive')} />}
+      {apiKey && (
+        <Switch
+          label="Active"
+          description="A disabled key is rejected but kept, so you can turn it back on."
+          {...register('isActive')}
+        />
+      )}
 
       <div className="flex justify-end gap-2 pt-1">
         <LoadingButton variant="ghost" onClick={onClose}>
           Cancel
         </LoadingButton>
-        <LoadingButton type="submit" state={state} loadingText={apiKey ? 'Saving' : 'Creating'} successText={apiKey ? 'Saved' : 'Created'}>
+        <LoadingButton
+          type="submit"
+          state={state}
+          loadingText={apiKey ? 'Saving' : 'Creating'}
+          successText={apiKey ? 'Saved' : 'Created'}
+        >
           {apiKey ? 'Save changes' : 'Create key'}
         </LoadingButton>
       </div>
@@ -200,7 +243,10 @@ const SecretView = ({ created, onClose }: { created: CreatedApiKey; onClose: () 
         <TriangleAlert size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
         Copy this key now. It's only shown once; afterwards only its first characters are visible.
       </div>
-      <code data-testid="api-key-secret" className="block rounded-md border border-border bg-ink p-3 font-mono text-sm break-all text-text select-all">
+      <code
+        data-testid="api-key-secret"
+        className="block rounded-md border border-border bg-ink p-3 font-mono text-sm break-all text-text select-all"
+      >
         {created.secret}
       </code>
       <div className="flex flex-wrap justify-end gap-2">
@@ -235,7 +281,11 @@ export const ApiKeyFormDialog = ({ open, apiKey, onClose }: { open: boolean; api
       title={created ? `${created.apiKey.keyName} is ready` : apiKey ? `Edit ${apiKey.keyName}` : 'New API key'}
       description={created || apiKey ? undefined : 'For scripts and pipelines that read the Vault. Give each one its own key.'}
     >
-      {created ? <SecretView created={created} onClose={close} /> : <ApiKeyForm apiKey={apiKey} onClose={close} onCreated={setCreated} />}
+      {created ? (
+        <SecretView created={created} onClose={close} />
+      ) : (
+        <ApiKeyForm apiKey={apiKey} onClose={close} onCreated={setCreated} />
+      )}
     </Dialog>
   )
 }

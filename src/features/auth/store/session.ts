@@ -17,13 +17,27 @@
 
 /** In-memory session state shared across the app. */
 
-import { atom } from 'jotai'
+import { atom, type SetStateAction } from 'jotai'
 import type { CurrentUser } from '../types'
+import { storeProfile } from './profileStorage'
 
 /** 'checking' while the saved session is being verified on load, then signed in or out. */
 export type SessionStatus = 'checking' | 'authenticated' | 'unauthenticated'
 
 /** Current session status; the route guards render from this. */
 export const sessionStatusAtom = atom<SessionStatus>('checking')
-/** Profile of the signed-in user, set on sign-in and restored from `/auth/verify` after a reload. */
-export const currentUserAtom = atom<CurrentUser | null>(null)
+/** In-memory value behind currentUserAtom. */
+const currentUserValueAtom = atom<CurrentUser | null>(null)
+
+/**
+ * Profile of the signed-in user. Set on sign-in, and every change is saved to storage
+ * (profileStorage.ts) so useSessionBootstrap can restore it after a page reload.
+ */
+export const currentUserAtom = atom(
+  (get) => get(currentUserValueAtom),
+  (get, set, update: SetStateAction<CurrentUser | null>) => {
+    const next = typeof update === 'function' ? update(get(currentUserValueAtom)) : update
+    set(currentUserValueAtom, next)
+    storeProfile(next)
+  },
+)

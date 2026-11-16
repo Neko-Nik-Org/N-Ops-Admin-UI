@@ -18,12 +18,18 @@
 
 import { describe, expect, it } from 'vitest'
 import {
+  changePassword,
+  changeUsername,
+  deactivateAccount,
   getOrgInfo,
   getUiInfo,
   getUserDetails,
   isJsonObject,
+  isUsernameAvailable,
   saveUiInfo,
   saveUserDetails,
+  sendEmailVerification,
+  verifyEmailCode,
 } from '@/features/account/api/account'
 import { api } from '../../../testUtils'
 
@@ -102,5 +108,64 @@ describe('getOrgInfo', () => {
       vaultNotesPerProjectLimit: 30,
     })
     expect(api.get).toHaveBeenCalledWith('/user/self/org-info')
+  })
+})
+
+/** The options the API needs for routes that take a bare JSON string body. */
+const JSON_BODY = { headers: { 'Content-Type': 'application/json' } }
+
+describe('email verification', () => {
+  it('asks the API to send a code', async () => {
+    api.post.mockResolvedValue({ status: 201, data: '' })
+    await sendEmailVerification()
+    expect(api.post).toHaveBeenCalledWith('/user/self/verify-email/send')
+  })
+
+  it('sends the code as a JSON string', async () => {
+    api.post.mockResolvedValue({ data: 'Email verified successfully' })
+    await verifyEmailCode('1234567')
+    expect(api.post).toHaveBeenCalledWith('/user/self/verify-email/validate', '"1234567"', JSON_BODY)
+  })
+})
+
+describe('isUsernameAvailable', () => {
+  it.each([
+    [200, true],
+    [409, false],
+  ])('maps status %i to %s', async (status, available) => {
+    api.get.mockResolvedValue({ status, data: '' })
+    await expect(isUsernameAvailable('new_name')).resolves.toBe(available)
+  })
+
+  it('treats 409 as an answer, not an error, and URL-encodes the name', async () => {
+    api.get.mockResolvedValue({ status: 200, data: '' })
+    await isUsernameAvailable('a b/c')
+    const [url, config] = api.get.mock.calls[0] as [string, { validateStatus: (s: number) => boolean }]
+    expect(url).toBe('/user/self/user-name/check/a%20b%2Fc')
+    expect(config.validateStatus(409)).toBe(true)
+    expect(config.validateStatus(200)).toBe(true)
+    expect(config.validateStatus(500)).toBe(false)
+  })
+})
+
+describe('self-service changes', () => {
+  it('changes the username', async () => {
+    api.post.mockResolvedValue({ data: '' })
+    await changeUsername('new_name')
+    expect(api.post).toHaveBeenCalledWith('/user/self/change-username', '"new_name"', JSON_BODY)
+  })
+
+  it('sends the new password base64-encoded (UTF-8 safe)', async () => {
+    api.post.mockResolvedValue({ data: '' })
+    await changePassword('Pässw0rd!')
+    const body = JSON.parse(api.post.mock.calls[0][1] as string) as string
+    expect(new TextDecoder().decode(Uint8Array.from(atob(body), (c) => c.charCodeAt(0)))).toBe('Pässw0rd!')
+    expect(api.post).toHaveBeenCalledWith('/user/self/change-password', expect.any(String), JSON_BODY)
+  })
+
+  it('deactivates the account', async () => {
+    api.delete.mockResolvedValue({ data: '' })
+    await deactivateAccount()
+    expect(api.delete).toHaveBeenCalledWith('/user/self/deactivate')
   })
 })

@@ -30,8 +30,12 @@ const REFRESH_AFTER_MS = 2 * 60 * 60 * 1000
 // Share one in-flight request across every caller.
 let inFlight: Promise<void> | null = null
 
-/** Calls `/auth/refresh` and stores the new session id, reusing any request already in flight. */
-const runRefresh = (): Promise<void> => {
+/**
+ * Calls `/auth/refresh` and stores the new session id, reusing any request already in flight.
+ * Also used right after a self-service change (e.g. email verified) so the API's cached session
+ * picks up the new data. Only valid for remembered sessions: check `isSessionRemembered()` first.
+ */
+export const refreshSessionNow = (): Promise<void> => {
   inFlight ??= refreshSession()
     .then((sessionId) => setSessionToken(sessionId, true))
     .finally(() => {
@@ -56,7 +60,7 @@ export const useSessionRefresh = (): void => {
     const schedule = () => {
       const dueIn = Math.max(0, getSessionIssuedAt() + REFRESH_AFTER_MS - Date.now())
       timer = setTimeout(() => {
-        runRefresh()
+        refreshSessionNow()
           .then(() => {
             if (!cancelled) schedule()
           })

@@ -17,7 +17,7 @@
 
 /** Sign-in hook used by the login form. */
 
-import { useAsyncAction } from '@/components/loading'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { login } from '../api/login'
 import { useApplySession } from './useApplySession'
 import type { LoginCredentials, LoginOutcome } from '../types'
@@ -27,13 +27,7 @@ export const useLogin = () => {
   const applySession = useApplySession()
 
   return useAsyncAction(
-    async ({
-      credentials,
-      turnstileToken,
-    }: {
-      credentials: LoginCredentials
-      turnstileToken: string
-    }): Promise<LoginOutcome> => {
+    async ({ credentials, turnstileToken }: { credentials: LoginCredentials; turnstileToken: string }): Promise<LoginOutcome> => {
       const response = await login(credentials, turnstileToken)
 
       /** Second factor needed: hand the challenge to the 2FA page instead of signing in. */

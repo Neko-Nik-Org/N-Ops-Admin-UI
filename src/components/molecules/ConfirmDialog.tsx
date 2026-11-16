@@ -18,7 +18,8 @@
 
 import type { ReactNode } from 'react'
 import { toast } from 'react-toastify'
-import { LoadingButton, useAsyncAction } from '@/components/loading'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { Dialog } from '@/components/molecules/Dialog'
 
 /** Props for ConfirmDialog. */
@@ -37,7 +38,15 @@ interface ConfirmDialogProps {
 }
 
 /** "Are you sure?" dialog with a danger button that shows progress, then closes on success. */
-export const ConfirmDialog = ({ open, title, children, confirmLabel, onConfirm, successMessage, onClose }: ConfirmDialogProps) => {
+export const ConfirmDialog = ({
+  open,
+  title,
+  children,
+  confirmLabel,
+  onConfirm,
+  successMessage,
+  onClose,
+}: ConfirmDialogProps) => {
   const [state, run] = useAsyncAction(onConfirm, { successMs: 500 })
 
   const confirm = () =>

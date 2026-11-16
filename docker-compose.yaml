@@ -1,4 +1,3 @@
-
 services:
   n-ops-admin-ui:
     image: neko7nik/n-ops-admin-ui:latest

@@ -19,7 +19,8 @@
 import { Copy, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Badge } from '@/components/atoms/Badge'
-import { LoadingButton, TableSkeleton } from '@/components/loading'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { TableSkeleton } from '@/components/molecules/Skeleton'
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'
@@ -30,7 +31,8 @@ import { useTagOptions } from '@/features/admin/hooks/useTagOptions'
 import type { Role } from '@/features/admin/types'
 
 /** Which dialog is open. `copy` opens the editor pre-filled from another role. */
-type DialogState = { kind: 'closed' } | { kind: 'create'; from?: Role } | { kind: 'edit'; role: Role } | { kind: 'delete'; role: Role }
+type DialogState =
+  { kind: 'closed' } | { kind: 'create'; from?: Role } | { kind: 'edit'; role: Role } | { kind: 'delete'; role: Role }
 
 /** Roles table: what each grants, where, and who has it. */
 export const AdminRolesPage = () => {
@@ -50,12 +52,18 @@ export const AdminRolesPage = () => {
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return (roles ?? []).filter((r) => !q || `${r.roleName} ${r.roleDescription} ${r.permissions.join(' ')}`.toLowerCase().includes(q))
+    return (roles ?? []).filter(
+      (r) => !q || `${r.roleName} ${r.roleDescription} ${r.permissions.join(' ')}`.toLowerCase().includes(q),
+    )
   }, [roles, search])
 
   /** A copy starts as a new role with the same settings and a "(copy)" name. */
   const editorRole =
-    dialog.kind === 'edit' ? dialog.role : dialog.kind === 'create' && dialog.from ? { ...dialog.from, roleName: `${dialog.from.roleName} (copy)` } : undefined
+    dialog.kind === 'edit'
+      ? dialog.role
+      : dialog.kind === 'create' && dialog.from
+        ? { ...dialog.from, roleName: `${dialog.from.roleName} (copy)` }
+        : undefined
 
   return (
     <div className="flex flex-col gap-6">
@@ -105,7 +113,9 @@ export const AdminRolesPage = () => {
                         </td>
                         <td className="py-3">
                           <Badge tone={role.permissions.length === ALL_PERMISSIONS.length ? 'signal' : 'neutral'}>
-                            {role.permissions.length === ALL_PERMISSIONS.length ? 'All' : `${role.permissions.length} of ${ALL_PERMISSIONS.length}`}
+                            {role.permissions.length === ALL_PERMISSIONS.length
+                              ? 'All'
+                              : `${role.permissions.length} of ${ALL_PERMISSIONS.length}`}
                           </Badge>
                         </td>
                         <td className="py-3">
@@ -125,7 +135,9 @@ export const AdminRolesPage = () => {
                           <div className="flex flex-wrap gap-1">
                             {role.canApproveApprovals && <Badge tone="signal">Approver</Badge>}
                             {role.canBypassApprovals && <Badge tone="warning">Skips approvals</Badge>}
-                            {!role.canApproveApprovals && !role.canBypassApprovals && <span className="text-sm text-text-muted">—</span>}
+                            {!role.canApproveApprovals && !role.canBypassApprovals && (
+                              <span className="text-sm text-text-muted">—</span>
+                            )}
                           </div>
                         </td>
                         <td className="py-3 text-sm text-text-muted">
@@ -186,8 +198,8 @@ export const AdminRolesPage = () => {
       >
         {dialog.kind === 'delete' && (
           <p>
-            Delete <span className="font-medium text-text">{dialog.role.roleName}</span>? Only roles that no user or API key uses can be
-            deleted. This can't be undone.
+            Delete <span className="font-medium text-text">{dialog.role.roleName}</span>? Only roles that no user or API key uses
+            can be deleted. This can't be undone.
           </p>
         )}
       </ConfirmDialog>

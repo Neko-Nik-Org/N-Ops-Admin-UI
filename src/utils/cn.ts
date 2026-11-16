@@ -18,5 +18,4 @@
 /** Joins CSS class names, skipping falsy values: cn('a', isOn && 'b') -> 'a b'. */
 /** Class-name helper. */
 
-export const cn = (...classes: Array<string | false | null | undefined>): string =>
-  classes.filter(Boolean).join(' ')
+export const cn = (...classes: Array<string | false | null | undefined>): string => classes.filter(Boolean).join(' ')

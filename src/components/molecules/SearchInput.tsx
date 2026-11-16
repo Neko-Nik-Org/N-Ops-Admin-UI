@@ -35,7 +35,11 @@ export const SearchInput = ({
   className?: string
 }) => (
   <div className={cn('relative', className)}>
-    <Search size={15} aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-text-muted" />
+    <Search
+      size={15}
+      aria-hidden="true"
+      className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-text-muted"
+    />
     <input
       type="search"
       value={value}

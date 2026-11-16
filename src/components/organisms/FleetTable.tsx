@@ -27,10 +27,7 @@ const Bar = ({ percent }: { percent: number | null }) => (
   <div className="flex items-center gap-2">
     <div className="h-1.5 w-20 overflow-hidden rounded-full bg-ink">
       {percent !== null && (
-        <div
-          className={cn('h-full rounded-full', percent > 85 ? 'bg-warning' : 'bg-signal')}
-          style={{ width: `${percent}%` }}
-        />
+        <div className={cn('h-full rounded-full', percent > 85 ? 'bg-warning' : 'bg-signal')} style={{ width: `${percent}%` }} />
       )}
     </div>
     <span className="text-sm text-text">{percent !== null ? `${percent}%` : 'No data'}</span>
@@ -45,7 +42,10 @@ export const FleetTable = ({ servers, total }: { servers: FleetServer[]; total: 
   <div className="rounded-xl border border-border bg-surface-raised p-5">
     <div className="mb-4 flex items-center justify-between">
       <h2 className="font-semibold text-text">
-        Fleet <span className="ml-1 text-sm font-normal text-text-muted">{servers.length} of {total} servers</span>
+        Fleet{' '}
+        <span className="ml-1 text-sm font-normal text-text-muted">
+          {servers.length} of {total} servers
+        </span>
       </h2>
       <Link to={ROUTES.servers} className="text-sm text-signal hover:text-signal-strong">
         View all servers

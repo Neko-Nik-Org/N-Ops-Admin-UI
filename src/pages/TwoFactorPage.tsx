@@ -18,7 +18,7 @@
 /** Two-factor sign-in page (/login/verify-2fa). */
 
 import { Navigate, useLocation } from 'react-router-dom'
-import { AuthShell } from '@/components/auth/AuthShell'
+import { AuthShell } from '@/components/templates/AuthShell'
 import { TwoFactorForm } from '@/components/organisms/TwoFactorForm'
 import type { TwoFactorContext } from '@/features/auth/types'
 import { ROUTES } from '@/constants/routes'

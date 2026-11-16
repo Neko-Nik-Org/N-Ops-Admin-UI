@@ -22,7 +22,8 @@ import { toast } from 'react-toastify'
 import { Select } from '@/components/atoms/Select'
 import { Switch } from '@/components/atoms/Switch'
 import { Textarea } from '@/components/atoms/Textarea'
-import { LoadingButton, useAsyncAction } from '@/components/loading'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { Dialog } from '@/components/molecules/Dialog'
 import { FormField } from '@/components/molecules/FormField'
 import { useSaveAuditExportSchedule } from '@/features/admin/hooks/useAdmin'
@@ -80,8 +81,18 @@ const ScheduleForm = ({ schedule, onClose }: { schedule?: AuditExportSchedule; o
         </FormField>
       </div>
       <FormField id="recipients" label="Email it to" error={errors.recipients?.message}>
-        <Textarea id="recipients" rows={2} placeholder="security@company.com" hasError={!!errors.recipients} {...register('recipients')} />
-        {!errors.recipients && <p className="text-xs text-text-muted">Separate addresses with commas. Each run sends the entries since the last run.</p>}
+        <Textarea
+          id="recipients"
+          rows={2}
+          placeholder="security@company.com"
+          hasError={!!errors.recipients}
+          {...register('recipients')}
+        />
+        {!errors.recipients && (
+          <p className="text-xs text-text-muted">
+            Separate addresses with commas. Each run sends the entries since the last run.
+          </p>
+        )}
       </FormField>
       <Switch label="Enabled" description="Paused schedules keep their settings but don't run." {...register('enabled')} />
       <div className="flex justify-end gap-2 pt-1">
@@ -97,7 +108,15 @@ const ScheduleForm = ({ schedule, onClose }: { schedule?: AuditExportSchedule; o
 }
 
 /** Creates a scheduled export, or edits `schedule` when given. */
-export const ExportScheduleDialog = ({ open, schedule, onClose }: { open: boolean; schedule?: AuditExportSchedule; onClose: () => void }) => (
+export const ExportScheduleDialog = ({
+  open,
+  schedule,
+  onClose,
+}: {
+  open: boolean
+  schedule?: AuditExportSchedule
+  onClose: () => void
+}) => (
   <Dialog
     open={open}
     onClose={onClose}

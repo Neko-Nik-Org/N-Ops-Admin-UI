@@ -29,7 +29,7 @@ export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
   const trail = PAGE_TITLES[pathname] ?? ['N-Ops']
 
   return (
-    <header className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3.5 sm:gap-4 sm:px-6">
+    <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-border bg-surface px-4 py-3.5 sm:gap-4 sm:px-6">
       {/* Left and right groups are both flex-1, so they split the free space equally and the search sits dead center */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <button type="button" aria-label="Open menu" onClick={onMenuClick} className="text-text-muted hover:text-text lg:hidden">

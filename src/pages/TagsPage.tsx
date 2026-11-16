@@ -20,7 +20,9 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'react-toastify'
-import { LoadingButton, TableSkeleton, useAsyncAction } from '@/components/loading'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { TableSkeleton } from '@/components/molecules/Skeleton'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { Dialog } from '@/components/molecules/Dialog'
 import { TagFormDialog } from '@/components/organisms/TagFormDialog'
 import { useHasPermissions, useHasTagAccess } from '@/features/auth/permissions'
@@ -48,8 +50,8 @@ const DeleteTagDialog = ({ tag, onClose }: { tag: Tag | null; onClose: () => voi
   return (
     <Dialog open={!!tag} onClose={onClose} title="Delete tag">
       <p className="text-sm text-text-muted">
-        Delete <span className="font-medium text-text">{tag?.tagName}</span>? Roles scoped to this tag lose it, and anything
-        that references it (such as API keys) is removed with it. This can't be undone.
+        Delete <span className="font-medium text-text">{tag?.tagName}</span>? Roles scoped to this tag lose it, and anything that
+        references it (such as API keys) is removed with it. This can't be undone.
       </p>
       <div className="flex justify-end gap-2">
         <LoadingButton variant="ghost" onClick={onClose}>
@@ -124,7 +126,9 @@ export const TagsPage = () => {
                     return (
                       <tr key={tag.tagId} className="border-t border-border">
                         <td className="py-3">
-                          <span className="rounded bg-ink px-1.5 py-0.5 font-mono text-xs text-accent-secondary">{tag.tagName}</span>
+                          <span className="rounded bg-ink px-1.5 py-0.5 font-mono text-xs text-accent-secondary">
+                            {tag.tagName}
+                          </span>
                         </td>
                         <td className="max-w-md py-3 text-sm text-text-muted">{tag.tagDescription || '—'}</td>
                         <td className="py-3 font-mono text-xs text-text-muted">{tag.tagId}</td>

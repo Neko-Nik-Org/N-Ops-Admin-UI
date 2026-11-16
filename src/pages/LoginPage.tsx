@@ -16,7 +16,7 @@
  */
 /** Sign-in page (/login). */
 
-import { AuthShell } from '@/components/auth/AuthShell'
+import { AuthShell } from '@/components/templates/AuthShell'
 import { LoginForm } from '@/components/organisms/LoginForm'
 
 /** The sign-in card on the animated auth background. */

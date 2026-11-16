@@ -18,7 +18,8 @@
 
 import moment from 'moment'
 import { AUDIT_ACTIONS, AUDIT_RETENTION_DAYS } from '../catalog'
-import { clone, db, mockDelay, notFound, recordAudit } from '../mock/db'
+import { db, recordAudit } from '@/mocks/adminDb'
+import { clone, mockDelay, notFound } from '@/mocks/helpers'
 import type {
   AuditExportFormat,
   AuditExportSchedule,
@@ -47,7 +48,8 @@ const filterLogs = (filters: AuditLogFilters): AuditLog[] => {
     if (filters.action && log.action !== filters.action && !log.action.startsWith(`${filters.action}.`)) return false
     if (filters.outcome && log.outcome !== filters.outcome) return false
     if (search) {
-      const haystack = `${log.actor.name} ${log.action} ${AUDIT_ACTIONS[log.action] ?? ''} ${log.resourceName} ${log.details} ${log.ip}`.toLowerCase()
+      const haystack =
+        `${log.actor.name} ${log.action} ${AUDIT_ACTIONS[log.action] ?? ''} ${log.resourceName} ${log.details} ${log.ip}`.toLowerCase()
       if (!haystack.includes(search)) return false
     }
     return true
@@ -69,13 +71,29 @@ export const serializeAuditLogs = (logs: AuditLog[], format: AuditExportFormat):
   if (format === 'json') return JSON.stringify(logs, null, 2)
   const header = ['id', 'time_utc', 'actor_type', 'actor', 'action', 'resource_type', 'resource', 'outcome', 'ip', 'details']
   const rows = logs.map((l) =>
-    [String(l.auditId), l.occurredAt, l.actor.type, l.actor.name, l.action, l.resourceType, l.resourceName, l.outcome, l.ip, l.details].map(csvCell).join(','),
+    [
+      String(l.auditId),
+      l.occurredAt,
+      l.actor.type,
+      l.actor.name,
+      l.action,
+      l.resourceType,
+      l.resourceName,
+      l.outcome,
+      l.ip,
+      l.details,
+    ]
+      .map(csvCell)
+      .join(','),
   )
   return [header.join(','), ...rows].join('\n')
 }
 
 /** Future: `GET /audit/export?format&...filters` (a file download). Records the export itself. */
-export const exportAuditLogs = async (filters: AuditLogFilters, format: AuditExportFormat): Promise<{ body: string; count: number }> => {
+export const exportAuditLogs = async (
+  filters: AuditLogFilters,
+  format: AuditExportFormat,
+): Promise<{ body: string; count: number }> => {
   await mockDelay()
   const logs = filterLogs(filters)
   recordAudit('audit.export', 'audit_log', `${logs.length} entries`, `${format.toUpperCase()} download`)
@@ -93,7 +111,11 @@ export const listAuditActors = async (): Promise<Array<{ value: string; label: s
 /** When a schedule next runs: tomorrow, next Monday or the 1st of next month, at 06:00. */
 const nextRun = (frequency: AuditExportSchedule['frequency']) => {
   const unit = frequency === 'daily' ? 'day' : frequency === 'weekly' ? 'isoWeek' : 'month'
-  return moment().add(1, unit === 'isoWeek' ? 'week' : unit).startOf(unit).add(6, 'hours').toISOString()
+  return moment()
+    .add(1, unit === 'isoWeek' ? 'week' : unit)
+    .startOf(unit)
+    .add(6, 'hours')
+    .toISOString()
 }
 
 const WORKFLOW_NAMES = { daily: 'Daily audit export', weekly: 'Weekly audit export', monthly: 'Monthly audit export' } as const
@@ -107,8 +129,19 @@ export const listAuditExportSchedules = async (): Promise<AuditExportSchedule[]>
 /** Future: creates an "Audit export" workflow from its template (`POST /workflow/create`). */
 export const createAuditExportSchedule = async (input: AuditExportScheduleInput): Promise<void> => {
   await mockDelay()
-  db.schedules.push({ ...clone(input), scheduleId: db.nextId.schedule++, workflowName: WORKFLOW_NAMES[input.frequency], lastRunAt: null, nextRunAt: nextRun(input.frequency) })
-  recordAudit('workflow.create', 'workflow', WORKFLOW_NAMES[input.frequency], `Sends ${input.format.toUpperCase()} to ${input.recipients.join(', ')}`)
+  db.schedules.push({
+    ...clone(input),
+    scheduleId: db.nextId.schedule++,
+    workflowName: WORKFLOW_NAMES[input.frequency],
+    lastRunAt: null,
+    nextRunAt: nextRun(input.frequency),
+  })
+  recordAudit(
+    'workflow.create',
+    'workflow',
+    WORKFLOW_NAMES[input.frequency],
+    `Sends ${input.format.toUpperCase()} to ${input.recipients.join(', ')}`,
+  )
 }
 
 /** Future: `PUT /workflow/update`. */

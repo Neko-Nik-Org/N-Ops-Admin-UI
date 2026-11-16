@@ -22,7 +22,8 @@ import { toast } from 'react-toastify'
 import { Input } from '@/components/atoms/Input'
 import { Switch } from '@/components/atoms/Switch'
 import { Textarea } from '@/components/atoms/Textarea'
-import { LoadingButton, useAsyncAction } from '@/components/loading'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { Dialog } from '@/components/molecules/Dialog'
 import { FormField } from '@/components/molecules/FormField'
 import { PERMISSION_GROUPS } from '@/features/admin/catalog'
@@ -129,7 +130,12 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
                 <div className="flex flex-col gap-1.5 pl-6">
                   {group.permissions.map((p) => (
                     <label key={p.key} className="flex cursor-pointer items-center gap-2 text-sm text-text-muted">
-                      <input type="checkbox" value={p.key} className="size-3.5 accent-[var(--color-signal)]" {...register('permissions')} />
+                      <input
+                        type="checkbox"
+                        value={p.key}
+                        className="size-3.5 accent-[var(--color-signal)]"
+                        {...register('permissions')}
+                      />
                       <span className="text-text">{p.label}</span>
                       <code className="ml-auto hidden font-mono text-[0.6875rem] text-text-muted sm:inline">{p.key}</code>
                     </label>
@@ -156,7 +162,9 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
                 key={tag.tagId}
                 className={cn(
                   'cursor-pointer rounded-full border px-3 py-1 font-mono text-xs transition-colors has-[:focus-visible]:border-signal',
-                  on ? 'border-accent-secondary bg-accent-secondary/15 text-accent-secondary' : 'border-border text-text-muted hover:border-border-strong',
+                  on
+                    ? 'border-accent-secondary bg-accent-secondary/15 text-accent-secondary'
+                    : 'border-border text-text-muted hover:border-border-strong',
                 )}
               >
                 <input type="checkbox" value={tag.tagId} className="sr-only" {...register('tagIds')} />
@@ -166,12 +174,18 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
           })}
         </div>
         <p className="text-xs text-text-muted">
-          {selectedTags.length ? 'People with this role only see resources with these tags.' : 'No tags picked: this role reaches every tag.'}
+          {selectedTags.length
+            ? 'People with this role only see resources with these tags.'
+            : 'No tags picked: this role reaches every tag.'}
         </p>
       </fieldset>
 
       <div className="flex flex-col gap-4 rounded-lg border border-border p-4">
-        <Switch label="Can approve requests" description="Approve or reject other people's approval requests." {...register('canApproveApprovals')} />
+        <Switch
+          label="Can approve requests"
+          description="Approve or reject other people's approval requests."
+          {...register('canApproveApprovals')}
+        />
         <Switch
           label="Skips approvals"
           description="Sensitive commands run without waiting for approval. Give this sparingly."
@@ -188,14 +202,21 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
           hasError={!!errors.allowedLinuxUsers}
           {...register('allowedLinuxUsers')}
         />
-        {!errors.allowedLinuxUsers && <p className="text-xs text-text-muted">Accounts this role may SSH in as, separated by commas. Leave empty for none.</p>}
+        {!errors.allowedLinuxUsers && (
+          <p className="text-xs text-text-muted">Accounts this role may SSH in as, separated by commas. Leave empty for none.</p>
+        )}
       </FormField>
 
       <div className="flex justify-end gap-2">
         <LoadingButton variant="ghost" onClick={onClose}>
           Cancel
         </LoadingButton>
-        <LoadingButton type="submit" state={state} loadingText={role ? 'Saving' : 'Creating'} successText={role ? 'Saved' : 'Created'}>
+        <LoadingButton
+          type="submit"
+          state={state}
+          loadingText={role ? 'Saving' : 'Creating'}
+          successText={role ? 'Saved' : 'Created'}
+        >
           {role ? 'Save changes' : 'Create role'}
         </LoadingButton>
       </div>

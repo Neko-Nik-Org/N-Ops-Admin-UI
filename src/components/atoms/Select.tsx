@@ -39,7 +39,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({ hasError, cl
     >
       {children}
     </select>
-    <ChevronDown size={15} aria-hidden="true" className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-text-muted" />
+    <ChevronDown
+      size={15}
+      aria-hidden="true"
+      className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-text-muted"
+    />
   </div>
 ))
 

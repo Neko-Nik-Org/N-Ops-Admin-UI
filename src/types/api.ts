@@ -22,3 +22,20 @@ export interface ApiErrorBody {
   error: string
   code: number
 }
+
+/**
+ * Rejection value of every apiClient call: a plain Error carrying the API's message,
+ * plus the HTTP status (undefined for network errors) so callers can branch on 409, 410, etc.
+ */
+export class ApiError extends Error {
+  readonly status?: number
+
+  constructor(message: string, status?: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
+/** HTTP status of a rejected apiClient call, or undefined if it isn't one. */
+export const errorStatus = (error: unknown): number | undefined => (error instanceof ApiError ? error.status : undefined)

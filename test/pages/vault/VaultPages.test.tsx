@@ -18,8 +18,8 @@
 
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { resetAdminMock } from '@/features/admin/mock/db'
-import { resetVaultMock } from '@/features/vault/mock/db'
+import { resetAdminMock } from '@/mocks/adminDb'
+import { resetVaultMock } from '@/mocks/vaultDb'
 import { VaultConfigFilesPage } from '@/pages/vault/VaultConfigFilesPage'
 import { VaultKeysPage } from '@/pages/vault/VaultKeysPage'
 import { VaultNotesPage } from '@/pages/vault/VaultNotesPage'
@@ -80,8 +80,12 @@ describe('VaultKeysPage', () => {
     render(<VaultKeysPage />, '/vault/keys')
     fireEvent.click(await screen.findByRole('button', { name: 'Import .env' }))
     fireEvent.change(within(dialog()).getByLabelText('Tag'), { target: { value: '3' } })
-    fireEvent.change(within(dialog()).getByLabelText('.env contents'), { target: { value: 'DATABASE_URL=postgres://dev2\nCACHE_TTL=60' } })
-    expect(within(dialog()).getByText('2 keys: 1 new, 1 already here (they get a new version if the value changed).')).toBeInTheDocument()
+    fireEvent.change(within(dialog()).getByLabelText('.env contents'), {
+      target: { value: 'DATABASE_URL=postgres://dev2\nCACHE_TTL=60' },
+    })
+    expect(
+      within(dialog()).getByText('2 keys: 1 new, 1 already here (they get a new version if the value changed).'),
+    ).toBeInTheDocument()
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Import' }))
     expect(await screen.findByText('Imported: 1 new, 1 changed, 0 unchanged.')).toBeInTheDocument()
     expect(await screen.findByText('CACHE_TTL')).toBeInTheDocument()

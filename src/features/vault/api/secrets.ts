@@ -16,9 +16,10 @@
  */
 /** Keys store: secret keys (env vars) with immutable versions, rollback and .env import/export. Mock until `/vault/secret/*` is live. */
 
-import { db as adminDb, clone, mockDelay, notFound, recordAudit } from '@/features/admin/mock/db'
+import { db as adminDb, recordAudit } from '@/mocks/adminDb'
+import { clone, mockDelay, notFound } from '@/mocks/helpers'
 import { parseDotenv, serializeDotenv } from '../dotenv'
-import { me, vaultDb, type StoredSecret } from '../mock/db'
+import { me, vaultDb, type StoredSecret } from '@/mocks/vaultDb'
 import type { SecretInput, SecretKey, VaultVersionMeta } from '../types'
 import { servicePath } from './projects'
 

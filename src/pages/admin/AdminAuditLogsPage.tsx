@@ -16,7 +16,19 @@
  */
 /** Admin › Audit logs (/admin/audit-logs): read-only history of the last 90 days, filters, export and scheduled exports. */
 
-import { Bot, CalendarClock, ChevronLeft, ChevronRight, Download, KeyRound, Pencil, Plus, Trash2, User, Workflow } from 'lucide-react'
+import {
+  Bot,
+  CalendarClock,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  KeyRound,
+  Pencil,
+  Plus,
+  Trash2,
+  User,
+  Workflow,
+} from 'lucide-react'
 import moment from 'moment'
 import { useDeferredValue, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -24,7 +36,9 @@ import { toast } from 'react-toastify'
 import { Badge, type BadgeTone } from '@/components/atoms/Badge'
 import { Input } from '@/components/atoms/Input'
 import { Select } from '@/components/atoms/Select'
-import { LoadingButton, TableSkeleton, useAsyncAction } from '@/components/loading'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { TableSkeleton } from '@/components/molecules/Skeleton'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'
@@ -122,7 +136,13 @@ const ScheduledExports = () => {
                   aria-label={`Edit ${s.workflowName}`}
                   onClick={() => setEditing({ open: true, schedule: s })}
                 />
-                <LoadingButton variant="ghost" size="sm" icon={<Trash2 size={14} />} aria-label={`Delete ${s.workflowName}`} onClick={() => setDeleting(s)} />
+                <LoadingButton
+                  variant="ghost"
+                  size="sm"
+                  icon={<Trash2 size={14} />}
+                  aria-label={`Delete ${s.workflowName}`}
+                  onClick={() => setDeleting(s)}
+                />
               </div>
             </li>
           ))}
@@ -139,8 +159,8 @@ const ScheduledExports = () => {
         onClose={() => setDeleting(null)}
       >
         <p>
-          Stop <span className="font-medium text-text">{deleting?.workflowName}</span> and delete its workflow? Files already sent aren't
-          affected.
+          Stop <span className="font-medium text-text">{deleting?.workflowName}</span> and delete its workflow? Files already sent
+          aren't affected.
         </p>
       </ConfirmDialog>
     </section>
@@ -280,7 +300,9 @@ export const AdminAuditLogsPage = () => {
                     onClick={() => setRange(days)}
                     className={cn(
                       'rounded-full border px-2.5 py-1.5 text-xs transition-colors',
-                      on ? 'border-text bg-text text-ink' : 'border-border text-text-muted hover:border-border-strong hover:text-text',
+                      on
+                        ? 'border-text bg-text text-ink'
+                        : 'border-border text-text-muted hover:border-border-strong hover:text-text',
                     )}
                   >
                     {label}
@@ -290,7 +312,12 @@ export const AdminAuditLogsPage = () => {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <SearchInput value={search} onChange={change(setSearch)} placeholder="Search resource, details or IP" className="min-w-56 flex-1" />
+            <SearchInput
+              value={search}
+              onChange={change(setSearch)}
+              placeholder="Search resource, details or IP"
+              className="min-w-56 flex-1"
+            />
             <Select aria-label="Who" value={actor} onChange={(e) => change(setActor)(e.target.value)} className="w-48">
               <option value="">Anyone</option>
               {actors?.map((a) => (
@@ -367,7 +394,9 @@ export const AdminAuditLogsPage = () => {
                         {log.details && <p className="truncate text-xs text-text-muted">{log.details}</p>}
                       </td>
                       <td className="py-2.5 pr-3">
-                        <Badge tone={OUTCOME_TONE[log.outcome]}>{log.outcome === 'success' ? 'Succeeded' : log.outcome === 'denied' ? 'Denied' : 'Failed'}</Badge>
+                        <Badge tone={OUTCOME_TONE[log.outcome]}>
+                          {log.outcome === 'success' ? 'Succeeded' : log.outcome === 'denied' ? 'Denied' : 'Failed'}
+                        </Badge>
                       </td>
                       <td className="py-2.5 font-mono text-xs text-text-muted">{log.ip}</td>
                     </tr>

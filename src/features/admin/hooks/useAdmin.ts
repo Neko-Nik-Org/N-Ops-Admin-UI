@@ -147,7 +147,8 @@ export const useAuditActors = () => useQuery({ queryKey: [...ADMIN_KEYS.audit, '
 export const useExportAuditLogs = () => {
   const refresh = useRefresh()
   return useMutation({
-    mutationFn: ({ filters, format }: { filters: AuditLogFilters; format: AuditExportFormat }) => exportAuditLogs(filters, format),
+    mutationFn: ({ filters, format }: { filters: AuditLogFilters; format: AuditExportFormat }) =>
+      exportAuditLogs(filters, format),
     onSuccess: refresh,
   })
 }

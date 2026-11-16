@@ -47,7 +47,11 @@ describe('tag hooks', () => {
 
   it.each([
     ['create', () => useCreateTag(), (m: ReturnType<typeof useCreateTag>) => m.mutateAsync({ tagName: 'x', tagDescription: '' })],
-    ['update', () => useUpdateTag(), (m: ReturnType<typeof useUpdateTag>) => m.mutateAsync({ tagId: 1, input: { tagName: 'x', tagDescription: '' } })],
+    [
+      'update',
+      () => useUpdateTag(),
+      (m: ReturnType<typeof useUpdateTag>) => m.mutateAsync({ tagId: 1, input: { tagName: 'x', tagDescription: '' } }),
+    ],
     ['delete', () => useDeleteTag(), (m: ReturnType<typeof useDeleteTag>) => m.mutateAsync(1)],
   ] as const)('refetches the list after a %s', async (_, useMutationHook, run) => {
     api.get.mockResolvedValue({ data: [raw(1, 'prod')] })

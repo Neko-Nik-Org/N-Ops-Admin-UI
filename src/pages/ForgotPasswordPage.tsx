@@ -18,7 +18,8 @@
 
 import { Lock } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { AuthCard, AuthShell } from '@/components/auth/AuthShell'
+import { AuthCard } from '@/components/molecules/AuthCard'
+import { AuthShell } from '@/components/templates/AuthShell'
 import { ROUTES } from '@/constants/routes'
 
 /**

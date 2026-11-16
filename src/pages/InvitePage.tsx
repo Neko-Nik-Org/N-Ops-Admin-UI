@@ -19,8 +19,9 @@
 
 import { CircleAlert } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { AuthCard, AuthShell } from '@/components/auth/AuthShell'
-import { NSpinner } from '@/components/loading'
+import { AuthCard } from '@/components/molecules/AuthCard'
+import { AuthShell } from '@/components/templates/AuthShell'
+import { NSpinner } from '@/components/atoms/NSpinner'
 import { InviteForm } from '@/components/organisms/InviteForm'
 import { useInviteDetails } from '@/features/invite/hooks/useInviteDetails'
 import { ROUTES } from '@/constants/routes'

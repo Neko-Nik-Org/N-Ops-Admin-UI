@@ -21,6 +21,7 @@ import { useSetAtom } from 'jotai'
 import { useEffect } from 'react'
 import { verifySession } from '../api/session'
 import { currentUserAtom, sessionStatusAtom } from '../store/session'
+import { loadStoredProfile } from '../store/profileStorage'
 import { clearSessionToken, getSessionToken } from '../store/sessionToken'
 
 /** Confirms a persisted session cookie is still valid on app load and restores the signed-in user's profile. */
@@ -31,13 +32,15 @@ export const useSessionBootstrap = (): void => {
   useEffect(() => {
     /** Nothing saved: go straight to the signed-out state without calling the API. */
     if (!getSessionToken()) {
+      clearSessionToken() // drops a profile left behind when a browser-session cookie expired
       setStatus('unauthenticated')
       return
     }
 
     verifySession()
       .then((user) => {
-        setCurrentUser(user)
+        // The API's /auth/verify has no body today, so fall back to the profile saved at sign-in.
+        setCurrentUser(user ?? loadStoredProfile())
         setStatus('authenticated')
       })
       .catch(() => {

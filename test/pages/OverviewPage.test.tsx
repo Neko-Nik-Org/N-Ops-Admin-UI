@@ -48,7 +48,9 @@ const overview = {
   alerts_latest_source: 'disk-check',
   alerts_latest_time: '10:42',
   fleet: [server('s1', 'web-1', 1, 'production'), server('s2', 'db-1', 2, 'staging', false)],
-  approvals: [{ approval_id: 'a1', code: 'R-7', title: 'Restart nginx', detail: 'Raised by arjun', expires_label: 'Expires in 1h' }],
+  approvals: [
+    { approval_id: 'a1', code: 'R-7', title: 'Restart nginx', detail: 'Raised by arjun', expires_label: 'Expires in 1h' },
+  ],
 }
 
 const tags = [

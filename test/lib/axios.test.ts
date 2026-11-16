@@ -19,6 +19,7 @@
 import { AxiosError, type AxiosAdapter, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getSessionToken, setSessionToken } from '@/features/auth/store/sessionToken'
+import { ApiError, errorStatus } from '@/types/api'
 
 // test/setup.ts mocks this module for everyone else; here we want the real client
 const { apiClient } = await vi.importActual<{ apiClient: AxiosInstance }>('@/lib/axios')
@@ -26,7 +27,8 @@ const { apiClient } = await vi.importActual<{ apiClient: AxiosInstance }>('@/lib
 let lastRequest: InternalAxiosRequestConfig | undefined
 
 /** Replaces the network with a fixed response (or a failure with `status` and `data`). */
-const respond = (status: number, data: unknown = {}): AxiosAdapter =>
+const respond =
+  (status: number, data: unknown = {}): AxiosAdapter =>
   async (config) => {
     lastRequest = config
     const response = { status, data, statusText: '', headers: {}, config }
@@ -71,7 +73,26 @@ describe('apiClient', () => {
   })
 
   it('falls back to the transport error message when the body has none', async () => {
-    apiClient.defaults.adapter = respond(500, 'Internal Server Error')
+    apiClient.defaults.adapter = respond(500, '')
     await expect(apiClient.get('/tag/list')).rejects.toThrow('Request failed')
+  })
+
+  it('uses a short plain-text body as the message (e.g. /user/self/verify-email/*)', async () => {
+    apiClient.defaults.adapter = respond(410, 'Verification code has expired, please request a new one')
+    await expect(apiClient.post('/user/self/verify-email/validate')).rejects.toThrow(
+      'Verification code has expired, please request a new one',
+    )
+  })
+
+  it('ignores HTML error pages', async () => {
+    apiClient.defaults.adapter = respond(502, '<html><body>Bad Gateway</body></html>')
+    await expect(apiClient.get('/tag/list')).rejects.toThrow('Request failed')
+  })
+
+  it('rejects with an ApiError carrying the HTTP status', async () => {
+    apiClient.defaults.adapter = respond(409, 'Email is already verified')
+    const error = await apiClient.post('/user/self/verify-email/send').catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(ApiError)
+    expect(errorStatus(error)).toBe(409)
   })
 })

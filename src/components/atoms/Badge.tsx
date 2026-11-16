@@ -31,7 +31,17 @@ const TONES: Record<BadgeTone, string> = {
 }
 
 /** A rounded label for statuses and short facts; `mono` for ids and tag names. */
-export const Badge = ({ tone = 'neutral', mono, children, className }: { tone?: BadgeTone; mono?: boolean; children: ReactNode; className?: string }) => (
+export const Badge = ({
+  tone = 'neutral',
+  mono,
+  children,
+  className,
+}: {
+  tone?: BadgeTone
+  mono?: boolean
+  children: ReactNode
+  className?: string
+}) => (
   <span
     className={cn(
       'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs whitespace-nowrap',

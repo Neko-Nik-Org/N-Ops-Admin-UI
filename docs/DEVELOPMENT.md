@@ -13,20 +13,31 @@ Internals of the N-Ops Admin UI, for contributors. For setup, see the [README](.
 ```
 src/
   app/          router, providers, auth route guards, theme
-  components/   atoms -> molecules -> organisms -> templates (shared, feature-agnostic UI)
-    loading/    N-mark loaders, LoadingButton, ScreenLoader, skeletons, async helpers
+  components/   shared, feature-agnostic UI in four layers (see below)
+    atoms/      smallest pieces: Input, Badge, NLogo, NSpinner, AuthBackground, ...
+    molecules/  small groups of atoms: FormField, LoadingButton, NLoader, Skeleton, OtpInput, ...
+    organisms/  self-contained sections: Sidebar, Topbar, dialogs, cards, ScreenLoader, ...
+    templates/  page layouts: AppShell (signed-in), AuthShell (sign-in screens)
   config/       typed env access (runtime env.js first, then VITE_* build values)
   constants/    route paths + sidebar sections (routes.ts), shared UI values (config.ts)
-  features/     one folder per domain: auth, account, tags, dashboard, invite
+  features/     one folder per domain: account, admin, auth, dashboard, invite, tags, vault
+  hooks/        shared, feature-agnostic React hooks (useAsyncAction, useDelayedLoading)
   lib/          axios instance, react-query client
+  mocks/        in-memory fake backend for features whose API isn't built yet (admin, vault)
   pages/        route-level screens, composed from templates + features
   types/        cross-app shared types
+  styles/       global stylesheets for the loaders and sign-in screens (imported once in main.tsx)
   utils/        small framework-free helpers
 test/           all tests (vitest), mirroring src/: test/config/env.test.ts tests src/config/env.ts
 docker/         container runtime: env.js writer and `serve` config
 ```
 
-Import from `src` with the `@/` alias (`@/features/tags/hooks/useTags`).
+Import from `src` with the `@/` alias (`@/features/tags/hooks/useTags`), straight from the file that
+defines the export. There are no barrel (`index.ts`) files.
+
+A component may only import components from its own layer or a lower one: atoms use no other
+components, molecules use atoms, organisms use molecules and atoms, and templates may use all three.
+Feature-specific logic lives in `features/`. Components only call its hooks and API functions.
 
 Never hardcode a route path: use `ROUTES` from `@/constants/routes`. To add a dashboard section, add it
 to `APP_SECTIONS` there. The router, sidebar and breadcrumb all pick it up automatically. Join class
@@ -52,6 +63,37 @@ The UI talks to [N-Ops Main API](https://github.com/Neko-Nik-Org/N-Ops-Main-API)
   They only hide or disable UI. The API's `403` is the real enforcement.
 - The backend's `ALLOWED_ORIGINS` must include this app's origin (dev and prod) for CORS to work.
 
+## Self-service account (`/user/self/*`)
+
+The Account page uses these endpoints. Each needs a valid session.
+
+| Action                    | Endpoint                                   | Notes                                                                                                                                                          |
+| ------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Send / re-send email code | `POST /user/self/verify-email/send`        | 7-digit code, valid 5 min. Re-sending replaces the old code. `409` means already verified.                                                                     |
+| Verify email code         | `POST /user/self/verify-email/validate`    | Body is a bare JSON string (`"1234567"`). `400` means a wrong code (the API discards it, so a new one must be sent), `410` means expired.                      |
+| Username available?       | `GET /user/self/user-name/check/:username` | `200` means free, `409` means taken. Reusable for admin user forms.                                                                                            |
+| Change username           | `POST /user/self/change-username`          | Bare JSON string body.                                                                                                                                         |
+| Change password           | `POST /user/self/change-password`          | Bare JSON string body, base64-encoded like at sign-in.                                                                                                         |
+| Edit profile details      | `POST /user/self/details`                  | Free-form JSON that replaces the whole object. The editor changes text values only. Non-text values are merged back unchanged (`features/account/details.ts`). |
+| Deactivate self           | `DELETE /user/self/deactivate`             | Ends this session. Only an admin can reactivate the account.                                                                                                   |
+
+Routes that take `web::Json<String>` need `JSON.stringify(value)` and an explicit
+`Content-Type: application/json`. Axios would otherwise send a plain string as form data. See
+`postJsonString` in `features/account/api/account.ts`. Some of these routes answer with plain-text
+bodies, not `{ error, code }`. `lib/axios.ts` uses a short text body as the message and rejects with
+an `ApiError` carrying `status`. Read the status with `errorStatus(error)` from `@/types/api`.
+
+**Session sync.** The API keeps a copy of the profile with the session in Redis and rebuilds it only
+on `POST /auth/refresh`, which works only for "Keep me signed in" sessions. After a self-service
+change, `useSyncSelfSession` (in `features/account/hooks`) updates the in-app profile. For remembered
+sessions it then calls `/auth/refresh`. Other sessions are not refreshed, so their server copy
+updates at the next sign-in. If the refresh fails with `401`, the user is asked to sign in again.
+
+**Live contract test.** `test/integration/selfAccount.live.test.ts` runs the real API modules
+against a running Main API. It is skipped unless `NOPS_LIVE_API_URL` is set. It changes data
+(passwords, usernames, deactivation), so only point it at a throwaway database. The file header
+lists the users and services it needs.
+
 ## Features with planned backends
 
 Some screens are built ahead of their backend. When their endpoints are missing, they show an
@@ -64,6 +106,11 @@ explicit "not available / not connected yet" state and **never fabricate data**:
   alert data expects one aggregate `GET /dashboard/overview`. Actions not wired up yet show a toast
   instead of failing silently.
 - Other sidebar sections render the shared `ComingSoonPage`.
+- **Admin** (users, roles, API keys, audit logs, organization) and **Vault** (projects, secrets,
+  config files, notes): the Main API has no endpoints for these yet, so their `features/<name>/api`
+  modules call an in-memory fake backend in `src/mocks/` (`adminDb.ts`, `vaultDb.ts`, shared
+  `helpers.ts`). Their pages show a "Mock data" badge, and the data resets on reload. Features never
+  import each other's mock data. Anything shared between the two mocks lives in `src/mocks/`.
 
 If you add the real backend for one of these, remove the fallback handling in the matching
 `features/<name>/api` module.
@@ -73,8 +120,8 @@ If you add the real backend for one of these, remove the fallback handling in th
 Light, dark, and system modes come from `src/app/theme.ts` (a Jotai atom persisted to
 `localStorage`) and `<html data-theme>`. All colors are CSS variables in `src/index.css`
 (`--color-ink`, `--color-signal`, `--color-warning`, …), with the dark default and the light
-override defined together. Use these tokens instead of hard-coded colors. The loading kit maps its
-colors onto them at the top of `components/loading/n-loading.css`, so it follows the theme too.
+override defined together. Use these tokens instead of hard-coded colors. The loader styles map
+their colors onto them at the top of `styles/n-loading.css`, so they follow the theme too.
 
 Fonts are IBM Plex Sans and IBM Plex Mono (SIL Open Font License), loaded from Google Fonts.
 

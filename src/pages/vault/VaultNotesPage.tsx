@@ -18,7 +18,8 @@
 
 import { Link2, Lock, NotebookPen, Plus, Users } from 'lucide-react'
 import { useState } from 'react'
-import { LoadingButton, TableSkeleton } from '@/components/loading'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { TableSkeleton } from '@/components/molecules/Skeleton'
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'

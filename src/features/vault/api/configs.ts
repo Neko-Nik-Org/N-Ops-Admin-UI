@@ -16,8 +16,9 @@
  */
 /** Config files: simple tagged, versioned text files per service. Mock until the API has them. */
 
-import { db as adminDb, clone, mockDelay, notFound, recordAudit } from '@/features/admin/mock/db'
-import { byteSize, me, vaultDb, type StoredConfig } from '../mock/db'
+import { db as adminDb, recordAudit } from '@/mocks/adminDb'
+import { clone, mockDelay, notFound } from '@/mocks/helpers'
+import { byteSize, me, vaultDb, type StoredConfig } from '@/mocks/vaultDb'
 import type { ConfigFile, ConfigFileInput, ConfigVersion, VaultVersionMeta } from '../types'
 import { servicePath } from './projects'
 
