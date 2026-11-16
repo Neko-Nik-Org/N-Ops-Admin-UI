@@ -35,7 +35,7 @@ jobs:
 
       # No config is baked in: API_BASE_URL / TURNSTILE_SITE_KEY come from the server's .env at run time.
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64
