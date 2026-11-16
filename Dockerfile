@@ -3,7 +3,7 @@
 # ── build: no config is baked in here ──
 # API_BASE_URL / TURNSTILE_SITE_KEY are read when the container starts (docker/write-env.mjs),
 # so the same image runs against test or production depending on docker-compose.
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -13,7 +13,7 @@ COPY . .
 RUN npm run build
 
 # ── runtime ──
-FROM node:22-alpine AS runtime
+FROM node:26-alpine AS runtime
 WORKDIR /app
 RUN npm install -g serve@14
 
