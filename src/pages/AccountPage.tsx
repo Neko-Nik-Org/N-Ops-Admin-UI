@@ -17,18 +17,21 @@
 
 /** Account page (/account): profile, security, preferences and organization quotas. */
 
+import { AccessCard } from '@/components/organisms/AccessCard'
 import { AccountSecurityCard } from '@/components/organisms/AccountSecurityCard'
 import { OrgInfoCard } from '@/components/organisms/OrgInfoCard'
 import { ProfileDetailsCard } from '@/components/organisms/ProfileDetailsCard'
 import { UserDetailsCard } from '@/components/organisms/UserDetailsCard'
 import { ThemeToggle } from '@/components/molecules/ThemeToggle'
 
-/** Two-column layout: profile, security and preferences on the left, organization info on the right. */
+/** Two-column layout: profile, security and preferences on the left; access and organization info on the right. */
 export const AccountPage = () => (
   <div className="flex flex-col gap-6">
     <div>
       <h1 className="text-2xl font-bold text-text">Account</h1>
-      <p className="text-sm text-text-muted">Your profile, security settings, preferences and your organization's quotas.</p>
+      <p className="text-sm text-text-muted">
+        Your profile, security settings, preferences, what your role allows and your organization's quotas.
+      </p>
     </div>
 
     <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
@@ -45,7 +48,10 @@ export const AccountPage = () => (
           </div>
         </section>
       </div>
-      <OrgInfoCard />
+      <div className="flex flex-col gap-4">
+        <AccessCard />
+        <OrgInfoCard />
+      </div>
     </div>
   </div>
 )

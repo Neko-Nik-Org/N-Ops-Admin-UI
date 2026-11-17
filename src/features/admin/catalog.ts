@@ -26,7 +26,10 @@ export interface PermissionGroup {
   permissions: ReadonlyArray<{ key: string; label: string }>
 }
 
-/** Permissions in display order. */
+/**
+ * Permissions in display order. Keys match the Main API (docs/Permissions.md and the
+ * `has_all_permissions` checks in src/routes). Listing tags needs no permission, so there is no `tag:view`.
+ */
 export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   {
     label: 'Organization',
@@ -47,10 +50,10 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   {
     label: 'Roles',
     permissions: [
-      { key: 'role:view', label: 'View roles' },
-      { key: 'role:create', label: 'Create roles' },
-      { key: 'role:edit', label: 'Edit roles' },
-      { key: 'role:delete', label: 'Delete roles' },
+      { key: 'user:role:view', label: 'View roles' },
+      { key: 'user:role:create', label: 'Create roles' },
+      { key: 'user:role:update', label: 'Edit roles' },
+      { key: 'user:role:delete', label: 'Delete roles' },
     ],
   },
   {
@@ -65,7 +68,6 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   {
     label: 'Tags',
     permissions: [
-      { key: 'tag:view', label: 'View tags' },
       { key: 'tag:create', label: 'Create tags' },
       { key: 'tag:edit', label: 'Edit tags' },
       { key: 'tag:delete', label: 'Delete tags' },
@@ -90,6 +92,10 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
   {
     label: 'Vault',
     permissions: [
+      { key: 'vault:project:view', label: 'View vault projects' },
+      { key: 'vault:project:create', label: 'Create vault projects' },
+      { key: 'vault:project:edit', label: 'Rename vault projects' },
+      { key: 'vault:project:delete', label: 'Delete vault projects' },
       { key: 'vault:keys:view', label: 'View secret keys' },
       { key: 'vault:keys:edit', label: 'Edit secret keys' },
       { key: 'vault:notes:view', label: 'View secure notes' },
@@ -150,9 +156,6 @@ export const AUDIT_ACTIONS: Readonly<Record<string, string>> = {
   'vault.project_create': 'Created a vault project',
   'vault.project_update': 'Updated a vault project',
   'vault.project_delete': 'Deleted a vault project',
-  'vault.service_create': 'Created a vault service',
-  'vault.service_update': 'Updated a vault service',
-  'vault.service_delete': 'Deleted a vault service',
   'server.ssh_session': 'Opened SSH session',
   'server.command': 'Ran a command',
   'approval.approve': 'Approved a request',

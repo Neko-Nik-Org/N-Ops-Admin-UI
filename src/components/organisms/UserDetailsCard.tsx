@@ -21,6 +21,7 @@ import { useAtomValue } from 'jotai'
 import { useState } from 'react'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { ChangeUsernameDialog } from '@/components/organisms/ChangeUsernameDialog'
+import { EditProfileDialog } from '@/components/organisms/EditProfileDialog'
 import { EmailVerificationDialog } from '@/components/organisms/EmailVerificationDialog'
 import { currentUserAtom } from '@/features/auth/store/session'
 import { cn } from '@/utils/cn'
@@ -31,14 +32,19 @@ import { cn } from '@/utils/cn'
  */
 export const UserDetailsCard = () => {
   const user = useAtomValue(currentUserAtom)
-  const [dialog, setDialog] = useState<'username' | 'email' | null>(null)
+  const [dialog, setDialog] = useState<'username' | 'email' | 'profile' | null>(null)
   if (!user) return null
 
   const close = () => setDialog(null)
 
   return (
     <section className="rounded-xl border border-border bg-surface-raised p-5">
-      <h2 className="mb-4 font-semibold text-text">Profile</h2>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h2 className="font-semibold text-text">Profile</h2>
+        <LoadingButton variant="ghost" size="sm" onClick={() => setDialog('profile')}>
+          Edit profile
+        </LoadingButton>
+      </div>
       <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-text-muted">Display name</dt>
@@ -76,6 +82,7 @@ export const UserDetailsCard = () => {
 
       <ChangeUsernameDialog open={dialog === 'username'} currentUserName={user.userName} onClose={close} />
       <EmailVerificationDialog open={dialog === 'email'} email={user.primaryEmail} onClose={close} />
+      <EditProfileDialog open={dialog === 'profile'} user={user} onClose={close} />
     </section>
   )
 }

@@ -21,7 +21,9 @@
  * immutable like `vault_secret_key_versions`.
  *
  * Tag ids: 1 production, 2 staging, 3 development, 4 internal.
- * The "Break-glass DB access" note is locked with the password `open-sesame`.
+ * Notes as seen by the mock signed-in user (Neko Nik, user 1): "On-call runbook" is Priya's, shared
+ * with them to edit; "Break-glass DB access" is their own; "CDN cutover checklist" is Lena's,
+ * shared read-only; "Vendor contacts" and "Priya's interview notes" are private to others.
  */
 
 import moment from 'moment'
@@ -35,7 +37,6 @@ import type {
   SecretKey,
   SecretVersion,
   VaultProject,
-  VaultService,
 } from '@/features/vault/types'
 
 const ago = (days: number, hours = 0) => moment().subtract(days, 'days').subtract(hours, 'hours').toISOString()
@@ -48,21 +49,27 @@ export interface StoredSecret extends SecretKey {
 export interface StoredConfig extends ConfigFile {
   versions: ConfigVersion[]
 }
-/** A note with its versions and, if locked, its password. */
+/** A note with its versions. */
 export interface StoredNote {
   noteId: number
   projectId: number
   ownerId: number
-  password: string | null
   createdAt: string
   shares: NoteShare[]
   links: NoteLink[]
   versions: NoteVersion[]
 }
 
-/** Builds version history: `[value, daysAgo, by, note]` oldest first. */
-const history = (rows: Array<[string, number, string, string]>): SecretVersion[] =>
-  rows.map(([value, days, createdBy, note], i) => ({ version: i + 1, value, createdAt: ago(days), createdBy, note }))
+/** Builds version history: `[value, daysAgo, by, note, hidden?]` oldest first. */
+const history = (rows: Array<[string, number, string, string, boolean?]>): SecretVersion[] =>
+  rows.map(([value, days, createdBy, note, isHidden = false], i) => ({
+    version: i + 1,
+    value,
+    createdAt: ago(days),
+    createdBy,
+    note,
+    isHidden,
+  }))
 
 const seedProjects = (): VaultProject[] =>
   (
@@ -80,26 +87,10 @@ const seedProjects = (): VaultProject[] =>
     updatedAt: ago(days),
   }))
 
-const seedServices = (): VaultService[] =>
-  (
-    [
-      [1, 'api', 'Public payments API.'],
-      [1, 'worker', 'Payout and webhook queue workers.'],
-      [2, 'frontend', 'Next.js app.'],
-      [2, 'edge', 'Nginx in front of everything.'],
-      [3, 'invoices', 'Invoice generation and email.'],
-      [4, 'grafana', 'Dashboards and alerting.'],
-    ] as const
-  ).map(([projectId, serviceName, description], i) => ({
-    serviceId: i + 1,
-    projectId,
-    serviceName,
-    description,
-    createdAt: ago(180 - i * 20),
-    updatedAt: ago(180 - i * 20),
-  }))
-
-/** [serviceId, name, tagId, versions, currentVersion (defaults to latest)] */
+/**
+ * [projectId, name, tagId, versions, currentVersion (defaults to latest)]. Before services were
+ * dropped from the schema these sat in services; each now lives directly in its project.
+ */
 type SecretRow = [number, string, number, SecretVersion[], number?]
 
 const SECRET_ROWS = (): SecretRow[] => [
@@ -126,8 +117,8 @@ const SECRET_ROWS = (): SecretRow[] => [
     1,
     history([
       ['sk_live_51Hc2f…old1', 200, 'Neko Nik', 'Initial'],
-      ['sk_live_51Hc2f9QpZt4mK2lYv8Rx', 120, 'Priya Rao', 'Rolled after Stripe dashboard change'],
-      ['sk_live_51Hc2f7WqLp0dJ6nUe3Ta', 40, 'Priya Rao', 'Rotated after leak drill'],
+      ['sk_live_51Hc2f9QpZt4mK2lYv8Rx', 120, 'Priya Rao', 'Rolled after Stripe dashboard change', true],
+      ['sk_live_51Hc2f7WqLp0dJ6nUe3Ta', 40, 'Priya Rao', 'Rotated after leak drill', true],
     ]),
   ],
   [1, 'STRIPE_SECRET_KEY', 2, history([['sk_test_51Hc2fA8bC3dE4fG5hI6j', 150, 'Marcus Chen', 'Initial']])],
@@ -151,10 +142,10 @@ const SECRET_ROWS = (): SecretRow[] => [
       ['debug', 20, 'Aisha Bello', 'Chasing webhook bug'],
     ]),
   ],
-  [2, 'QUEUE_URL', 1, history([['amqps://worker:Vb6Nm2Qa@mq.internal:5671/payouts', 170, 'Neko Nik', 'Initial']])],
-  [2, 'SENTRY_DSN', 1, history([['https://4f1c2e@o12345.ingest.sentry.io/678', 170, 'Neko Nik', 'Initial']])],
+  [1, 'QUEUE_URL', 1, history([['amqps://worker:Vb6Nm2Qa@mq.internal:5671/payouts', 170, 'Neko Nik', 'Initial']])],
+  [1, 'SENTRY_DSN', 1, history([['https://4f1c2e@o12345.ingest.sentry.io/678', 170, 'Neko Nik', 'Initial']])],
   [
-    2,
+    1,
     'CONCURRENCY',
     1,
     history([
@@ -162,12 +153,12 @@ const SECRET_ROWS = (): SecretRow[] => [
       ['16', 30, 'Aisha Bello', 'Black Friday load'],
     ]),
   ],
-  [3, 'NEXT_PUBLIC_API_URL', 1, history([['https://api.acme.dev', 160, 'Lena Fischer', 'Initial']])],
-  [3, 'NEXT_PUBLIC_API_URL', 2, history([['https://api.staging.acme.dev', 160, 'Lena Fischer', 'Initial']])],
-  [3, 'SESSION_SECRET', 1, history([['c1f9a7e3d5b2468f0e9d8c7b6a5f4e3d', 160, 'Lena Fischer', 'Initial']])],
-  [4, 'CLOUDFLARE_API_TOKEN', 1, history([['cf_Tk_8e3Qz1Lp6Wv2Ny9', 140, 'Marcus Chen', 'Initial']])],
+  [2, 'NEXT_PUBLIC_API_URL', 1, history([['https://api.acme.dev', 160, 'Lena Fischer', 'Initial']])],
+  [2, 'NEXT_PUBLIC_API_URL', 2, history([['https://api.staging.acme.dev', 160, 'Lena Fischer', 'Initial']])],
+  [2, 'SESSION_SECRET', 1, history([['c1f9a7e3d5b2468f0e9d8c7b6a5f4e3d', 160, 'Lena Fischer', 'Initial']])],
+  [2, 'CLOUDFLARE_API_TOKEN', 1, history([['cf_Tk_8e3Qz1Lp6Wv2Ny9', 140, 'Marcus Chen', 'Initial']])],
   [
-    4,
+    2,
     'ORIGIN_HOST',
     1,
     history([
@@ -175,22 +166,24 @@ const SECRET_ROWS = (): SecretRow[] => [
       ['10.0.4.20', 9, 'Marcus Chen', 'New origin box'],
     ]),
   ],
-  [5, 'SMTP_PASSWORD', 1, history([['Sm7p!Pa55-2026', 100, 'Sara Lindqvist', 'Initial']])],
-  [5, 'PDF_RENDERER_URL', 1, history([['http://pdf-renderer.internal:3000', 100, 'Sara Lindqvist', 'Initial']])],
-  [6, 'GRAFANA_ADMIN_PASSWORD', 4, history([['gr4f4n4-Adm1n!', 55, 'Olivia Hart', 'Initial']])],
+  [3, 'SMTP_PASSWORD', 1, history([['Sm7p!Pa55-2026', 100, 'Sara Lindqvist', 'Initial']])],
+  [3, 'PDF_RENDERER_URL', 1, history([['http://pdf-renderer.internal:3000', 100, 'Sara Lindqvist', 'Initial']])],
+  [4, 'GRAFANA_ADMIN_PASSWORD', 4, history([['gr4f4n4-Adm1n!', 55, 'Olivia Hart', 'Initial']])],
 ]
 
 const seedSecrets = (): StoredSecret[] =>
-  SECRET_ROWS().map(([serviceId, name, tagId, versions, current], i) => {
+  SECRET_ROWS().map(([projectId, name, tagId, versions, current], i) => {
     const latest = versions.at(-1)!
+    const currentVersion = current ?? latest.version
     return {
       secretId: i + 1,
-      serviceId,
+      projectId,
       name,
       tagId,
       versions,
-      currentVersion: current ?? latest.version,
+      currentVersion,
       latestVersion: latest.version,
+      isHidden: versions.find((v) => v.version === currentVersion)!.isHidden,
       updatedAt: latest.createdAt,
       updatedBy: latest.createdBy,
     }
@@ -271,7 +264,7 @@ datasources:
     isDefault: true
 `
 
-/** [serviceId, fileName, tagId, versions as [content, daysAgo, by, note]] */
+/** [projectId, fileName, tagId, versions as [content, daysAgo, by, note]] */
 const CONFIG_ROWS: Array<[number, string, number, Array<[string, number, string, string]>]> = [
   [
     1,
@@ -284,9 +277,9 @@ const CONFIG_ROWS: Array<[number, string, number, Array<[string, number, string,
   ],
   [1, 'app.yaml', 2, [[APP_YAML('staging', 1), 150, 'Marcus Chen', 'Initial']]],
   [1, 'docker-compose.yml', 1, [[COMPOSE, 60, 'Marcus Chen', 'Initial']]],
-  [2, 'worker.toml', 1, [[WORKER_TOML, 90, 'Aisha Bello', 'Initial']]],
+  [1, 'worker.toml', 1, [[WORKER_TOML, 90, 'Aisha Bello', 'Initial']]],
   [
-    4,
+    2,
     'nginx.conf',
     1,
     [
@@ -295,13 +288,13 @@ const CONFIG_ROWS: Array<[number, string, number, Array<[string, number, string,
       [NGINX_V3, 9, 'Marcus Chen', 'HSTS, health check, new origin'],
     ],
   ],
-  [6, 'datasources.yaml', 4, [[DATASOURCES, 55, 'Olivia Hart', 'Initial']]],
+  [4, 'datasources.yaml', 4, [[DATASOURCES, 55, 'Olivia Hart', 'Initial']]],
 ]
 
 const bytes = (text: string) => new TextEncoder().encode(text).length
 
 const seedConfigs = (): StoredConfig[] =>
-  CONFIG_ROWS.map(([serviceId, fileName, tagId, rows], i) => {
+  CONFIG_ROWS.map(([projectId, fileName, tagId, rows], i) => {
     const versions: ConfigVersion[] = rows.map(([content, days, createdBy, note], v) => ({
       version: v + 1,
       content,
@@ -313,7 +306,7 @@ const seedConfigs = (): StoredConfig[] =>
     const latest = versions.at(-1)!
     return {
       fileId: i + 1,
-      serviceId,
+      projectId,
       fileName,
       tagId,
       versions,
@@ -333,7 +326,7 @@ const RUNBOOK_V3 = `When the payments API pages:
 
 1. Check the Overview dashboard for web-1 / web-2 and db-primary.
 2. Look at https://status.stripe.com.
-3. If webhooks are backing up, scale the worker (CONCURRENCY in Vault → payments-api/worker).
+3. If webhooks are backing up, scale the worker (CONCURRENCY in Vault → payments-api).
 4. Still stuck after 15 minutes? Call Priya, then Marcus.
 
 Post-incident: write it up in #incidents within 24 hours.`
@@ -345,9 +338,9 @@ const seedNotes = (): StoredNote[] => [
     noteId: 1,
     projectId: 1,
     ownerId: 2,
-    password: null,
     createdAt: ago(120),
     shares: [
+      { userId: 1, displayName: user(1).displayName, canEdit: true },
       { userId: 3, displayName: user(3).displayName, canEdit: true },
       { userId: 4, displayName: user(4).displayName, canEdit: false },
     ],
@@ -376,7 +369,6 @@ const seedNotes = (): StoredNote[] => [
     noteId: 2,
     projectId: 1,
     ownerId: 1,
-    password: 'open-sesame',
     createdAt: ago(90),
     shares: [{ userId: 2, displayName: user(2).displayName, canEdit: false }],
     links: [],
@@ -396,9 +388,8 @@ const seedNotes = (): StoredNote[] => [
     noteId: 3,
     projectId: 2,
     ownerId: 6,
-    password: null,
     createdAt: ago(20),
-    shares: [],
+    shares: [{ userId: 1, displayName: user(1).displayName, canEdit: false }],
     links: [
       { shareId: 'k8Qz2LmV', url: '', hasPassword: false, expiresAt: moment().add(5, 'days').toISOString(), createdAt: ago(2) },
     ],
@@ -427,7 +418,6 @@ const seedNotes = (): StoredNote[] => [
     noteId: 4,
     projectId: 3,
     ownerId: 10,
-    password: null,
     createdAt: ago(45),
     shares: [{ userId: 8, displayName: user(8).displayName, canEdit: true }],
     links: [],
@@ -443,26 +433,43 @@ const seedNotes = (): StoredNote[] => [
       },
     ],
   },
+  {
+    // Priya's own note in payments-api, not shared: the signed-in user can't see it
+    noteId: 5,
+    projectId: 1,
+    ownerId: 2,
+    createdAt: ago(10),
+    shares: [],
+    links: [],
+    versions: [
+      {
+        version: 1,
+        title: "Priya's interview notes",
+        content: 'Candidate feedback for the SRE role. Private.',
+        createdAt: ago(10),
+        createdBy: 'Priya Rao',
+        note: '',
+      },
+    ],
+  },
 ]
 
 /** Everything the vault mock holds. */
 interface VaultState {
   projects: VaultProject[]
-  services: VaultService[]
   secrets: StoredSecret[]
   configs: StoredConfig[]
   notes: StoredNote[]
-  nextId: { project: number; service: number; secret: number; config: number; note: number }
+  nextId: { project: number; secret: number; config: number; note: number }
 }
 
 const createState = (): VaultState => {
   const state: VaultState = {
     projects: seedProjects(),
-    services: seedServices(),
     secrets: seedSecrets(),
     configs: seedConfigs(),
     notes: seedNotes(),
-    nextId: { project: 5, service: 7, secret: 0, config: 0, note: 5 },
+    nextId: { project: 5, secret: 0, config: 0, note: 6 },
   }
   state.nextId.secret = state.secrets.length + 1
   state.nextId.config = state.configs.length + 1

@@ -27,8 +27,9 @@ import {
   listAuditLogs,
   updateAuditExportSchedule,
 } from '../api/auditLogs'
-import { getOrganization, updateOrganization } from '../api/organization'
-import { createRole, deleteRole, listRoles, updateRole } from '../api/roles'
+import { PROFILE_KEY } from '@/features/account/hooks/useAccount'
+import { useHasPermissions } from '@/features/auth/permissions'
+import { createRole, deleteRole, fetchRole, listRoles, updateRole } from '../api/roles'
 import { createUser, deleteUser, listUsers, updateUser } from '../api/users'
 import type {
   AdminUserInput,
@@ -36,13 +37,12 @@ import type {
   AuditExportFormat,
   AuditExportScheduleInput,
   AuditLogFilters,
-  OrganizationInput,
+  Role,
   RoleInput,
 } from '../types'
 
 /** Cache keys, all under ['admin'] so a sign-out clear catches them. */
 export const ADMIN_KEYS = {
-  organization: ['admin', 'organization'],
   users: ['admin', 'users'],
   roles: ['admin', 'roles'],
   apiKeys: ['admin', 'api-keys'],
@@ -56,21 +56,12 @@ const useRefresh = (...keys: ReadonlyArray<readonly string[]>) => {
   return () => Promise.all([...keys, ADMIN_KEYS.audit].map((queryKey) => queryClient.invalidateQueries({ queryKey })))
 }
 
-// ── Organization ─────────────────────────────────────────
-
-export const useOrganization = () => useQuery({ queryKey: ADMIN_KEYS.organization, queryFn: getOrganization })
-
-export const useUpdateOrganization = () => {
-  const refresh = useRefresh(ADMIN_KEYS.organization)
-  return useMutation({ mutationFn: (input: OrganizationInput) => updateOrganization(input), onSuccess: refresh })
-}
-
 // ── Users ────────────────────────────────────────────────
 
 export const useAdminUsers = () => useQuery({ queryKey: ADMIN_KEYS.users, queryFn: listUsers })
 
 export const useCreateUser = () => {
-  const refresh = useRefresh(ADMIN_KEYS.users, ADMIN_KEYS.organization)
+  const refresh = useRefresh(ADMIN_KEYS.users)
   return useMutation({ mutationFn: (input: AdminUserInput) => createUser(input), onSuccess: refresh })
 }
 
@@ -83,13 +74,36 @@ export const useUpdateUser = () => {
 }
 
 export const useDeleteUser = () => {
-  const refresh = useRefresh(ADMIN_KEYS.users, ADMIN_KEYS.organization)
+  const refresh = useRefresh(ADMIN_KEYS.users)
   return useMutation({ mutationFn: (userId: number) => deleteUser(userId), onSuccess: refresh })
 }
 
 // ── Roles ────────────────────────────────────────────────
 
-export const useRoles = () => useQuery({ queryKey: ADMIN_KEYS.roles, queryFn: listRoles })
+/** Every role in the organization, from `/user/roles/list`. Pass `enabled: false` without `user:role:view`. */
+export const useRoles = ({ enabled = true }: { enabled?: boolean } = {}) =>
+  useQuery({ queryKey: ADMIN_KEYS.roles, queryFn: listRoles, enabled })
+
+/** One role fresh from `GET /user/roles/fetch/{id}`; idle while `roleId` is null. */
+export const useRole = (roleId: number | null) =>
+  useQuery({
+    queryKey: [...ADMIN_KEYS.roles, roleId],
+    queryFn: () => fetchRole(roleId as number),
+    enabled: roleId !== null,
+    retry: false,
+    gcTime: 0,
+  })
+
+/**
+ * Real roles for pickers and name lookups on other pages (Users, API keys). Only fetched with
+ * `user:role:view`; without it `canView` is false and the list stays empty.
+ */
+export const useRoleOptions = () => {
+  const canView = useHasPermissions('user:role:view')
+  const { data: roles = [], isLoading } = useRoles({ enabled: canView })
+  const roleName = (roleId: number) => roles.find((r) => r.roleId === roleId)?.roleName ?? `Role #${roleId}`
+  return { roles, roleName, canView, isLoading: canView && isLoading }
+}
 
 export const useCreateRole = () => {
   const refresh = useRefresh(ADMIN_KEYS.roles)
@@ -97,9 +111,10 @@ export const useCreateRole = () => {
 }
 
 export const useUpdateRole = () => {
-  const refresh = useRefresh(ADMIN_KEYS.roles)
+  // the edited role may be the signed-in user's own, so their profile is reloaded too
+  const refresh = useRefresh(ADMIN_KEYS.roles, PROFILE_KEY)
   return useMutation({
-    mutationFn: ({ roleId, input }: { roleId: number; input: RoleInput }) => updateRole(roleId, input),
+    mutationFn: ({ role, input }: { role: Role; input: RoleInput }) => updateRole(role, input),
     onSuccess: refresh,
   })
 }

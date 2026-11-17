@@ -14,12 +14,11 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Which vault project and service you're looking at, remembered per browser and shared by the Vault pages. */
+/** How the Vault explorer lists a folder's contents, remembered per browser. */
 
 import { atomWithStorage } from 'jotai/utils'
 
-/** Selected project id (localStorage `nops-vault-project`); null until one is picked. */
-export const vaultProjectIdAtom = atomWithStorage<number | null>('nops-vault-project', null, undefined, { getOnInit: true })
+export type ExplorerView = 'icons' | 'details'
 
-/** Selected service id (localStorage `nops-vault-service`); null until one is picked. */
-export const vaultServiceIdAtom = atomWithStorage<number | null>('nops-vault-service', null, undefined, { getOnInit: true })
+/** "Large icons" (the default, like Explorer) or "Details" (a table with columns). */
+export const explorerViewAtom = atomWithStorage<ExplorerView>('nops-vault-view', 'icons', undefined, { getOnInit: true })

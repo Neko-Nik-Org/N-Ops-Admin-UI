@@ -14,9 +14,13 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Create / edit role dialog for Admin › Roles: permissions, tag scope, approvals and Linux users. */
+/**
+ * Create / edit role dialog for Admin › Roles: permissions, tag scope, approvals and Linux users.
+ * Like the API, it only offers permissions and tags the signed-in user has themselves.
+ */
 
 import { yupResolver } from '@hookform/resolvers/yup'
+import { useAtomValue } from 'jotai'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'react-toastify'
 import { Input } from '@/components/atoms/Input'
@@ -25,10 +29,13 @@ import { Textarea } from '@/components/atoms/Textarea'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { Dialog } from '@/components/molecules/Dialog'
+import { Skeleton } from '@/components/molecules/Skeleton'
 import { FormField } from '@/components/molecules/FormField'
-import { PERMISSION_GROUPS } from '@/features/admin/catalog'
-import { useCreateRole, useUpdateRole } from '@/features/admin/hooks/useAdmin'
-import { useTagOptions } from '@/features/admin/hooks/useTagOptions'
+import { ALL_PERMISSIONS, PERMISSION_GROUPS } from '@/features/admin/catalog'
+import { useCreateRole, useRole, useRoles, useUpdateRole } from '@/features/admin/hooks/useAdmin'
+import { isWithinLimit } from '@/features/auth/permissions'
+import { currentUserAtom } from '@/features/auth/store/session'
+import { useTags } from '@/features/tags/hooks/useTags'
 import { roleSchema, splitList, type RoleFormValues } from '@/features/admin/schema/adminSchemas'
 import type { Role, RoleInput } from '@/features/admin/types'
 import { cn } from '@/utils/cn'
@@ -36,12 +43,22 @@ import { cn } from '@/utils/cn'
 /** The form; mounted only while the dialog is open. */
 const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; onClose: () => void }) => {
   const start = role ?? template
-  const { options: tags } = useTagOptions()
+  const user = useAtomValue(currentUserAtom)
+  // the API lists only the tags this user may access, which are exactly the ones they may grant
+  const { data: tags = [] } = useTags()
+  // already cached by the Roles page; used to catch duplicate names, which the API only reports as a database error
+  const { data: existingRoles = [] } = useRoles()
+  /** Unknown profile (e.g. storage blocked): offer everything and let the API decide. */
+  const canGrant = (permission: string) => !user || user.permissions.includes(permission)
+  const tagLimited = !!user && user.tags.length > 0
+  /** Linux accounts the user may hand out; empty = no limit, undefined = not known yet (API decides). */
+  const ownLinuxUsers = user?.allowedLinuxUsers ?? []
+  const linuxLimited = ownLinuxUsers.length > 0
   const { mutateAsync: create } = useCreateRole()
   const { mutateAsync: update } = useUpdateRole()
   const [state, save] = useAsyncAction(
     async (input: RoleInput): Promise<void> => {
-      if (role) await update({ roleId: role.roleId, input })
+      if (role) await update({ role, input })
       else await create(input)
     },
     { successMs: 500 },
@@ -52,6 +69,7 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
     handleSubmit,
     control,
     setValue,
+    setError,
     formState: { errors },
   } = useForm<RoleFormValues>({
     resolver: yupResolver(roleSchema),
@@ -70,14 +88,29 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
   const selected = useWatch({ control, name: 'permissions' }) ?? []
   const selectedTags = (useWatch({ control, name: 'tagIds' }) ?? []).map(Number)
 
-  /** Ticks or clears a whole permission group. */
+  /** Ticks or clears the grantable permissions of a group. */
   const toggleGroup = (keys: string[], on: boolean) => {
     const rest = selected.filter((p) => !keys.includes(p))
     setValue('permissions', on ? [...rest, ...keys] : rest, { shouldDirty: true, shouldValidate: true })
   }
 
-  const onSubmit = (v: RoleFormValues) =>
-    save({
+  const onSubmit = (v: RoleFormValues) => {
+    // role names are unique per organization (case-sensitive, like the database constraint)
+    if (existingRoles.some((r) => r.roleId !== role?.roleId && r.roleName === v.roleName)) {
+      setError('roleName', { message: `A role called "${v.roleName}" already exists.` })
+      return
+    }
+    // the API refuses an unrestricted role from someone who is limited to some tags
+    if (tagLimited && !v.tagIds.length) {
+      setError('tagIds', { message: "You're limited to some tags, so pick at least one." })
+      return
+    }
+    const linuxUsers = splitList(v.allowedLinuxUsers)
+    if (!isWithinLimit(ownLinuxUsers, linuxUsers)) {
+      setError('allowedLinuxUsers', { message: `Pick from the Linux users you have yourself: ${ownLinuxUsers.join(', ')}.` })
+      return
+    }
+    return save({
       roleName: v.roleName,
       roleDescription: v.roleDescription,
       permissions: v.permissions,
@@ -91,15 +124,29 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
         setTimeout(onClose, 500)
       })
       .catch((error: Error) => toast.error(error.message))
+  }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-col gap-5" noValidate>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_2fr]">
         <FormField id="roleName" label="Name" error={errors.roleName?.message}>
-          <Input id="roleName" placeholder="Operator" autoComplete="off" hasError={!!errors.roleName} {...register('roleName')} />
+          <Input
+            id="roleName"
+            placeholder="Operator"
+            autoComplete="off"
+            maxLength={100}
+            hasError={!!errors.roleName}
+            {...register('roleName')}
+          />
         </FormField>
         <FormField id="roleDescription" label="Description" error={errors.roleDescription?.message}>
-          <Input id="roleDescription" placeholder="What this role is for" autoComplete="off" {...register('roleDescription')} />
+          <Input
+            id="roleDescription"
+            placeholder="What this role is for"
+            autoComplete="off"
+            hasError={!!errors.roleDescription}
+            {...register('roleDescription')}
+          />
         </FormField>
       </div>
 
@@ -108,9 +155,14 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
           <span>Permissions</span>
           <span className="text-xs">{selected.length} selected</span>
         </legend>
+        {user && ALL_PERMISSIONS.some((p) => !canGrant(p)) && (
+          <p className="-mt-1 text-xs text-text-muted">
+            You can only grant permissions your own role has. The rest are greyed out.
+          </p>
+        )}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {PERMISSION_GROUPS.map((group) => {
-            const keys = group.permissions.map((p) => p.key)
+            const keys = group.permissions.map((p) => p.key).filter(canGrant)
             const count = keys.filter((k) => selected.includes(k)).length
             return (
               <div key={group.label} className="rounded-lg border border-border p-3">
@@ -118,7 +170,8 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
                   <input
                     type="checkbox"
                     className="size-4 accent-[var(--color-signal)]"
-                    checked={count === keys.length}
+                    checked={keys.length > 0 && count === keys.length}
+                    disabled={!keys.length}
                     ref={(el) => {
                       if (el) el.indeterminate = count > 0 && count < keys.length
                     }}
@@ -129,10 +182,18 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
                 </label>
                 <div className="flex flex-col gap-1.5 pl-6">
                   {group.permissions.map((p) => (
-                    <label key={p.key} className="flex cursor-pointer items-center gap-2 text-sm text-text-muted">
+                    <label
+                      key={p.key}
+                      className={cn(
+                        'flex items-center gap-2 text-sm text-text-muted',
+                        canGrant(p.key) ? 'cursor-pointer' : 'cursor-not-allowed opacity-50',
+                      )}
+                      title={canGrant(p.key) ? undefined : "Your role doesn't have this permission"}
+                    >
                       <input
                         type="checkbox"
                         value={p.key}
+                        disabled={!canGrant(p.key)}
                         className="size-3.5 accent-[var(--color-signal)]"
                         {...register('permissions')}
                       />
@@ -154,6 +215,7 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
 
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-1 text-sm text-text-muted">Limit to tags</legend>
+        {!tags.length && <p className="text-xs text-text-muted">There are no tags yet. Create some on the Tags page.</p>}
         <div className="flex flex-wrap gap-2">
           {tags.map((tag) => {
             const on = selectedTags.includes(tag.tagId)
@@ -173,22 +235,40 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
             )
           })}
         </div>
-        <p className="text-xs text-text-muted">
-          {selectedTags.length
-            ? 'People with this role only see resources with these tags.'
-            : 'No tags picked: this role reaches every tag.'}
-        </p>
+        {errors.tagIds?.message ? (
+          <p className="text-sm text-danger" role="alert">
+            {errors.tagIds.message}
+          </p>
+        ) : (
+          <p className="text-xs text-text-muted">
+            {selectedTags.length
+              ? 'People with this role only see resources with these tags.'
+              : tagLimited
+                ? "You're limited to some tags, so pick at least one."
+                : 'No tags picked: this role reaches every tag.'}
+          </p>
+        )}
       </fieldset>
 
       <div className="flex flex-col gap-4 rounded-lg border border-border p-4">
         <Switch
           label="Can approve requests"
-          description="Approve or reject other people's approval requests."
+          description={
+            user?.canApproveApprovals === false
+              ? "Only someone who can approve requests can give this. Your role can't."
+              : "Approve or reject other people's approval requests."
+          }
+          disabled={user?.canApproveApprovals === false}
           {...register('canApproveApprovals')}
         />
         <Switch
           label="Skips approvals"
-          description="Sensitive commands run without waiting for approval. Give this sparingly."
+          description={
+            user?.canBypassApprovals === false
+              ? "Only someone who skips approvals can give this. Your role can't."
+              : 'Sensitive commands run without waiting for approval. Give this sparingly.'
+          }
+          disabled={user?.canBypassApprovals === false}
           {...register('canBypassApprovals')}
         />
       </div>
@@ -203,7 +283,11 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
           {...register('allowedLinuxUsers')}
         />
         {!errors.allowedLinuxUsers && (
-          <p className="text-xs text-text-muted">Accounts this role may SSH in as, separated by commas. Leave empty for none.</p>
+          <p className="text-xs text-text-muted">
+            {linuxLimited
+              ? `Accounts this role may SSH in as, separated by commas. You can give: ${ownLinuxUsers.join(', ')}.`
+              : 'Accounts this role may SSH in as, separated by commas. Leave empty for any.'}
+          </p>
         )}
       </FormField>
 
@@ -222,6 +306,22 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
       </div>
     </form>
   )
+}
+
+/**
+ * Edits `role` starting from its latest saved state, so the save only sends what this edit changed.
+ * If that fetch fails the form falls back to the copy from the list.
+ */
+const EditRoleForm = ({ role, onClose }: { role: Role; onClose: () => void }) => {
+  const { data: latest, isPending } = useRole(role.roleId)
+  if (isPending)
+    return (
+      <div className="flex flex-col gap-3" aria-busy="true" aria-label="Loading role">
+        <Skeleton height={40} />
+        <Skeleton height={192} />
+      </div>
+    )
+  return <RoleForm role={latest ?? role} onClose={onClose} />
 }
 
 /** Creates a role (optionally from `template`), or edits `role` when given. */
@@ -243,8 +343,8 @@ export const RoleFormDialog = ({
     onClose={onClose}
     size="lg"
     title={role ? `Edit ${role.roleName}` : 'New role'}
-    description="A role is a set of permissions. Users and API keys each get one role."
+    description="A role is a set of permissions. Each user gets one role."
   >
-    <RoleForm role={role} template={template} onClose={onClose} />
+    {open && role ? <EditRoleForm role={role} onClose={onClose} /> : <RoleForm template={template} onClose={onClose} />}
   </Dialog>
 )

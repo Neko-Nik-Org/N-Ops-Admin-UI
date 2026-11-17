@@ -14,9 +14,10 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Admin › Roles (/admin/roles): permission sets for users and API keys. */
+/** Admin › Roles (/admin/roles): permission sets for users, backed by `/user/roles/*`. */
 
 import { Copy, Pencil, Plus, Trash2 } from 'lucide-react'
+import { useAtomValue } from 'jotai'
 import { useMemo, useState } from 'react'
 import { Badge } from '@/components/atoms/Badge'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
@@ -26,29 +27,33 @@ import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'
 import { RoleFormDialog } from '@/components/organisms/RoleFormDialog'
 import { ALL_PERMISSIONS } from '@/features/admin/catalog'
-import { useAdminUsers, useApiKeys, useDeleteRole, useRoles } from '@/features/admin/hooks/useAdmin'
-import { useTagOptions } from '@/features/admin/hooks/useTagOptions'
+import { useDeleteRole, useRoles } from '@/features/admin/hooks/useAdmin'
 import type { Role } from '@/features/admin/types'
+import { isRoleWithinScope, useHasPermissions } from '@/features/auth/permissions'
+import { currentUserAtom } from '@/features/auth/store/session'
+import { useTags } from '@/features/tags/hooks/useTags'
 
 /** Which dialog is open. `copy` opens the editor pre-filled from another role. */
 type DialogState =
   { kind: 'closed' } | { kind: 'create'; from?: Role } | { kind: 'edit'; role: Role } | { kind: 'delete'; role: Role }
 
-/** Roles table: what each grants, where, and who has it. */
+/** Shown on edit / delete buttons for a role wider than the signed-in user's own access. */
+const OUT_OF_SCOPE = 'This role has permissions or tags your own role lacks, so you can’t change it.'
+
+/** Roles table: what each grants and where. Actions follow the `user:role:*` permissions. */
 export const AdminRolesPage = () => {
-  const { data: roles, isLoading, error } = useRoles()
-  const { data: users } = useAdminUsers()
-  const { data: keys } = useApiKeys()
-  const { tagName } = useTagOptions()
+  const user = useAtomValue(currentUserAtom)
+  const canView = useHasPermissions('user:role:view')
+  const canCreate = useHasPermissions('user:role:view', 'user:role:create')
+  const canUpdate = useHasPermissions('user:role:view', 'user:role:update')
+  const canDelete = useHasPermissions('user:role:view', 'user:role:delete')
+  const { data: roles, isLoading, error } = useRoles({ enabled: canView })
+  const { data: tags } = useTags()
+  const tagName = (tagId: number) => tags?.find((t) => t.tagId === tagId)?.tagName ?? `#${tagId}`
   const { mutateAsync: remove } = useDeleteRole()
   const [dialog, setDialog] = useState<DialogState>({ kind: 'closed' })
   const [search, setSearch] = useState('')
   const close = () => setDialog({ kind: 'closed' })
-
-  const usage = (roleId: number) => ({
-    users: users?.filter((u) => u.roleId === roleId).length ?? 0,
-    keys: keys?.filter((k) => k.roleId === roleId).length ?? 0,
-  })
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -69,17 +74,20 @@ export const AdminRolesPage = () => {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Roles"
-        description="Each role is a set of permissions, optionally limited to some tags. Users and API keys share these roles."
-        mock
+        description="Each role is a set of permissions, optionally limited to some tags. Every user signs in with one role."
         actions={
-          <LoadingButton icon={<Plus size={15} />} onClick={() => setDialog({ kind: 'create' })}>
-            New role
-          </LoadingButton>
+          canCreate && (
+            <LoadingButton icon={<Plus size={15} />} onClick={() => setDialog({ kind: 'create' })}>
+              New role
+            </LoadingButton>
+          )
         }
       />
 
-      {isLoading ? (
-        <TableSkeleton rows={6} columns={5} />
+      {!canView ? (
+        <p className="text-sm text-text-muted">You need the “View roles” permission (user:role:view) to see roles.</p>
+      ) : isLoading ? (
+        <TableSkeleton rows={6} columns={4} />
       ) : error ? (
         <p className="text-sm text-text-muted">Couldn't load roles: {error.message}</p>
       ) : (
@@ -96,7 +104,6 @@ export const AdminRolesPage = () => {
                     <th className="pb-2 font-medium">Permissions</th>
                     <th className="pb-2 font-medium">Tags</th>
                     <th className="pb-2 font-medium">Approvals</th>
-                    <th className="pb-2 font-medium">Used by</th>
                     <th className="pb-2 font-medium">
                       <span className="sr-only">Actions</span>
                     </th>
@@ -104,7 +111,7 @@ export const AdminRolesPage = () => {
                 </thead>
                 <tbody>
                   {visible.map((role) => {
-                    const used = usage(role.roleId)
+                    const inScope = isRoleWithinScope(user, role)
                     return (
                       <tr key={role.roleId} className="border-t border-border align-top">
                         <td className="max-w-xs py-3">
@@ -140,34 +147,40 @@ export const AdminRolesPage = () => {
                             )}
                           </div>
                         </td>
-                        <td className="py-3 text-sm text-text-muted">
-                          {used.users} user{used.users === 1 ? '' : 's'}
-                          {used.keys > 0 && `, ${used.keys} key${used.keys === 1 ? '' : 's'}`}
-                        </td>
                         <td className="py-3">
                           <div className="flex justify-end gap-1">
-                            <LoadingButton
-                              variant="ghost"
-                              size="sm"
-                              icon={<Copy size={14} />}
-                              aria-label={`Duplicate ${role.roleName}`}
-                              title="Duplicate"
-                              onClick={() => setDialog({ kind: 'create', from: role })}
-                            />
-                            <LoadingButton
-                              variant="ghost"
-                              size="sm"
-                              icon={<Pencil size={14} />}
-                              aria-label={`Edit ${role.roleName}`}
-                              onClick={() => setDialog({ kind: 'edit', role })}
-                            />
-                            <LoadingButton
-                              variant="ghost"
-                              size="sm"
-                              icon={<Trash2 size={14} />}
-                              aria-label={`Delete ${role.roleName}`}
-                              onClick={() => setDialog({ kind: 'delete', role })}
-                            />
+                            {canCreate && (
+                              <LoadingButton
+                                variant="ghost"
+                                size="sm"
+                                icon={<Copy size={14} />}
+                                aria-label={`Duplicate ${role.roleName}`}
+                                title="Duplicate"
+                                onClick={() => setDialog({ kind: 'create', from: role })}
+                              />
+                            )}
+                            {canUpdate && (
+                              <LoadingButton
+                                variant="ghost"
+                                size="sm"
+                                icon={<Pencil size={14} />}
+                                aria-label={`Edit ${role.roleName}`}
+                                title={inScope ? 'Edit' : OUT_OF_SCOPE}
+                                disabled={!inScope}
+                                onClick={() => setDialog({ kind: 'edit', role })}
+                              />
+                            )}
+                            {canDelete && (
+                              <LoadingButton
+                                variant="ghost"
+                                size="sm"
+                                icon={<Trash2 size={14} />}
+                                aria-label={`Delete ${role.roleName}`}
+                                title={inScope ? 'Delete' : OUT_OF_SCOPE}
+                                disabled={!inScope}
+                                onClick={() => setDialog({ kind: 'delete', role })}
+                              />
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -198,8 +211,8 @@ export const AdminRolesPage = () => {
       >
         {dialog.kind === 'delete' && (
           <p>
-            Delete <span className="font-medium text-text">{dialog.role.roleName}</span>? Only roles that no user or API key uses
-            can be deleted. This can't be undone.
+            Delete <span className="font-medium text-text">{dialog.role.roleName}</span>? A role that any user still has can't be
+            deleted: move those users to another role first. This can't be undone.
           </p>
         )}
       </ConfirmDialog>

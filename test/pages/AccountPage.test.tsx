@@ -229,6 +229,121 @@ describe('AccountPage — username', () => {
   })
 })
 
+describe('AccountPage — edit profile', () => {
+  const rawProfile = {
+    user_id: 1,
+    organization_id: 'org-1',
+    user_name: 'priya',
+    display_name: 'Priya R',
+    organization_name: 'Acme',
+    primary_email: 'priya@acme.dev',
+    is_email_verified: true,
+    is_user_active: true,
+    is_organization_active: true,
+    permissions: ['tag:create'],
+    tags: [],
+    allowed_linux_users: [],
+    can_approve_approvals: false,
+    can_bypass_approvals: false,
+  }
+
+  /** Org info, plus /user/self/profile answering with `profile`. */
+  const mockWithProfile = (profile: object = rawProfile) =>
+    api.get.mockImplementation((url: string) => Promise.resolve({ data: url === '/user/self/profile' ? profile : orgInfo }))
+
+  const openEditor = () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Edit profile' }))
+    return screen.getByRole('dialog')
+  }
+
+  it('validates the name and email', async () => {
+    mockWithProfile()
+    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    const dialog = openEditor()
+    fireEvent.change(within(dialog).getByLabelText('Display name'), { target: { value: '  ' } })
+    fireEvent.change(within(dialog).getByLabelText('Email'), { target: { value: 'nope' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    expect(await within(dialog).findByText('Enter your name.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Enter a valid email address.')).toBeInTheDocument()
+    expect(api.put).not.toHaveBeenCalled()
+  })
+
+  it('renames without sending the email, so it stays verified', async () => {
+    mockWithProfile()
+    api.put.mockResolvedValue({ data: 'Profile updated successfully' })
+    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    const dialog = openEditor()
+    expect(within(dialog).queryByRole('note')).not.toBeInTheDocument()
+    fireEvent.change(within(dialog).getByLabelText('Display name'), { target: { value: ' Priya R ' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText('Profile saved.')).toBeInTheDocument()
+    expect(api.put).toHaveBeenCalledWith('/user/self/profile', { display_name: 'Priya R' })
+    expect(store.get(currentUserAtom)).toMatchObject({ displayName: 'Priya R', isEmailVerified: true })
+    expect(store.get(sessionStatusAtom)).toBe('authenticated')
+  })
+
+  it('closes without a request when nothing changed', async () => {
+    mockWithProfile()
+    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    const dialog = openEditor()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(api.put).not.toHaveBeenCalled()
+  })
+
+  it('changes the email and refreshes a remembered session so the new address can be verified', async () => {
+    mockWithProfile()
+    setSessionToken('old', true)
+    api.put.mockResolvedValue({ data: 'Profile updated successfully' })
+    api.post.mockImplementation((url: string) =>
+      Promise.resolve(url === '/auth/refresh' ? { data: { session_id: 'new' } } : { data: '' }),
+    )
+    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    const dialog = openEditor()
+    fireEvent.change(within(dialog).getByLabelText('Email'), { target: { value: 'priya@new.dev' } })
+    expect(within(dialog).getByRole('note')).toHaveTextContent('Your new email will need verifying.')
+    expect(within(dialog).getByRole('note')).not.toHaveTextContent('signed out')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText(/Profile saved. Verify priya@new.dev/)).toBeInTheDocument()
+    expect(api.put).toHaveBeenCalledWith('/user/self/profile', { display_name: 'Priya Rao', primary_email: 'priya@new.dev' })
+    expect(api.post).toHaveBeenCalledWith('/auth/refresh')
+    expect(store.get(currentUserAtom)).toMatchObject({ primaryEmail: 'priya@new.dev', isEmailVerified: false })
+    expect(getSessionToken()).toBe('new')
+  })
+
+  it('signs out after an email change when the session cannot be refreshed', async () => {
+    mockWithProfile()
+    setSessionToken('old', false)
+    api.put.mockResolvedValue({ data: 'Profile updated successfully' })
+    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    const dialog = openEditor()
+    fireEvent.change(within(dialog).getByLabelText('Email'), { target: { value: 'priya@new.dev' } })
+    expect(within(dialog).getByRole('note')).toHaveTextContent('You’ll be signed out after saving')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText('Profile saved. Sign in again to verify priya@new.dev.')).toBeInTheDocument()
+    await waitFor(() => expect(store.get(sessionStatusAtom)).toBe('unauthenticated'))
+    expect(api.post).not.toHaveBeenCalledWith('/auth/refresh')
+  })
+
+  it('explains a clash and reloads the profile in case the name was saved', async () => {
+    mockWithProfile({ ...rawProfile, display_name: 'Priya R' })
+    api.put.mockRejectedValue(new ApiError('SQL Database error', 417))
+    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    const dialog = openEditor()
+    fireEvent.change(within(dialog).getByLabelText('Display name'), { target: { value: 'Priya R' } })
+    fireEvent.change(within(dialog).getByLabelText('Email'), { target: { value: 'taken@acme.dev' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText(/may already be in use/)).toBeInTheDocument()
+    await waitFor(() => expect(store.get(currentUserAtom)?.displayName).toBe('Priya R'))
+    expect(store.get(currentUserAtom)?.primaryEmail).toBe('priya@acme.dev')
+    expect(store.get(sessionStatusAtom)).toBe('authenticated')
+  })
+})
+
 describe('AccountPage — security', () => {
   it('is shown even when the profile is unknown', () => {
     mockGets()

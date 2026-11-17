@@ -41,9 +41,9 @@ export const ROUTES = {
   serviceManagement: '/service-management',
   postgres: '/service-management/postgres',
   vault: '/vault',
-  vaultKeys: '/vault/keys',
-  vaultNotes: '/vault/notes',
-  vaultConfigFiles: '/vault/config-files',
+  /** A project folder; `/vault/:projectId/:section` opens its Env, Conf or Notes folder. */
+  vaultProject: '/vault/:projectId',
+  vaultSection: '/vault/:projectId/:section',
   approvals: '/approvals',
   metrics: '/metrics',
   workflows: '/workflows',
@@ -88,16 +88,8 @@ export const APP_SECTIONS: readonly AppSection[] = [
     icon: Boxes,
     children: [{ path: ROUTES.postgres, title: 'Postgres' }],
   },
-  {
-    path: ROUTES.vault,
-    title: 'Vault',
-    icon: Lock,
-    children: [
-      { path: ROUTES.vaultKeys, title: 'Keys store' },
-      { path: ROUTES.vaultNotes, title: 'Secure notes' },
-      { path: ROUTES.vaultConfigFiles, title: 'Config files' },
-    ],
-  },
+  // one link: the Vault page is a file explorer with its own folder tree
+  { path: ROUTES.vault, title: 'Vault', icon: Lock },
   { path: ROUTES.approvals, title: 'Approvals', icon: CheckCircle2 },
   { path: ROUTES.metrics, title: 'Metrics', icon: LineChart },
   { path: ROUTES.workflows, title: 'Workflows', icon: Workflow },
@@ -117,6 +109,15 @@ export const APP_SECTIONS: readonly AppSection[] = [
   },
 ]
 
+/** Older Vault URLs (tabs and pages before the explorer), kept working by sending them to the Vault root. */
+export const VAULT_REDIRECTS: readonly string[] = [
+  '/vault/env',
+  '/vault/conf',
+  '/vault/notes',
+  '/vault/keys',
+  '/vault/config-files',
+]
+
 /** Every routed sidebar page: plain sections plus each group's children. */
 export const APP_PAGES: readonly AppPage[] = APP_SECTIONS.flatMap((s) => s.children ?? [s])
 
@@ -126,4 +127,14 @@ export const PAGE_TITLES: Readonly<Record<string, readonly string[]>> = {
     APP_SECTIONS.flatMap((s) => (s.children ? s.children.map((c) => [c.path, [s.title, c.title]]) : [[s.path, [s.title]]])),
   ),
   [ROUTES.account]: ['Account'],
+}
+
+/**
+ * Breadcrumb trail for a URL: an exact match, else the sidebar section it sits under (e.g. a Vault
+ * folder like /vault/3/env shows "Vault", whose own address bar shows the rest).
+ */
+export const pageTrail = (pathname: string): readonly string[] => {
+  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname]
+  const section = APP_SECTIONS.find((s) => s.path !== ROUTES.overview && pathname.startsWith(`${s.path}/`))
+  return section ? [section.title] : []
 }

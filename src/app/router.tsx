@@ -26,7 +26,7 @@ import type { ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth, RequireGuest } from './guards'
 import { AppShell } from '@/components/templates/AppShell'
-import { APP_PAGES, APP_SECTIONS, ROUTES } from '@/constants/routes'
+import { APP_PAGES, APP_SECTIONS, ROUTES, VAULT_REDIRECTS } from '@/constants/routes'
 import { AccountPage } from '@/pages/AccountPage'
 import { AdminApiKeysPage } from '@/pages/admin/AdminApiKeysPage'
 import { AdminAuditLogsPage } from '@/pages/admin/AdminAuditLogsPage'
@@ -41,9 +41,7 @@ import { NotFoundPage } from '@/pages/NotFoundPage'
 import { OverviewPage } from '@/pages/OverviewPage'
 import { TagsPage } from '@/pages/TagsPage'
 import { TwoFactorPage } from '@/pages/TwoFactorPage'
-import { VaultConfigFilesPage } from '@/pages/vault/VaultConfigFilesPage'
-import { VaultKeysPage } from '@/pages/vault/VaultKeysPage'
-import { VaultNotesPage } from '@/pages/vault/VaultNotesPage'
+import { VaultPage } from '@/pages/vault/VaultPage'
 
 /** Sections that have a real page; every other sidebar section renders ComingSoonPage. */
 const BUILT_PAGES: Partial<Record<string, ReactNode>> = {
@@ -54,9 +52,6 @@ const BUILT_PAGES: Partial<Record<string, ReactNode>> = {
   [ROUTES.adminApiKeys]: <AdminApiKeysPage />,
   [ROUTES.adminRoles]: <AdminRolesPage />,
   [ROUTES.adminAuditLogs]: <AdminAuditLogsPage />,
-  [ROUTES.vaultKeys]: <VaultKeysPage />,
-  [ROUTES.vaultNotes]: <VaultNotesPage />,
-  [ROUTES.vaultConfigFiles]: <VaultConfigFilesPage />,
 }
 
 /** All application routes. Sections that are not built yet render ComingSoonPage. */
@@ -104,8 +99,15 @@ export const AppRouter = () => (
           </RequireAuth>
         }
       >
-        {APP_PAGES.map(({ path, title }) => (
+        {APP_PAGES.filter(({ path }) => path !== ROUTES.vault).map(({ path, title }) => (
           <Route key={path} path={path} element={BUILT_PAGES[path] ?? <ComingSoonPage title={title} />} />
+        ))}
+        {/* Vault: a file explorer whose URL is the open folder; older Vault URLs go to its root */}
+        <Route path={ROUTES.vault} element={<VaultPage />} />
+        <Route path={ROUTES.vaultProject} element={<VaultPage />} />
+        <Route path={ROUTES.vaultSection} element={<VaultPage />} />
+        {VAULT_REDIRECTS.map((from) => (
+          <Route key={from} path={from} element={<Navigate to={ROUTES.vault} replace />} />
         ))}
         {/* A group's own URL (e.g. /vault) opens its first page */}
         {APP_SECTIONS.filter((s) => s.children?.length).map(({ path, children }) => (

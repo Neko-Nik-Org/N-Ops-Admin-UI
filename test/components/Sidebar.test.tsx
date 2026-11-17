@@ -52,15 +52,22 @@ describe('Sidebar', () => {
 
   it('expands a group to show its pages', () => {
     renderSidebar()
-    const vault = screen.getByRole('button', { name: 'Vault' })
-    expect(vault).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('link', { name: 'Keys store' })).not.toBeInTheDocument()
+    const admin = screen.getByRole('button', { name: 'Admin' })
+    expect(admin).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('link', { name: 'Roles' })).not.toBeInTheDocument()
 
-    fireEvent.click(vault)
-    expect(vault).toHaveAttribute('aria-expanded', 'true')
-    for (const name of ['Keys store', 'Secure notes', 'Config files']) {
+    fireEvent.click(admin)
+    expect(admin).toHaveAttribute('aria-expanded', 'true')
+    for (const name of ['Organization', 'Users', 'API keys', 'Roles', 'Tags', 'Audit logs']) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument()
     }
+  })
+
+  it('shows Vault as one link that stays active on every Vault tab', () => {
+    renderSidebar('/vault/notes')
+    const vault = screen.getByRole('link', { name: 'Vault' })
+    expect(vault).toHaveAttribute('href', '/vault')
+    expect(vault).toHaveAttribute('aria-current', 'page')
   })
 
   it('opens the group that holds the current page', () => {
@@ -79,8 +86,8 @@ describe('Sidebar', () => {
     expect(localStorage.getItem('nops-sidebar-collapsed')).toBe('true')
 
     // Clicking a group icon brings the full sidebar back with that group open
-    fireEvent.click(screen.getByRole('button', { name: 'Vault' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Admin' }))
     expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Keys store' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Roles' })).toBeInTheDocument()
   })
 })

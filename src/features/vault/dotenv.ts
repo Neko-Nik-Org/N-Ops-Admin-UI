@@ -14,7 +14,7 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Reading and writing `.env` files for the Keys store's import and export. */
+/** Reading and writing `.env` files for the Vault Env tab's import and export. */
 
 /** One KEY=value pair. */
 export interface DotenvEntry {

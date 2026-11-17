@@ -19,7 +19,7 @@
  * Field names follow the API schema (docs/Schema/PGSQL.sql in N-Ops-Main-API), camelCased.
  */
 
-/** The organization's editable profile plus its read-only quotas (`organization` table). */
+/** The mock backend's organization record (quotas and usage for the mock Users / Vault pages). The real one comes from `/user/self/org-info`. */
 export interface Organization {
   organizationId: string
   organizationName: string
@@ -46,12 +46,6 @@ export interface OrganizationProfile {
   website: string
   contactEmail: string
   timezone: string
-}
-
-/** Fields an admin can change on the organization. */
-export interface OrganizationInput {
-  organizationName: string
-  info: OrganizationProfile
 }
 
 /** A person in the organization (`app_user`). */
@@ -100,7 +94,10 @@ export interface Role {
 /** Fields set when creating or editing a role. */
 export type RoleInput = Omit<Role, 'roleId' | 'createdAt' | 'updatedAt'>
 
-/** An API key. It acts with an existing role's permissions, limited to one tag (`api_key`). */
+/**
+ * An API key. It acts with an existing role's permissions, limited to one tag and to the vault
+ * projects it is linked to (`api_key` + `api_key_vault_project`).
+ */
 export interface ApiKey {
   apiKeyId: number
   keyName: string
@@ -109,6 +106,8 @@ export interface ApiKey {
   keyPrefix: string
   roleId: number
   tagId: number
+  /** Vault projects the key can read; at least one. */
+  vaultProjectIds: number[]
   isActive: boolean
   createdAt: string
   updatedAt: string
@@ -123,6 +122,7 @@ export interface ApiKeyInput {
   keyDescription: string
   roleId: number
   tagId: number
+  vaultProjectIds: number[]
   isActive: boolean
   expiresAt: string | null
 }

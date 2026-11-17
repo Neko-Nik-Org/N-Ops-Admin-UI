@@ -22,12 +22,13 @@ import type { ApiKey, ApiKeyInput, CreatedApiKey } from '../types'
 
 const findKey = (apiKeyId: number) => db.apiKeys.find((k) => k.apiKeyId === apiKeyId) ?? notFound('API key')
 
-/** Key names are unique per organization; the role must exist. */
+/** Key names are unique per organization. Roles are real, so the API will check the role id when keys go live. */
 const assertValid = (input: ApiKeyInput, exceptId?: number) => {
   if (db.apiKeys.some((k) => k.apiKeyId !== exceptId && k.keyName.toLowerCase() === input.keyName.toLowerCase())) {
     throw new Error(`An API key called "${input.keyName}" already exists.`)
   }
-  if (!db.roles.some((r) => r.roleId === input.roleId)) throw new Error('Pick a role for this key.')
+  // projects are real now; the API will check the ids when API keys go live
+  if (!input.vaultProjectIds.length) throw new Error('Pick at least one vault project.')
 }
 
 /** Random URL-safe characters for the mock secret. */
@@ -62,7 +63,7 @@ export const createApiKey = async (input: ApiKeyInput): Promise<CreatedApiKey> =
     lastUsedAt: null,
   }
   db.apiKeys.push(apiKey)
-  recordAudit('api_key.create', 'api_key', apiKey.keyName, `Role: ${db.roles.find((r) => r.roleId === input.roleId)?.roleName}`)
+  recordAudit('api_key.create', 'api_key', apiKey.keyName, `Role #${input.roleId}`)
   return { apiKey: clone(apiKey), secret }
 }
 

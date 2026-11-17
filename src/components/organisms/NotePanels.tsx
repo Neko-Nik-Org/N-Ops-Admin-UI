@@ -14,7 +14,7 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Secure note panels: unlock, read, edit (with lock settings), history and sharing. */
+/** Secure note panels: read, edit, history and sharing (people in the org, or public links). */
 
 import { History, Link2, Lock, Pencil, Share2, Trash2, Users } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
@@ -22,7 +22,6 @@ import { toast } from 'react-toastify'
 import { Badge } from '@/components/atoms/Badge'
 import { Input } from '@/components/atoms/Input'
 import { Select } from '@/components/atoms/Select'
-import { Switch } from '@/components/atoms/Switch'
 import { Textarea } from '@/components/atoms/Textarea'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { SkeletonText } from '@/components/molecules/Skeleton'
@@ -32,7 +31,6 @@ import { Dialog } from '@/components/molecules/Dialog'
 import { DiffView } from '@/components/molecules/DiffView'
 import { FormField } from '@/components/molecules/FormField'
 import { useAdminUsers } from '@/features/admin/hooks/useAdmin'
-import { NoteLockedError } from '@/features/vault/api/notes'
 import {
   useCreateNote,
   useCreateNoteLink,
@@ -42,67 +40,55 @@ import {
   useSetNoteShares,
   useUpdateNote,
 } from '@/features/vault/hooks/useVault'
-import type { NoteInput, NoteVersion, SecureNote } from '@/features/vault/types'
+import type { NoteAccess, NoteInput, NoteVersion, SecureNote } from '@/features/vault/types'
 import { cn } from '@/utils/cn'
 import { formatDate, formatDateTime, formatRelative } from '@/utils/format'
 
 // ── Edit / create ────────────────────────────────────────
 
-/** Title, content and lock settings. Creates a note in `projectId`, or saves a new version of `note`. */
+/** Title and content. Creates a (private) note in `projectId`, or saves a new version of `note`. */
 export const NoteForm = ({
   projectId,
   note,
   current,
-  password,
   onDone,
   onSaved,
 }: {
   projectId: number
   note?: SecureNote
   current?: NoteVersion
-  /** The password the note was unlocked with. */
-  password?: string
   onDone: () => void
-  /** Called with the new note's id, or the password now in effect after an edit. */
-  onSaved: (result: { noteId?: number; password?: string }) => void
+  /** Called with the new note's id after a create. */
+  onSaved: (result: { noteId?: number }) => void
 }) => {
   const [title, setTitle] = useState(current?.title ?? '')
   const [content, setContent] = useState(current?.content ?? '')
-  const [locked, setLocked] = useState(note?.isProtected ?? false)
-  const [changePassword, setChangePassword] = useState(!note?.isProtected)
-  const [newPassword, setNewPassword] = useState('')
   const [reason, setReason] = useState('')
-  const [errors, setErrors] = useState<{ title?: string; password?: string }>({})
+  const [errors, setErrors] = useState<{ title?: string }>({})
   const { mutateAsync: create } = useCreateNote()
   const { mutateAsync: update } = useUpdateNote()
 
-  /** undefined = keep the lock as is, '' = remove it, otherwise the new password. */
-  const passwordChange = (): string | undefined => {
-    if (!locked) return note?.isProtected ? '' : undefined
-    return changePassword ? newPassword : undefined
-  }
-
   const [state, save] = useAsyncAction(
-    async (input: NoteInput) => {
+    async (input: NoteInput): Promise<{ noteId?: number }> => {
       if (note) {
-        await update({ noteId: note.noteId, input, password })
-        return { password: input.password === undefined ? password : input.password || undefined }
+        await update({ noteId: note.noteId, input })
+        return {}
       }
-      return { noteId: (await create({ projectId, input })).noteId, password: input.password || undefined }
+      return { noteId: (await create({ projectId, input })).noteId }
     },
     { successMs: 400 },
   )
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    const next: typeof errors = {}
-    if (!title.trim()) next.title = 'Give the note a title.'
-    if (locked && changePassword && newPassword.length < 8) next.password = 'Use at least 8 characters.'
-    setErrors(next)
-    if (Object.keys(next).length) return
-    save({ title: title.trim(), content, password: passwordChange(), note: reason })
+    if (!title.trim()) {
+      setErrors({ title: 'Give the note a title.' })
+      return
+    }
+    setErrors({})
+    save({ title: title.trim(), content, note: reason })
       .then((result) => {
-        toast.success(note ? 'Note saved.' : 'Note created.')
+        toast.success(note ? 'Note saved.' : 'Note created. Only you can see it until you share it.')
         onSaved(result)
         setTimeout(onDone, 400)
       })
@@ -131,35 +117,12 @@ export const NoteForm = ({
           className="font-mono text-sm"
         />
       </FormField>
-      <div className="flex flex-col gap-3 rounded-lg border border-border p-4">
-        <Switch
-          label="Lock with a password"
-          description="The note is encrypted with this password. Nobody can read it without it, and it can't be recovered."
-          checked={locked}
-          onChange={(e) => setLocked(e.target.checked)}
-        />
-        {locked && note?.isProtected && !changePassword && (
-          <button
-            type="button"
-            className="w-fit text-sm text-signal hover:text-signal-strong"
-            onClick={() => setChangePassword(true)}
-          >
-            Change password
-          </button>
-        )}
-        {locked && changePassword && (
-          <FormField id="notePassword" label={note?.isProtected ? 'New password' : 'Password'} error={errors.password}>
-            <Input
-              id="notePassword"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              autoComplete="new-password"
-              hasError={!!errors.password}
-            />
-          </FormField>
-        )}
-      </div>
+      {!note && (
+        <p className="flex items-center gap-1.5 text-xs text-text-muted">
+          <Lock size={13} aria-hidden="true" />
+          Private: only you can see it until you share it with people or by link.
+        </p>
+      )}
       {note && (
         <FormField id="noteReason" label="What changed?">
           <Input
@@ -183,49 +146,10 @@ export const NoteForm = ({
   )
 }
 
-// ── Unlock ───────────────────────────────────────────────
-
-/** Asks for a locked note's password. `error` comes from the last failed attempt. */
-const UnlockForm = ({ note, error, onUnlock }: { note: SecureNote; error?: string; onUnlock: (password: string) => void }) => {
-  const [password, setPassword] = useState('')
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (password) onUnlock(password)
-      }}
-      className="mx-auto flex max-w-sm flex-col items-center gap-4 py-10 text-center"
-    >
-      <span className="flex size-12 items-center justify-center rounded-xl border border-signal/40 bg-signal/10 text-signal">
-        <Lock size={22} aria-hidden="true" />
-      </span>
-      <div>
-        <h2 className="font-semibold text-text">{note.title}</h2>
-        <p className="text-sm text-text-muted">This note is locked. Enter its password to read it.</p>
-      </div>
-      <FormField id="unlockPassword" label="Password" error={error}>
-        <Input
-          id="unlockPassword"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="off"
-          autoFocus
-          hasError={!!error}
-          className="w-72"
-        />
-      </FormField>
-      <LoadingButton type="submit" disabled={!password}>
-        Unlock
-      </LoadingButton>
-    </form>
-  )
-}
-
 // ── History ──────────────────────────────────────────────
 
-const NoteHistory = ({ note, password, latest }: { note: SecureNote; password?: string; latest: NoteVersion }) => {
-  const { data: versions, isLoading } = useNoteVersions(note.noteId, password, true)
+const NoteHistory = ({ note, latest }: { note: SecureNote; latest: NoteVersion }) => {
+  const { data: versions, isLoading } = useNoteVersions(note.noteId)
   const [picked, setPicked] = useState<NoteVersion | null>(null)
   if (isLoading || !versions) return <SkeletonText lines={4} />
   return (
@@ -272,44 +196,30 @@ const NoteHistory = ({ note, password, latest }: { note: SecureNote; password?: 
 
 // ── Read view ────────────────────────────────────────────
 
-/**
- * One note: asks for the password if it's locked, then shows it with Edit, History, Share and Delete.
- * `password` / `onPassword` keep the unlock for this session (memory only).
- */
-export const NotePanel = ({
-  note,
-  password,
-  onPassword,
-  onShare,
-  onDelete,
-}: {
-  note: SecureNote
-  password?: string
-  onPassword: (password: string | undefined) => void
-  onShare: () => void
-  onDelete: () => void
-}) => {
-  const [mode, setMode] = useState<'read' | 'edit' | 'history'>('read')
-  // bumps on every unlock attempt, so a retried password refetches (the password itself isn't cached)
-  const [attempt, setAttempt] = useState(0)
-  const canRead = !note.isProtected || password !== undefined
-  const { data: current, isLoading, error } = useNoteContent(note.noteId, password, canRead, `${note.latestVersion}-${attempt}`)
-  const unlock = (value: string) => {
-    onPassword(value)
-    setAttempt((n) => n + 1)
+/** Who can see a note, in a few words, for the signed-in user. */
+const describeAccess = (note: Pick<SecureNote, 'myAccess' | 'ownerName' | 'shares' | 'links'>): string => {
+  if (note.myAccess === 'owner') {
+    if (!note.shares.length && !note.links.length) return 'Private: only you'
+    const parts = [
+      note.shares.length && `${note.shares.length} ${note.shares.length === 1 ? 'person' : 'people'}`,
+      note.links.length && `${note.links.length} public link${note.links.length === 1 ? '' : 's'}`,
+    ].filter(Boolean)
+    return `Shared with ${parts.join(' and ')}`
   }
+  return `${note.ownerName} shared this with you · ${note.myAccess === 'edit' ? 'can edit' : 'read only'}`
+}
 
-  if (!canRead || error instanceof NoteLockedError) {
-    return (
-      <UnlockForm
-        note={note}
-        error={error instanceof NoteLockedError && password !== undefined ? error.message : undefined}
-        onUnlock={unlock}
-      />
-    )
-  }
-  if (isLoading || !current) return <SkeletonText lines={8} />
+const ACCESS_TONE: Record<NoteAccess, 'signal' | 'accent' | 'neutral'> = { owner: 'signal', edit: 'accent', read: 'neutral' }
+
+/** One note with History, plus Edit (owner or can-edit) and Share / Delete (owner only). */
+export const NotePanel = ({ note, onShare, onDelete }: { note: SecureNote; onShare: () => void; onDelete: () => void }) => {
+  const [mode, setMode] = useState<'read' | 'edit' | 'history'>('read')
+  const { data: current, isLoading, error } = useNoteContent(note.noteId, note.latestVersion)
+  const isOwner = note.myAccess === 'owner'
+  const canEdit = note.myAccess !== 'read'
+
   if (error) return <p className="text-sm text-text-muted">Couldn't open the note: {(error as Error).message}</p>
+  if (isLoading || !current) return <SkeletonText lines={8} />
 
   if (mode === 'edit') {
     return (
@@ -317,9 +227,8 @@ export const NotePanel = ({
         projectId={note.projectId}
         note={note}
         current={current}
-        password={password}
         onDone={() => setMode('read')}
-        onSaved={({ password: next }) => onPassword(next)}
+        onSaved={() => undefined}
       />
     )
   }
@@ -328,13 +237,13 @@ export const NotePanel = ({
     <article className="flex flex-col gap-4">
       <header className="flex flex-wrap items-start gap-2">
         <div className="min-w-0 flex-1">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-text">
-            {note.isProtected && <Lock size={16} className="text-signal" aria-label="Locked" />}
-            {current.title}
-          </h2>
+          <h2 className="text-lg font-semibold text-text">{current.title}</h2>
           <p className="text-xs text-text-muted" title={formatDateTime(current.createdAt)}>
             v{current.version} · edited {formatRelative(current.createdAt)} by {current.createdBy} · owner {note.ownerName}
           </p>
+          <Badge tone={ACCESS_TONE[note.myAccess]} className="mt-1.5">
+            {describeAccess(note)}
+          </Badge>
         </div>
         <div className="flex flex-wrap gap-1">
           <LoadingButton
@@ -346,24 +255,30 @@ export const NotePanel = ({
           >
             History
           </LoadingButton>
-          <LoadingButton variant="ghost" size="sm" icon={<Share2 size={14} />} onClick={onShare}>
-            Share
-          </LoadingButton>
-          <LoadingButton variant="ghost" size="sm" icon={<Pencil size={14} />} onClick={() => setMode('edit')}>
-            Edit
-          </LoadingButton>
-          <LoadingButton
-            variant="ghost"
-            size="sm"
-            icon={<Trash2 size={14} />}
-            aria-label={`Delete ${current.title}`}
-            title="Delete"
-            onClick={onDelete}
-          />
+          {isOwner && (
+            <LoadingButton variant="ghost" size="sm" icon={<Share2 size={14} />} onClick={onShare}>
+              Share
+            </LoadingButton>
+          )}
+          {canEdit && (
+            <LoadingButton variant="ghost" size="sm" icon={<Pencil size={14} />} onClick={() => setMode('edit')}>
+              Edit
+            </LoadingButton>
+          )}
+          {isOwner && (
+            <LoadingButton
+              variant="ghost"
+              size="sm"
+              icon={<Trash2 size={14} />}
+              aria-label={`Delete ${current.title}`}
+              title="Delete"
+              onClick={onDelete}
+            />
+          )}
         </div>
       </header>
 
-      {(note.shares.length > 0 || note.links.length > 0) && (
+      {isOwner && (note.shares.length > 0 || note.links.length > 0) && (
         <p className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
           {note.shares.length > 0 && (
             <span className="flex items-center gap-1">
@@ -381,7 +296,7 @@ export const NotePanel = ({
       )}
 
       {mode === 'history' ? (
-        <NoteHistory note={note} password={password} latest={current} />
+        <NoteHistory note={note} latest={current} />
       ) : (
         <div className="rounded-lg border border-border bg-ink/40 p-4 font-mono text-sm leading-6 whitespace-pre-wrap text-text">
           {current.content || <span className="text-text-muted">Empty note.</span>}
@@ -403,7 +318,7 @@ const EXPIRY_OPTIONS: Array<[string, number | null]> = [
 const ShareForm = ({ note }: { note: SecureNote }) => {
   // fixed when the dialog opens, so expiry badges don't flicker between renders
   const [now] = useState(() => Date.now())
-  const { data: users } = useAdminUsers()
+  const { data: users, isLoading: usersLoading } = useAdminUsers()
   const [shares, setShares] = useState(() => new Map(note.shares.map((s) => [s.userId, s.canEdit])))
   const { mutateAsync: saveShares } = useSetNoteShares()
   const [shareState, runShares] = useAsyncAction(
@@ -435,6 +350,11 @@ const ShareForm = ({ note }: { note: SecureNote }) => {
     <div className="flex flex-col gap-6">
       <section className="flex flex-col gap-3">
         <h3 className="text-sm font-semibold text-text">People in your organization</h3>
+        <p className="-mt-2 text-xs text-text-muted">
+          The note is private to you until you give someone access. “Can edit” lets them save new versions; only you can share or
+          delete it.
+        </p>
+        {usersLoading && <SkeletonText lines={4} />}
         <ul className="flex max-h-60 flex-col gap-1 overflow-y-auto">
           {users
             ?.filter((u) => u.userId !== note.ownerId && u.isActive)
@@ -477,7 +397,8 @@ const ShareForm = ({ note }: { note: SecureNote }) => {
       <section className="flex flex-col gap-3 border-t border-border pt-5">
         <h3 className="text-sm font-semibold text-text">Public links</h3>
         <p className="text-xs text-text-muted">
-          Anyone with a link can read the latest version, without signing in. Remove a link to stop it working.
+          Anyone with a link can read the latest version without signing in. Add a password and an expiry if you like; remove a
+          link to stop it working.
         </p>
         {note.links.length > 0 && (
           <ul className="flex flex-col gap-2">
@@ -550,7 +471,7 @@ const ShareForm = ({ note }: { note: SecureNote }) => {
   )
 }
 
-/** Who in the org can read or edit `note`, and its public links. */
+/** Who in the org can read or edit `note`, and its public links (owner only). */
 export const NoteShareDialog = ({ note, onClose }: { note: SecureNote | null; onClose: () => void }) => (
   <Dialog open={!!note} onClose={onClose} size="lg" title={`Share "${note?.title ?? ''}"`}>
     {note && <ShareForm note={note} />}

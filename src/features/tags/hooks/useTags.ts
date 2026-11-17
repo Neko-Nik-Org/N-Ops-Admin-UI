@@ -17,7 +17,7 @@
 
 /** React Query hooks for listing and editing tags. */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAtom } from 'jotai'
 import { createTag, deleteTag, getTag, listTags, updateTag } from '../api/tags'
 import { selectedTagIdAtom } from '../store/selectedTag'
@@ -26,8 +26,11 @@ import type { Tag, TagInput } from '../types'
 /** Cache key prefix shared by the tag list and single-tag queries. */
 const TAGS_KEY = ['tags'] as const
 
+/** Shared definition, also loaded up front by the startup screen (useAppBootstrap). */
+export const tagsQuery = queryOptions({ queryKey: TAGS_KEY, queryFn: listTags, retry: false })
+
 /** All tags the signed-in user can see. */
-export const useTags = () => useQuery({ queryKey: TAGS_KEY, queryFn: listTags, retry: false })
+export const useTags = () => useQuery(tagsQuery)
 
 /**
  * The tag the dashboard is scoped to. A saved id that is not in the user's tag list (deleted, or

@@ -15,8 +15,12 @@
  * <https://www.gnu.org/licenses/>.
  */
 /**
- * Vault types: projects → services → secret keys and config files (tagged, versioned),
- * and per-project secure notes. Mirrors the vault_* tables in N-Ops-Main-API/docs/Schema/PGSQL.sql.
+ * Vault types. Each project holds three things:
+ * - env: secret keys (deployment credentials and application secrets), tagged and versioned;
+ * - conf: config files (deployable configuration artifacts), tagged and versioned;
+ * - notes: secure notes (human-readable sensitive information, docs, recovery instructions,
+ *   procedures), private to their owner unless shared, and never tagged.
+ * Mirrors the vault_* tables in N-Ops-Main-API/docs/Schema/PGSQL.sql.
  */
 
 /** Top level of the Vault (`vault_project`). Counts toward the plan's project limit. */
@@ -26,19 +30,11 @@ export interface VaultProject {
   description: string
   createdAt: string
   updatedAt: string
+  /** The API's free-form `details` (the description lives in it); kept so a rename doesn't drop other keys. */
+  details?: Record<string, unknown>
 }
 
-/** A service inside a project (`vault_service`); keys and config files live here. */
-export interface VaultService {
-  serviceId: number
-  projectId: number
-  serviceName: string
-  description: string
-  createdAt: string
-  updatedAt: string
-}
-
-/** Fields for creating or renaming a project or service. */
+/** Fields for creating or renaming a project. */
 export interface VaultContainerInput {
   name: string
   description: string
@@ -53,21 +49,29 @@ export interface VaultVersionMeta {
   note: string
 }
 
-/** A secret key (env var) without its value (`vault_secret_keys`). Unique per name + service + tag. */
+/** A secret key (env var) without its value (`vault_secret_keys`). Unique per name + project + tag. */
 export interface SecretKey {
   secretId: number
-  serviceId: number
+  projectId: number
   name: string
   tagId: number
   /** The version in use; can point back at an older one after a rollback. */
   currentVersion: number
   latestVersion: number
+  /** The version in use is hidden: its value can't be revealed, copied or exported from the UI. */
+  isHidden: boolean
   updatedAt: string
   updatedBy: string
 }
 
-/** A secret version's metadata plus its value (only returned when revealed). */
-export interface SecretVersion extends VaultVersionMeta {
+/** A secret version's metadata (`vault_secret_key_versions`), without its value. */
+export interface SecretVersionMeta extends VaultVersionMeta {
+  /** `is_hidden`: a write-only value, never shown in the UI or logs. */
+  isHidden: boolean
+}
+
+/** A secret version with its value (only returned when revealed, and never for a hidden one). */
+export interface SecretVersion extends SecretVersionMeta {
   value: string
 }
 
@@ -77,12 +81,14 @@ export interface SecretInput {
   tagId: number
   value: string
   note: string
+  /** Store it write-only: it can be used but never shown again. */
+  isHidden: boolean
 }
 
 /** A config file without its content. Same rules as keys: tagged, versioned. */
 export interface ConfigFile {
   fileId: number
-  serviceId: number
+  projectId: number
   fileName: string
   tagId: number
   currentVersion: number
@@ -122,15 +128,22 @@ export interface NoteLink {
   createdAt: string
 }
 
-/** A secure note's summary (no content). */
+/** What the signed-in user may do with a note: the owner does everything; shares are read or edit. */
+export type NoteAccess = 'owner' | 'edit' | 'read'
+
+/**
+ * A secure note's summary (no content). Private by default: only its owner and the people it is
+ * shared with see it. Notes have no tag. Public links (optionally with a password and expiry) let
+ * anyone read the latest version.
+ */
 export interface SecureNote {
   noteId: number
   projectId: number
   title: string
   ownerId: number
   ownerName: string
-  /** Locked with a password: the content is encrypted and needs the password to read. */
-  isProtected: boolean
+  /** The signed-in user's access to this note. */
+  myAccess: NoteAccess
   latestVersion: number
   createdAt: string
   updatedAt: string
@@ -144,11 +157,10 @@ export interface NoteVersion extends VaultVersionMeta {
   content: string
 }
 
-/** Fields for creating or editing a note. `password`: undefined keeps the current lock, '' removes it. */
+/** Fields for creating or editing a note. `note` is the optional "what changed" for the version. */
 export interface NoteInput {
   title: string
   content: string
-  password?: string
   note?: string
 }
 

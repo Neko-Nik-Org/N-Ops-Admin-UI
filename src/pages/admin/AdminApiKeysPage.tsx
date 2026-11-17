@@ -26,8 +26,9 @@ import { ConfirmDialog } from '@/components/molecules/ConfirmDialog'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'
 import { ApiKeyFormDialog } from '@/components/organisms/ApiKeyFormDialog'
-import { useApiKeys, useDeleteApiKey, useRoles } from '@/features/admin/hooks/useAdmin'
+import { useApiKeys, useDeleteApiKey, useRoleOptions } from '@/features/admin/hooks/useAdmin'
 import { useTagOptions } from '@/features/admin/hooks/useTagOptions'
+import { useVaultProjects } from '@/features/vault/hooks/useVault'
 import type { ApiKey } from '@/features/admin/types'
 import { formatDate, formatRelative } from '@/utils/format'
 
@@ -46,14 +47,14 @@ const KeyStatus = ({ apiKey }: { apiKey: ApiKey }) => {
 /** API keys table. */
 export const AdminApiKeysPage = () => {
   const { data: keys, isLoading, error } = useApiKeys()
-  const { data: roles } = useRoles()
+  const { roleName } = useRoleOptions()
   const { tagName } = useTagOptions()
+  const { data: projects } = useVaultProjects()
+  const projectName = (id: number) => projects?.find((p) => p.projectId === id)?.projectName ?? `#${id}`
   const { mutateAsync: remove } = useDeleteApiKey()
   const [dialog, setDialog] = useState<DialogState>({ kind: 'closed' })
   const [search, setSearch] = useState('')
   const close = () => setDialog({ kind: 'closed' })
-
-  const roleName = (roleId: number) => roles?.find((r) => r.roleId === roleId)?.roleName ?? '—'
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -64,7 +65,7 @@ export const AdminApiKeysPage = () => {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="API keys"
-        description="Keys let scripts and pipelines read the Vault. Each acts with one of your roles, on one tag."
+        description="Keys let scripts and pipelines read the Vault. Each acts with one of your roles, on one tag, in the vault projects you pick."
         mock
         actions={
           <LoadingButton icon={<Plus size={15} />} onClick={() => setDialog({ kind: 'create' })}>
@@ -92,7 +93,7 @@ export const AdminApiKeysPage = () => {
                   <tr className="text-xs tracking-wide text-text-muted uppercase">
                     <th className="pb-2 font-medium">Key</th>
                     <th className="pb-2 font-medium">Role</th>
-                    <th className="pb-2 font-medium">Tag</th>
+                    <th className="pb-2 font-medium">Scope</th>
                     <th className="pb-2 font-medium">Status</th>
                     <th className="pb-2 font-medium">Last used</th>
                     <th className="pb-2 font-medium">Expires</th>
@@ -111,9 +112,20 @@ export const AdminApiKeysPage = () => {
                       </td>
                       <td className="py-3 text-sm text-text">{roleName(key.roleId)}</td>
                       <td className="py-3">
-                        <Badge tone="accent" mono>
-                          {tagName(key.tagId)}
-                        </Badge>
+                        <div className="flex max-w-56 flex-wrap gap-1">
+                          <Badge tone="accent" mono>
+                            {tagName(key.tagId)}
+                          </Badge>
+                          {key.vaultProjectIds.length ? (
+                            key.vaultProjectIds.map((id) => (
+                              <Badge key={id} tone="neutral" mono>
+                                {projectName(id)}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-xs text-warning">No vault projects</span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3">
                         <KeyStatus apiKey={key} />

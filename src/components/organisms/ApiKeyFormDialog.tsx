@@ -30,8 +30,10 @@ import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { Dialog } from '@/components/molecules/Dialog'
 import { FormField } from '@/components/molecules/FormField'
-import { useCreateApiKey, useRoles, useUpdateApiKey } from '@/features/admin/hooks/useAdmin'
+import { useCreateApiKey, useRoleOptions, useUpdateApiKey } from '@/features/admin/hooks/useAdmin'
 import { useTagOptions } from '@/features/admin/hooks/useTagOptions'
+import { useVaultProjects } from '@/features/vault/hooks/useVault'
+import { cn } from '@/utils/cn'
 import { apiKeySchema, type ApiKeyFormValues } from '@/features/admin/schema/adminSchemas'
 import type { ApiKey, ApiKeyInput, CreatedApiKey } from '@/features/admin/types'
 import { downloadText } from '@/utils/download'
@@ -54,8 +56,9 @@ const ApiKeyForm = ({
   onClose: () => void
   onCreated: (created: CreatedApiKey) => void
 }) => {
-  const { data: roles } = useRoles()
+  const { roles, canView: canViewRoles } = useRoleOptions()
   const { options: tags } = useTagOptions()
+  const { data: projects = [] } = useVaultProjects()
   const { mutateAsync: create } = useCreateApiKey()
   const { mutateAsync: update } = useUpdateApiKey()
   const [state, save] = useAsyncAction(
@@ -82,6 +85,8 @@ const ApiKeyForm = ({
       keyDescription: apiKey?.keyDescription ?? '',
       roleId: apiKey?.roleId ?? 0,
       tagId: apiKey?.tagId ?? 0,
+      // checkbox values are strings in the DOM
+      vaultProjectIds: (apiKey?.vaultProjectIds.map(String) ?? []) as unknown as number[],
       isActive: apiKey?.isActive ?? true,
       expiresOn: apiKey
         ? apiKey.expiresAt
@@ -92,7 +97,8 @@ const ApiKeyForm = ({
   })
   const expiresOn = useWatch({ control, name: 'expiresOn' })
   const roleId = Number(useWatch({ control, name: 'roleId' }))
-  const role = roles?.find((r) => r.roleId === roleId)
+  const role = roles.find((r) => r.roleId === roleId)
+  const selectedProjects = (useWatch({ control, name: 'vaultProjectIds' }) ?? []).map(Number)
 
   const onSubmit = (v: ApiKeyFormValues) =>
     save({
@@ -100,6 +106,7 @@ const ApiKeyForm = ({
       keyDescription: v.keyDescription,
       roleId: Number(v.roleId),
       tagId: Number(v.tagId),
+      vaultProjectIds: v.vaultProjectIds.map(Number),
       isActive: v.isActive,
       expiresAt: v.expiresOn ? moment(v.expiresOn).endOf('day').toISOString() : null,
     })
@@ -140,17 +147,24 @@ const ApiKeyForm = ({
             <option value={0} disabled>
               Pick a role
             </option>
-            {roles?.map((r) => (
+            {roles.map((r) => (
               <option key={r.roleId} value={r.roleId}>
                 {r.roleName}
               </option>
             ))}
           </Select>
+          {!roles.length && (
+            <p className="text-xs text-text-muted">
+              {canViewRoles
+                ? 'There are no roles yet. Create one on the Roles page.'
+                : 'You need the “View roles” permission (user:role:view) to pick a role.'}
+            </p>
+          )}
         </FormField>
         <FormField id="tagId" label="Tag" error={errors.tagId?.message}>
           <Select id="tagId" hasError={!!errors.tagId} {...register('tagId')}>
             <option value={0} disabled>
-              Pick a tag
+              {tags.length ? 'Pick a tag' : 'No tags yet: create one on the Tags page'}
             </option>
             {tags.map((t) => (
               <option key={t.tagId} value={t.tagId}>
@@ -165,6 +179,39 @@ const ApiKeyForm = ({
           ? `Acts with the ${role.roleName} role's ${role.permissions.length} permission${role.permissions.length === 1 ? '' : 's'}, only on resources with this tag.`
           : 'The key acts with the role’s permissions, only on resources with the tag you pick.'}
       </p>
+
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1 text-sm text-text-muted">Vault projects</legend>
+        {!projects.length && (
+          <p className="text-xs text-text-muted">There are no vault projects yet. Create one in the Vault first.</p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {projects.map((p) => {
+            const on = selectedProjects.includes(p.projectId)
+            return (
+              <label
+                key={p.projectId}
+                className={cn(
+                  'cursor-pointer rounded-full border px-3 py-1 font-mono text-xs transition-colors has-[:focus-visible]:border-signal',
+                  on ? 'border-signal bg-signal/15 text-signal' : 'border-border text-text-muted hover:border-border-strong',
+                )}
+              >
+                <input type="checkbox" value={p.projectId} className="sr-only" {...register('vaultProjectIds')} />
+                {p.projectName}
+              </label>
+            )
+          })}
+        </div>
+        {errors.vaultProjectIds?.message ? (
+          <p className="text-sm text-danger" role="alert">
+            {errors.vaultProjectIds.message}
+          </p>
+        ) : (
+          <p className="text-xs text-text-muted">
+            The key can read keys and config files in these projects only (with the tag above).
+          </p>
+        )}
+      </fieldset>
 
       <FormField id="expiresOn" label="Expires" error={errors.expiresOn?.message}>
         <div className="flex flex-wrap items-center gap-2">

@@ -14,26 +14,18 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tag choices for the Admin forms, bridging the real tag API and the mock admin data. */
+/** Tag choices for forms and tag names for tables, from the real tag API (`GET /tag/list`). */
 
 import { useTags } from '@/features/tags/hooks/useTags'
 
-/** The tags the mock admin data refers to (ids 1–4), used when the real tag list is empty or unavailable. */
-const SAMPLE_TAGS = [
-  { tagId: 1, tagName: 'production' },
-  { tagId: 2, tagName: 'staging' },
-  { tagId: 3, tagName: 'development' },
-  { tagId: 4, tagName: 'internal' },
-]
-
 /**
- * Tags to pick from (the organization's real tags when there are any, otherwise the samples)
- * and a lookup that names any id, falling back to the sample names and then "#id".
+ * The organization's tags to pick from (only those the user may access, as the API filters them),
+ * and a lookup that names any id, falling back to "#id" for a tag that doesn't exist or isn't
+ * visible (e.g. one referenced by the still-mock Vault and API key data).
  */
 export const useTagOptions = () => {
   const { data } = useTags()
-  const options = data?.length ? data.map(({ tagId, tagName }) => ({ tagId, tagName })) : SAMPLE_TAGS
-  const tagName = (tagId: number) =>
-    options.find((t) => t.tagId === tagId)?.tagName ?? SAMPLE_TAGS.find((t) => t.tagId === tagId)?.tagName ?? `#${tagId}`
+  const options = (data ?? []).map(({ tagId, tagName }) => ({ tagId, tagName }))
+  const tagName = (tagId: number) => options.find((t) => t.tagId === tagId)?.tagName ?? `#${tagId}`
   return { options, tagName }
 }

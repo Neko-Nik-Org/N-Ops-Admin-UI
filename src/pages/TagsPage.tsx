@@ -72,9 +72,9 @@ const DeleteTagDialog = ({ tag, onClose }: { tag: Tag | null; onClose: () => voi
 export const TagsPage = () => {
   const { data: tags, isLoading, error } = useTags()
   const [dialog, setDialog] = useState<DialogState>({ kind: 'closed' })
-  const canCreate = useHasPermissions('tag:view', 'tag:create')
-  const canEdit = useHasPermissions('tag:view', 'tag:edit')
-  const canDelete = useHasPermissions('tag:view', 'tag:delete')
+  const canCreate = useHasPermissions('tag:create')
+  const canEdit = useHasPermissions('tag:edit')
+  const canDelete = useHasPermissions('tag:delete')
   const hasTagAccess = useHasTagAccess()
   const close = () => setDialog({ kind: 'closed' })
 

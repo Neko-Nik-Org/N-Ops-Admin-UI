@@ -53,15 +53,15 @@ describe('TagsPage', () => {
   })
 
   it("shows the API's error", async () => {
-    api.get.mockRejectedValue(new Error('Missing permission tag:view'))
+    api.get.mockRejectedValue(new Error('Insufficient permissions'))
     renderTags()
     expect(await screen.findByText("Couldn't load tags")).toBeInTheDocument()
-    expect(screen.getByText('Missing permission tag:view')).toBeInTheDocument()
+    expect(screen.getByText('Insufficient permissions')).toBeInTheDocument()
   })
 
   it('hides actions the user has no permission for', async () => {
     mockTags()
-    renderTags(makeUser({ permissions: ['tag:view'] }))
+    renderTags(makeUser({ permissions: [] }))
     await screen.findByText('production')
     expect(screen.queryByRole('button', { name: 'New tag' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Edit / })).not.toBeInTheDocument()

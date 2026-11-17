@@ -38,7 +38,7 @@ import {
   useRollbackConfig,
   useSaveConfig,
 } from '@/features/vault/hooks/useVault'
-import type { ConfigFile, VaultService } from '@/features/vault/types'
+import type { ConfigFile, VaultProject } from '@/features/vault/types'
 import { cn } from '@/utils/cn'
 import { downloadText } from '@/utils/download'
 import { formatBytes, formatDateTime, formatRelative } from '@/utils/format'
@@ -242,12 +242,12 @@ export const ConfigFilePanel = ({ file, onDelete }: { file: ConfigFile; onDelete
 // ── New file ─────────────────────────────────────────────
 
 const NewConfigForm = ({
-  service,
+  project,
   defaultTagId,
   onClose,
   onCreated,
 }: {
-  service: VaultService
+  project: VaultProject
   defaultTagId: number
   onClose: () => void
   onCreated: (file: ConfigFile) => void
@@ -259,7 +259,7 @@ const NewConfigForm = ({
   const [errors, setErrors] = useState<{ name?: string; tag?: string }>({})
   const { mutateAsync: create } = useCreateConfig()
   const [state, save] = useAsyncAction(
-    () => create({ serviceId: service.serviceId, input: { fileName, tagId, content, note: '' } }),
+    () => create({ projectId: project.projectId, input: { fileName, tagId, content, note: '' } }),
     { successMs: 400 },
   )
 
@@ -310,7 +310,7 @@ const NewConfigForm = ({
         <FormField id="configTag" label="Tag" error={errors.tag}>
           <Select id="configTag" value={tagId} onChange={(e) => setTagId(Number(e.target.value))} hasError={!!errors.tag}>
             <option value={0} disabled>
-              Pick a tag
+              {options.length ? 'Pick a tag' : 'No tags yet: create one on the Tags page'}
             </option>
             {options.map((t) => (
               <option key={t.tagId} value={t.tagId}>
@@ -353,27 +353,27 @@ const NewConfigForm = ({
   )
 }
 
-/** Creates a config file in `service`, typed in or uploaded. */
+/** Creates a config file in `project`, typed in or uploaded. */
 export const NewConfigDialog = ({
   open,
-  service,
+  project,
   defaultTagId,
   onClose,
   onCreated,
 }: {
   open: boolean
-  service: VaultService | null
+  project: VaultProject | null
   defaultTagId: number
   onClose: () => void
   onCreated: (file: ConfigFile) => void
 }) => (
   <Dialog
-    open={open && !!service}
+    open={open && !!project}
     onClose={onClose}
     size="lg"
-    title={`New config file in ${service?.serviceName}`}
+    title={`New config file in ${project?.projectName}`}
     description="Text files up to 256 KB. Each save keeps the previous version."
   >
-    {service && <NewConfigForm service={service} defaultTagId={defaultTagId} onClose={onClose} onCreated={onCreated} />}
+    {project && <NewConfigForm project={project} defaultTagId={defaultTagId} onClose={onClose} onCreated={onCreated} />}
   </Dialog>
 )

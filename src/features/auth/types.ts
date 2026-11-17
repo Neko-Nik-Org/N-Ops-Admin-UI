@@ -40,6 +40,14 @@ export interface CurrentUser {
   organizationName: string
   primaryEmail: string
   isEmailVerified: boolean
+  /**
+   * The rest of the role's scope. Sign-in doesn't send these; they arrive with the full profile
+   * (`GET /user/self/profile`), so they are undefined until that has loaded once.
+   */
+  /** Linux accounts the user may use; empty means any. */
+  allowedLinuxUsers?: string[]
+  canApproveApprovals?: boolean
+  canBypassApprovals?: boolean
 }
 
 /** Login response when no second factor is needed: includes the session id and user profile. */
@@ -98,6 +106,15 @@ export interface TwoFactorContext {
 /** Supported second factors: authenticator app code or emailed code. */
 export type TwoFactorMethod = 'totp' | 'email'
 
+/** `GET /user/self/profile`: the user's profile, read fresh from the database (not the session). */
+export interface RawUserProfile extends RawSessionProfile {
+  is_user_active: boolean
+  is_organization_active: boolean
+  allowed_linux_users: string[]
+  can_approve_approvals: boolean
+  can_bypass_approvals: boolean
+}
+
 /** Converts the API's session profile into the CurrentUser shape the app uses. */
 export const toCurrentUser = (p: RawSessionProfile): CurrentUser => ({
   userId: p.user_id,
@@ -109,4 +126,12 @@ export const toCurrentUser = (p: RawSessionProfile): CurrentUser => ({
   organizationName: p.organization_name,
   primaryEmail: p.primary_email,
   isEmailVerified: p.is_email_verified,
+})
+
+/** Converts the full profile into a CurrentUser, including the scope fields sign-in leaves out. */
+export const profileToCurrentUser = (p: RawUserProfile): CurrentUser => ({
+  ...toCurrentUser(p),
+  allowedLinuxUsers: p.allowed_linux_users,
+  canApproveApprovals: p.can_approve_approvals,
+  canBypassApprovals: p.can_bypass_approvals,
 })

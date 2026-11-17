@@ -14,62 +14,141 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Roles (CRUD). Mock until `/user/roles/*` is live. */
+/**
+ * API calls for roles (`/user/roles/*`). A role is a permission set, optionally limited to some
+ * tags and Linux users. The API only lets you create, edit or delete a role whose permissions,
+ * tags and approval flags are within your own (see `validate_role_restrictions` in the Main API).
+ */
 
-import { db, recordAudit } from '@/mocks/adminDb'
-import { clone, mockDelay, notFound } from '@/mocks/helpers'
+import { apiClient } from '@/lib/axios'
 import type { Role, RoleInput } from '../types'
 
-const findRole = (roleId: number) => db.roles.find((r) => r.roleId === roleId) ?? notFound('role')
+/** Role as sent by the API. */
+interface RawRole {
+  role_id: number
+  role_name: string
+  role_description: string
+  permissions: string[]
+  allowed_linux_users: string[]
+  /** Empty means every tag. */
+  allowed_tags: number[]
+  can_bypass_approvals: boolean
+  can_approve_approvals: boolean
+  created_at: string
+  updated_at: string
+}
 
-/** Role names are unique per organization. */
-const assertUnique = (name: string, exceptId?: number) => {
-  if (db.roles.some((r) => r.roleId !== exceptId && r.roleName.toLowerCase() === name.toLowerCase())) {
-    throw new Error(`A role called "${name}" already exists.`)
+/** Maps an API role to the app's camelCase Role. */
+const toRole = (r: RawRole): Role => ({
+  roleId: r.role_id,
+  roleName: r.role_name,
+  roleDescription: r.role_description,
+  permissions: r.permissions,
+  tagIds: r.allowed_tags,
+  canApproveApprovals: r.can_approve_approvals,
+  canBypassApprovals: r.can_bypass_approvals,
+  allowedLinuxUsers: r.allowed_linux_users,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+})
+
+/** The permission half of a role, as the create and update-permissions endpoints take it. */
+const toRawPermissions = (input: RoleInput) => ({
+  permissions: input.permissions,
+  allowed_linux_users: input.allowedLinuxUsers,
+  allowed_tags: input.tagIds,
+  can_approve_approvals: input.canApproveApprovals,
+  can_bypass_approvals: input.canBypassApprovals,
+})
+
+/** Roles fetched per request when listing every role. */
+export const ROLE_PAGE_SIZE = 100
+
+/** Options for one page of roles. */
+export interface ListRolesParams {
+  /** Case-insensitive match on the role name. */
+  search?: string
+  limit?: number
+  offset?: number
+}
+
+/** `GET /user/roles/list` — one page of roles, newest first. Requires `user:role:view`. */
+export const listRolesPage = async ({ search, limit = ROLE_PAGE_SIZE, offset = 0 }: ListRolesParams = {}): Promise<Role[]> => {
+  const params: Record<string, string | number> = { limit, offset }
+  if (search?.trim()) params.role_name_search = search.trim()
+  const { data } = await apiClient.get<RawRole[]>('/user/roles/list', { params })
+  return data.map(toRole)
+}
+
+/** Every role in the organization, newest first (pages through `/user/roles/list`). */
+export const listRoles = async (): Promise<Role[]> => {
+  const roles: Role[] = []
+  for (;;) {
+    const page = await listRolesPage({ offset: roles.length })
+    roles.push(...page)
+    if (page.length < ROLE_PAGE_SIZE) return roles
   }
 }
 
-/** Future: `GET /user/roles/list`. */
-export const listRoles = async (): Promise<Role[]> => {
-  await mockDelay()
-  return clone(db.roles)
+/** `GET /user/roles/fetch/{id}` — requires `user:role:view`. */
+export const fetchRole = async (roleId: number): Promise<Role> => {
+  const { data } = await apiClient.get<RawRole>(`/user/roles/fetch/${roleId}`)
+  return toRole(data)
 }
 
-/** Future: `POST /user/roles/create`. */
-export const createRole = async (input: RoleInput): Promise<Role> => {
-  await mockDelay()
-  assertUnique(input.roleName)
-  const now = new Date().toISOString()
-  const role: Role = { ...clone(input), roleId: db.nextId.role++, createdAt: now, updatedAt: now }
-  db.roles.push(role)
-  recordAudit('role.create', 'role', role.roleName, `${role.permissions.length} permissions`)
-  return clone(role)
+/** `POST /user/roles/create` — requires `user:role:view` + `user:role:create`. Responds 201 with no body. */
+export const createRole = async (input: RoleInput): Promise<void> => {
+  await apiClient.post('/user/roles/create', {
+    role_name: input.roleName,
+    role_description: input.roleDescription,
+    ...toRawPermissions(input),
+  })
 }
 
-/** Future: `PUT /user/roles/update`. */
-export const updateRole = async (roleId: number, input: RoleInput): Promise<void> => {
-  await mockDelay()
-  const role = findRole(roleId)
-  assertUnique(input.roleName, roleId)
-  Object.assign(role, clone(input), { updatedAt: new Date().toISOString() })
-  recordAudit('role.update', 'role', role.roleName, `${role.permissions.length} permissions`)
+/** `PATCH /user/roles/update/info/{id}` — renames / re-describes a role. Requires `user:role:view` + `user:role:update`. */
+export const updateRoleInfo = async (roleId: number, input: Pick<RoleInput, 'roleName' | 'roleDescription'>): Promise<void> => {
+  await apiClient.patch(`/user/roles/update/info/${roleId}`, {
+    role_name: input.roleName,
+    role_description: input.roleDescription,
+  })
 }
 
 /**
- * Future: `DELETE /user/roles/delete/{id}`. In the schema, deleting a role also deletes every user
- * and API key that has it (ON DELETE CASCADE), so this refuses while anything still uses the role.
+ * `PUT /user/roles/update/permissions/{id}` — replaces the role's permissions, tags, Linux users and
+ * approval flags. Requires `user:role:view` + `user:role:update`.
+ */
+export const updateRolePermissions = async (roleId: number, input: RoleInput): Promise<void> => {
+  await apiClient.put(`/user/roles/update/permissions/${roleId}`, toRawPermissions(input))
+}
+
+const sameSet = <T>(a: readonly T[], b: readonly T[]) => a.length === b.length && a.every((x) => b.includes(x))
+
+/** Whether saving `input` over `role` changes its name or description. */
+const infoChanged = (role: Role, input: RoleInput) =>
+  role.roleName !== input.roleName || role.roleDescription !== input.roleDescription
+
+/** Whether saving `input` over `role` changes anything the permissions endpoint covers. */
+const permissionsChanged = (role: Role, input: RoleInput) =>
+  !sameSet(role.permissions, input.permissions) ||
+  !sameSet(role.tagIds, input.tagIds) ||
+  !sameSet(role.allowedLinuxUsers, input.allowedLinuxUsers) ||
+  role.canApproveApprovals !== input.canApproveApprovals ||
+  role.canBypassApprovals !== input.canBypassApprovals
+
+/**
+ * Saves an edited role. The API splits a role into info and permissions, so this calls only the
+ * endpoint(s) whose fields changed: permissions first, so a rejected permission change leaves the
+ * name untouched too.
+ */
+export const updateRole = async (role: Role, input: RoleInput): Promise<void> => {
+  if (permissionsChanged(role, input)) await updateRolePermissions(role.roleId, input)
+  if (infoChanged(role, input)) await updateRoleInfo(role.roleId, input)
+}
+
+/**
+ * `DELETE /user/roles/delete/{id}` — requires `user:role:view` + `user:role:delete`. The API answers
+ * 412 while any user still has the role.
  */
 export const deleteRole = async (roleId: number): Promise<void> => {
-  await mockDelay()
-  const role = findRole(roleId)
-  const users = db.users.filter((u) => u.roleId === roleId).length
-  const keys = db.apiKeys.filter((k) => k.roleId === roleId).length
-  if (users || keys) {
-    const parts = [users && `${users} user${users === 1 ? '' : 's'}`, keys && `${keys} API key${keys === 1 ? '' : 's'}`].filter(
-      Boolean,
-    )
-    throw new Error(`${parts.join(' and ')} still use "${role.roleName}". Move them to another role first.`)
-  }
-  db.roles = db.roles.filter((r) => r.roleId !== roleId)
-  recordAudit('role.delete', 'role', role.roleName)
+  await apiClient.delete(`/user/roles/delete/${roleId}`)
 }

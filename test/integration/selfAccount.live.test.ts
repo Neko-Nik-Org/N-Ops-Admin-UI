@@ -24,7 +24,7 @@
  *
  * Needs a disposable database (it changes passwords, usernames and deactivates a user) with users
  * `alice`, `bob` and `carol` (password `Start#Pass1`, email `<name>@example.test`, unverified) whose
- * role has tag:view/create/edit/delete, a Turnstile verify URL that always succeeds, and Mailpit
+ * role has tag:create/edit/delete, a Turnstile verify URL that always succeeds, and Mailpit
  * catching the API's SMTP mail. The API's ALLOWED_ORIGINS must include https://localhost.
  */
 

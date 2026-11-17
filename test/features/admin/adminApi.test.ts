@@ -20,8 +20,6 @@ import moment from 'moment'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createApiKey, listApiKeys } from '@/features/admin/api/apiKeys'
 import { exportAuditLogs, listAuditLogs, retentionStart } from '@/features/admin/api/auditLogs'
-import { getOrganization, updateOrganization } from '@/features/admin/api/organization'
-import { deleteRole, listRoles } from '@/features/admin/api/roles'
 import { createUser, deleteUser, listUsers, updateUser } from '@/features/admin/api/users'
 import { db, resetAdminMock } from '@/mocks/adminDb'
 import type { AdminUserInput } from '@/features/admin/types'
@@ -45,8 +43,7 @@ describe('users', () => {
 
     expect(user).toMatchObject({ userName: 'zoe', isEmailVerified: false, lastLoginAt: null, allowedIps: [] })
     expect(await listUsers()).toHaveLength(before + 1)
-    expect((await getOrganization()).usage.users).toBe(before + 1)
-    expect(db.auditLogs[0]).toMatchObject({ action: 'user.create', resourceName: 'zoe', details: 'Role: Developer' })
+    expect(db.auditLogs[0]).toMatchObject({ action: 'user.create', resourceName: 'zoe', details: 'Role #4' })
   })
 
   it('rejects a username or email someone else has', async () => {
@@ -56,23 +53,9 @@ describe('users', () => {
     await expect(updateUser(2, { ...newUser, userName: 'priya', primaryEmail: 'priya@acme.dev' })).resolves.toBeUndefined()
   })
 
-  it("won't delete the last Owner", async () => {
-    await expect(deleteUser(1)).rejects.toThrow("You can't delete the last Owner")
+  it('deletes a user', async () => {
     await deleteUser(3)
     expect((await listUsers()).some((u) => u.userId === 3)).toBe(false)
-  })
-})
-
-describe('roles', () => {
-  it('refuses to delete a role users or keys still have, since the schema would cascade', async () => {
-    await expect(deleteRole(4)).rejects.toThrow('4 users and 1 API key still use "Developer"')
-    await expect(deleteRole(6)).rejects.toThrow('3 API keys still use "CI deploy"')
-  })
-
-  it('deletes an unused role', async () => {
-    await deleteUser(8) // the only Auditor
-    await deleteRole(5)
-    expect((await listRoles()).map((r) => r.roleName)).not.toContain('Auditor')
   })
 })
 
@@ -83,10 +66,12 @@ describe('API keys', () => {
       keyDescription: 'CI',
       roleId: 6,
       tagId: 1,
+      vaultProjectIds: [1, 3],
       isActive: true,
       expiresAt: null,
     })
 
+    expect(apiKey.vaultProjectIds).toEqual([1, 3])
     expect(secret).toMatch(new RegExp(`^nk-${apiKey.apiKeyId}_[A-Za-z0-9]{40}$`))
     expect(secret.startsWith(apiKey.keyPrefix)).toBe(true)
     expect(JSON.stringify(await listApiKeys())).not.toContain(secret)
@@ -94,8 +79,21 @@ describe('API keys', () => {
 
   it('rejects a duplicate name', async () => {
     await expect(
-      createApiKey({ keyName: 'GRAFANA-AGENT', keyDescription: '', roleId: 6, tagId: 1, isActive: true, expiresAt: null }),
+      createApiKey({
+        keyName: 'GRAFANA-AGENT',
+        keyDescription: '',
+        roleId: 6,
+        tagId: 1,
+        vaultProjectIds: [1],
+        isActive: true,
+        expiresAt: null,
+      }),
     ).rejects.toThrow('already exists')
+  })
+
+  it('needs at least one vault project', async () => {
+    const base = { keyName: 'ci', keyDescription: '', roleId: 6, tagId: 1, isActive: true, expiresAt: null }
+    await expect(createApiKey({ ...base, vaultProjectIds: [] })).rejects.toThrow('Pick at least one vault project.')
   })
 })
 
@@ -130,14 +128,5 @@ describe('audit logs', () => {
     expect(lines).toHaveLength(count + 1)
     expect(lines.slice(1).every((l) => l.includes(',workflow.'))).toBe(true)
     expect(db.auditLogs[0]).toMatchObject({ action: 'audit.export', details: 'CSV download' })
-  })
-})
-
-describe('organization', () => {
-  it('updates the profile and logs it', async () => {
-    const org = await getOrganization()
-    await updateOrganization({ organizationName: 'Acme Inc', info: { ...org.info, website: 'https://acme.inc' } })
-    expect(await getOrganization()).toMatchObject({ organizationName: 'Acme Inc', info: { website: 'https://acme.inc' } })
-    expect(db.auditLogs[0]).toMatchObject({ action: 'org.update', resourceName: 'Acme Inc' })
   })
 })

@@ -31,6 +31,7 @@ import { APP_SECTIONS, ROUTES } from '@/constants/routes'
 import { currentUserAtom } from '@/features/auth/store/session'
 import { useOverview } from '@/features/dashboard/hooks/useOverview'
 import { useLogout } from '@/features/auth/hooks/useLogout'
+import { ServiceHealthIndicator } from '@/components/molecules/ServiceHealthIndicator'
 import { cn } from '@/utils/cn'
 
 interface SidebarProps {
@@ -131,6 +132,7 @@ export const Sidebar = ({ variant = 'desktop', onNavigate, onClose }: SidebarPro
       </nav>
 
       <div className={cn('flex shrink-0 flex-col gap-3 border-t border-border pt-4', collapsed ? 'items-center' : 'px-1')}>
+        <ServiceHealthIndicator compact={collapsed} />
         {!collapsed && (
           <div className="flex items-center justify-between gap-2 text-sm text-text-muted">
             <span>Theme</span>

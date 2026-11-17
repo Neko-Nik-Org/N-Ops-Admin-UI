@@ -32,7 +32,7 @@ const successResponse = {
   data: {
     user_id: 7,
     organization_id: 'org-1',
-    permissions: ['tag:view'],
+    permissions: ['tag:create'],
     tags: [3],
     user_name: 'priya',
     display_name: 'Priya Rao',

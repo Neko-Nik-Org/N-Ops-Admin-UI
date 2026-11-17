@@ -85,6 +85,20 @@ export const changeUsernameSchema = yup.object({
 /** Values produced by the change-username form. */
 export type ChangeUsernameFormValues = yup.InferType<typeof changeUsernameSchema>
 
+/** Display name and email; limits match the `app_user` columns (VARCHAR 100 / 254). */
+export const editProfileSchema = yup.object({
+  displayName: yup.string().trim().required('Enter your name.').max(100, 'Keep it to 100 characters or fewer.'),
+  primaryEmail: yup
+    .string()
+    .trim()
+    .required('Enter your email address.')
+    .email('Enter a valid email address.')
+    .max(254, 'Keep it to 254 characters or fewer.'),
+})
+
+/** Values produced by the edit-profile form. */
+export type EditProfileFormValues = yup.InferType<typeof editProfileSchema>
+
 /** Longest label and value accepted in the profile details editor. */
 export const DETAIL_LABEL_MAX = 50
 export const DETAIL_VALUE_MAX = 500

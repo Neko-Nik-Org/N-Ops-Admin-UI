@@ -27,13 +27,13 @@ import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { Dialog } from '@/components/molecules/Dialog'
 import { FormField } from '@/components/molecules/FormField'
-import { useCreateUser, useRoles, useUpdateUser } from '@/features/admin/hooks/useAdmin'
+import { useCreateUser, useRoleOptions, useUpdateUser } from '@/features/admin/hooks/useAdmin'
 import { splitList, userSchema, type UserFormValues } from '@/features/admin/schema/adminSchemas'
 import type { AdminUser, AdminUserInput } from '@/features/admin/types'
 
 /** The form itself; mounted only while the dialog is open, so it always starts from `user`. */
 const UserForm = ({ user, onClose }: { user?: AdminUser; onClose: () => void }) => {
-  const { data: roles } = useRoles()
+  const { roles, canView: canViewRoles } = useRoleOptions()
   const { mutateAsync: create } = useCreateUser()
   const { mutateAsync: update } = useUpdateUser()
   const [state, save] = useAsyncAction(
@@ -109,12 +109,19 @@ const UserForm = ({ user, onClose }: { user?: AdminUser; onClose: () => void }) 
           <option value={0} disabled>
             Pick a role
           </option>
-          {roles?.map((r) => (
+          {roles.map((r) => (
             <option key={r.roleId} value={r.roleId}>
               {r.roleName}
             </option>
           ))}
         </Select>
+        {!roles.length && (
+          <p className="text-xs text-text-muted">
+            {canViewRoles
+              ? 'There are no roles yet. Create one on the Roles page.'
+              : 'You need the “View roles” permission (user:role:view) to pick a role.'}
+          </p>
+        )}
       </FormField>
 
       <div className="flex flex-col gap-4 rounded-lg border border-border p-4">

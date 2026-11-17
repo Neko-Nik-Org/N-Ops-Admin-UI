@@ -21,29 +21,33 @@ import { useAtomValue } from 'jotai'
 import { useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { ScreenLoader } from '@/components/organisms/ScreenLoader'
-import { useAppBootstrap } from '@/features/account/hooks/useAppBootstrap'
+import { SESSION_STEP_LABEL, useAppBootstrap } from '@/features/account/hooks/useAppBootstrap'
 import { sessionStatusAtom } from '@/features/auth/store/session'
 import { ROUTES } from '@/constants/routes'
 
 /** Full-screen loader shown while the saved session is still being verified. */
-const SessionCheck = () => <ScreenLoader messages={['Checking your session']} />
+const SessionCheck = () => <ScreenLoader messages={[SESSION_STEP_LABEL]} />
 
 /**
  * Renders its children only for signed-in users; everyone else is redirected to /login.
  *
- * One ScreenLoader covers both the saved-session check and the startup data load
- * (useAppBootstrap), so it runs straight through from sign-in to the dashboard. The pages
- * mount once the data is in, while the loader fades out on top of them.
+ * One ScreenLoader covers every startup step (useAppBootstrap: session check, health check and
+ * the signed-in user's data), so it runs straight through from sign-in to the dashboard. The
+ * pages mount once the data is in, while the loader fades out on top of them.
  */
 export const RequireAuth = ({ children }: { children: ReactNode }) => {
   const status = useAtomValue(sessionStatusAtom)
-  const bootstrap = useAppBootstrap(status === 'authenticated')
+  const bootstrap = useAppBootstrap(status)
   const [loaderGone, setLoaderGone] = useState(false)
+  // Startup runs once. Afterwards a page refetching a failed startup query (which React Query
+  // briefly reports as pending again) must not bring the loader back: that would unmount the page,
+  // which refetches on its next mount, and loop.
+  const [started, setStarted] = useState(false)
+  if (bootstrap.ready && !started) setStarted(true)
 
   if (status === 'unauthenticated') return <Navigate to={ROUTES.login} replace />
 
-  const checking = status === 'checking'
-  const ready = !checking && bootstrap.ready
+  const ready = started || bootstrap.ready
 
   return (
     <>
@@ -51,8 +55,8 @@ export const RequireAuth = ({ children }: { children: ReactNode }) => {
       {!loaderGone && (
         <ScreenLoader
           visible={!ready}
-          messages={checking ? ['Checking your session'] : bootstrap.pendingLabels}
-          progress={checking ? undefined : bootstrap.progress}
+          messages={bootstrap.pendingLabels}
+          progress={bootstrap.progress}
           onHidden={() => setLoaderGone(true)}
         />
       )}

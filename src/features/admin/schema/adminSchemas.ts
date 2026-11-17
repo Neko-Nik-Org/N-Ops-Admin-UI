@@ -28,15 +28,6 @@ export const splitList = (value: string | undefined): string[] =>
     .map((s) => s.trim())
     .filter(Boolean)
 
-export const organizationSchema = yup.object({
-  organizationName: yup.string().trim().required('Enter an organization name.').max(250, 'Keep it to 250 characters or fewer.'),
-  description: yup.string().trim().max(500, 'Keep it to 500 characters or fewer.').default(''),
-  website: yup.string().trim().url('Enter a full URL, like https://example.com.').default(''),
-  contactEmail: yup.string().trim().email('Enter a valid email address.').default(''),
-  timezone: yup.string().required(),
-})
-export type OrganizationFormValues = yup.InferType<typeof organizationSchema>
-
 export const userSchema = yup.object({
   userName: yup
     .string()
@@ -90,6 +81,7 @@ export const apiKeySchema = yup.object({
   keyDescription: yup.string().trim().required('Say what this key is for.'),
   roleId: yup.number().typeError('Pick a role.').required('Pick a role.').min(1, 'Pick a role.'),
   tagId: yup.number().typeError('Pick a tag.').required('Pick a tag.').min(1, 'Pick a tag.'),
+  vaultProjectIds: yup.array(yup.number().required()).min(1, 'Pick at least one vault project.').default([]),
   isActive: yup.boolean().default(true),
   /** '' = never expires; otherwise YYYY-MM-DD. */
   expiresOn: yup

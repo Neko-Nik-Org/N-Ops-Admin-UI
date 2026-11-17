@@ -19,7 +19,15 @@
 
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { getOrgInfo, getUiInfo, getUserDetails, isUsernameAvailable, saveUiInfo, saveUserDetails } from '../api/account'
+import {
+  getOrgInfo,
+  getProfile,
+  getUiInfo,
+  getUserDetails,
+  isUsernameAvailable,
+  saveUiInfo,
+  saveUserDetails,
+} from '../api/account'
 import { usernamePolicyError } from '../schema/accountSchemas'
 import type { JsonObject } from '../types'
 
@@ -27,6 +35,8 @@ import type { JsonObject } from '../types'
 const UI_INFO_KEY = ['user-self', 'ui-info'] as const
 const ORG_INFO_KEY = ['user-self', 'org-info'] as const
 const USER_DETAILS_KEY = ['user-self', 'details'] as const
+/** Cache key for the full profile; invalidate it after changing the user's own role. */
+export const PROFILE_KEY = ['user-self', 'profile'] as const
 
 /**
  * Shared query definitions. The post-login bootstrap (useAppBootstrap) loads these up front,
@@ -35,6 +45,7 @@ const USER_DETAILS_KEY = ['user-self', 'details'] as const
 export const orgInfoQuery = queryOptions({ queryKey: ORG_INFO_KEY, queryFn: getOrgInfo, retry: false })
 export const uiInfoQuery = queryOptions({ queryKey: UI_INFO_KEY, queryFn: getUiInfo, retry: false, staleTime: Infinity })
 export const userDetailsQuery = queryOptions({ queryKey: USER_DETAILS_KEY, queryFn: getUserDetails, retry: false })
+export const profileQuery = queryOptions({ queryKey: PROFILE_KEY, queryFn: getProfile, retry: false })
 
 /** Organization name, quotas and usage for the Account page. */
 export const useOrgInfo = () => useQuery(orgInfoQuery)

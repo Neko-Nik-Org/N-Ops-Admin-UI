@@ -22,12 +22,15 @@ import {
   changeUsername,
   deactivateAccount,
   getOrgInfo,
+  getProfile,
+  InactiveAccountError,
   getUiInfo,
   getUserDetails,
   isJsonObject,
   isUsernameAvailable,
   saveUiInfo,
   saveUserDetails,
+  updateProfile,
   sendEmailVerification,
   verifyEmailCode,
 } from '@/features/account/api/account'
@@ -167,5 +170,76 @@ describe('self-service changes', () => {
     api.delete.mockResolvedValue({ data: '' })
     await deactivateAccount()
     expect(api.delete).toHaveBeenCalledWith('/user/self/deactivate')
+  })
+})
+
+describe('getProfile', () => {
+  const raw = {
+    user_id: 4,
+    organization_id: 'org-1',
+    user_name: 'priya',
+    display_name: 'Priya Rao',
+    organization_name: 'Acme',
+    primary_email: 'priya@acme.dev',
+    is_email_verified: false,
+    is_user_active: true,
+    is_organization_active: true,
+    permissions: ['user:role:view'],
+    tags: [1, 3],
+    allowed_linux_users: ['deploy'],
+    can_approve_approvals: false,
+    can_bypass_approvals: true,
+  }
+
+  it('maps GET /user/self/profile to the current user, with the role scope', async () => {
+    api.get.mockResolvedValue({ data: raw })
+    await expect(getProfile()).resolves.toEqual({
+      userId: 4,
+      organizationId: 'org-1',
+      userName: 'priya',
+      displayName: 'Priya Rao',
+      organizationName: 'Acme',
+      primaryEmail: 'priya@acme.dev',
+      isEmailVerified: false,
+      permissions: ['user:role:view'],
+      tags: [1, 3],
+      allowedLinuxUsers: ['deploy'],
+      canApproveApprovals: false,
+      canBypassApprovals: true,
+    })
+    expect(api.get).toHaveBeenCalledWith('/user/self/profile')
+  })
+
+  it('rejects with 404 when the API finds no user (null body)', async () => {
+    api.get.mockResolvedValue({ data: null })
+    await expect(getProfile()).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('rejects with InactiveAccountError for a deactivated user or organization', async () => {
+    api.get.mockResolvedValue({ data: { ...raw, is_user_active: false } })
+    await expect(getProfile()).rejects.toMatchObject({ name: 'InactiveAccountError', reason: 'user' })
+    api.get.mockResolvedValue({ data: { ...raw, is_organization_active: false } })
+    const error = await getProfile().catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(InactiveAccountError)
+    expect(error).toMatchObject({ reason: 'organization' })
+  })
+
+  it('rejects a malformed body instead of storing a broken profile', async () => {
+    api.get.mockResolvedValue({ data: {} })
+    await expect(getProfile()).rejects.toThrow('unexpected profile')
+  })
+})
+
+describe('updateProfile', () => {
+  it('sends only the display name when the email is not given', async () => {
+    api.put.mockResolvedValue({ data: 'Profile updated successfully' })
+    await updateProfile({ displayName: 'Priya R' })
+    expect(api.put).toHaveBeenCalledWith('/user/self/profile', { display_name: 'Priya R' })
+  })
+
+  it('sends a new email when given', async () => {
+    api.put.mockResolvedValue({ data: 'Profile updated successfully' })
+    await updateProfile({ displayName: 'Priya R', primaryEmail: 'p@new.dev' })
+    expect(api.put).toHaveBeenCalledWith('/user/self/profile', { display_name: 'Priya R', primary_email: 'p@new.dev' })
   })
 })

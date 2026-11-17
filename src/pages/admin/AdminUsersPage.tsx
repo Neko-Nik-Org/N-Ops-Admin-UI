@@ -26,7 +26,8 @@ import { ConfirmDialog } from '@/components/molecules/ConfirmDialog'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'
 import { UserFormDialog } from '@/components/organisms/UserFormDialog'
-import { useAdminUsers, useDeleteUser, useOrganization, useRoles } from '@/features/admin/hooks/useAdmin'
+import { useOrgInfo } from '@/features/account/hooks/useAccount'
+import { useAdminUsers, useDeleteUser, useRoleOptions } from '@/features/admin/hooks/useAdmin'
 import type { AdminUser } from '@/features/admin/types'
 import { formatRelative } from '@/utils/format'
 
@@ -51,16 +52,14 @@ const TwoFactor = ({ user }: { user: AdminUser }) => {
 /** Users table with search and role / status filters. */
 export const AdminUsersPage = () => {
   const { data: users, isLoading, error } = useAdminUsers()
-  const { data: roles } = useRoles()
-  const { data: org } = useOrganization()
+  const { roles, roleName } = useRoleOptions()
+  const { data: org } = useOrgInfo()
   const { mutateAsync: remove } = useDeleteUser()
   const [dialog, setDialog] = useState<DialogState>({ kind: 'closed' })
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const close = () => setDialog({ kind: 'closed' })
-
-  const roleName = (roleId: number) => roles?.find((r) => r.roleId === roleId)?.roleName ?? '—'
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -72,15 +71,16 @@ export const AdminUsersPage = () => {
     )
   }, [users, search, roleFilter, statusFilter])
 
-  const atLimit = !!org && !!users && users.length >= org.limits.users
+  // seats come from the real org-info; the user list itself is still mock data
+  const atLimit = !!org && org.users.current >= org.users.limit
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Users"
         description={
-          users && org
-            ? `${users.length} of ${org.limits.users} seats used. Each person signs in with one role.`
+          org
+            ? `${org.users.current} of ${org.users.limit} seats used. Each person signs in with one role.`
             : 'People in your organization and their roles.'
         }
         mock

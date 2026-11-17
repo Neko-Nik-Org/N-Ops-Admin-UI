@@ -14,29 +14,29 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Config files: simple tagged, versioned text files per service. Mock until the API has them. */
+/** Config files: simple tagged, versioned text files per project. Mock until the API has them (still a TODO in its schema). */
 
 import { db as adminDb, recordAudit } from '@/mocks/adminDb'
 import { clone, mockDelay, notFound } from '@/mocks/helpers'
 import { byteSize, me, vaultDb, type StoredConfig } from '@/mocks/vaultDb'
 import type { ConfigFile, ConfigFileInput, ConfigVersion, VaultVersionMeta } from '../types'
-import { servicePath } from './projects'
+import { projectPath } from './projects'
 
 /** Largest file the store accepts. */
 export const MAX_CONFIG_BYTES = 256 * 1024
 
 const findConfig = (fileId: number) => vaultDb.configs.find((c) => c.fileId === fileId) ?? notFound('file')
 const summary = ({ versions: _versions, ...file }: StoredConfig): ConfigFile => clone(file)
-const label = (c: StoredConfig) => `${servicePath(c.serviceId)} / ${c.fileName}`
+const label = (c: StoredConfig) => `${projectPath(c.projectId)} / ${c.fileName}`
 
 const checkContent = (content: string) => {
   if (byteSize(content) > MAX_CONFIG_BYTES) throw new Error(`Files can be up to ${MAX_CONFIG_BYTES / 1024} KB.`)
 }
 
-/** Future: `GET /vault/config/list?service_id`. */
-export const listConfigs = async (serviceId: number): Promise<ConfigFile[]> => {
+/** Future: `GET /vault/config/list?project_id`. */
+export const listConfigs = async (projectId: number): Promise<ConfigFile[]> => {
   await mockDelay()
-  return vaultDb.configs.filter((c) => c.serviceId === serviceId).map(summary)
+  return vaultDb.configs.filter((c) => c.projectId === projectId).map(summary)
 }
 
 /** Future: `GET /vault/config/get/{id}?version` — a version's content (default: current). Audited. */
@@ -57,25 +57,22 @@ export const listConfigVersions = async (fileId: number): Promise<Array<VaultVer
     .reverse()
 }
 
-/** Future: `POST /vault/config/create`. File names are unique per service + tag. */
-export const createConfig = async (serviceId: number, input: ConfigFileInput): Promise<ConfigFile> => {
+/** Future: `POST /vault/config/create`. File names are unique per project + tag. */
+export const createConfig = async (projectId: number, input: ConfigFileInput): Promise<ConfigFile> => {
   await mockDelay()
   if (!/^[\w.-]{1,100}$/.test(input.fileName)) throw new Error('Use letters, numbers, dots, dashes or underscores (no folders).')
-  if (vaultDb.configs.some((c) => c.serviceId === serviceId && c.fileName === input.fileName && c.tagId === input.tagId)) {
+  if (vaultDb.configs.some((c) => c.projectId === projectId && c.fileName === input.fileName && c.tagId === input.tagId)) {
     throw new Error(`${input.fileName} already exists for this tag. Edit it to add a new version.`)
   }
   checkContent(input.content)
-  const projectId = vaultDb.services.find((s) => s.serviceId === serviceId)?.projectId
-  const count = vaultDb.configs.filter(
-    (c) => vaultDb.services.find((s) => s.serviceId === c.serviceId)?.projectId === projectId,
-  ).length
+  const count = vaultDb.configs.filter((c) => c.projectId === projectId).length
   if (count >= adminDb.organization.limits.vaultKeysPerProject) throw new Error('This project has reached its file limit.')
 
   const now = new Date().toISOString()
   const sizeBytes = byteSize(input.content)
   const file: StoredConfig = {
     fileId: vaultDb.nextId.config++,
-    serviceId,
+    projectId,
     fileName: input.fileName,
     tagId: input.tagId,
     currentVersion: 1,

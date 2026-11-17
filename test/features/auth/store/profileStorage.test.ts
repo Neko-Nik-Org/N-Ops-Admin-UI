@@ -50,4 +50,15 @@ describe('profileStorage', () => {
     clearSessionToken()
     expect(loadStoredProfile()).toBeNull()
   })
+
+  it('keeps the role scope from the full profile', () => {
+    const user = makeUser({ allowedLinuxUsers: ['deploy'], canApproveApprovals: true, canBypassApprovals: false })
+    storeProfile(user)
+    expect(loadStoredProfile()).toEqual(user)
+  })
+
+  it('ignores a saved profile whose scope fields have the wrong type', () => {
+    localStorage.setItem('nops_profile', JSON.stringify({ ...makeUser(), allowedLinuxUsers: 'deploy' }))
+    expect(loadStoredProfile()).toBeNull()
+  })
 })

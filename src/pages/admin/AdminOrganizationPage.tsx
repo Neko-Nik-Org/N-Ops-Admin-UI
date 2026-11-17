@@ -14,207 +14,109 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Admin › Organization (/admin/organization): view and edit the organization's profile; quotas are read-only. */
+/**
+ * Admin › Organization (/admin/organization): the organization's profile and plan usage, from
+ * `GET /user/self/org-info`. Read-only: the API has no endpoint for changing the organization yet
+ * (its `/super-admin/organization` routes are still commented out).
+ */
 
-import { yupResolver } from '@hookform/resolvers/yup'
-import { Pencil } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
-import { useForm } from 'react-hook-form'
-import { toast } from 'react-toastify'
-import { Badge } from '@/components/atoms/Badge'
-import { Input } from '@/components/atoms/Input'
-import { Select } from '@/components/atoms/Select'
-import { Textarea } from '@/components/atoms/Textarea'
-import { LoadingButton } from '@/components/molecules/LoadingButton'
-import { SkeletonText } from '@/components/molecules/Skeleton'
-import { useAsyncAction } from '@/hooks/useAsyncAction'
-import { FormField } from '@/components/molecules/FormField'
+import type { ReactNode } from 'react'
 import { Meter } from '@/components/molecules/Meter'
 import { PageHeader } from '@/components/molecules/PageHeader'
-import { useOrganization, useUpdateOrganization } from '@/features/admin/hooks/useAdmin'
-import { organizationSchema, type OrganizationFormValues } from '@/features/admin/schema/adminSchemas'
-import type { Organization } from '@/features/admin/types'
+import { SkeletonText } from '@/components/molecules/Skeleton'
+import { useOrgInfo } from '@/features/account/hooks/useAccount'
+import type { OrgInfo } from '@/features/account/types'
 import { formatBytes, formatDate, formatNumber } from '@/utils/format'
 
-/** Time zones the browser knows, with a short fallback list for older browsers. */
-const TIME_ZONES: readonly string[] = (() => {
-  try {
-    return Intl.supportedValuesOf('timeZone')
-  } catch {
-    return [
-      'UTC',
-      'Asia/Kolkata',
-      'Europe/London',
-      'Europe/Berlin',
-      'America/New_York',
-      'America/Los_Angeles',
-      'Asia/Singapore',
-      'Australia/Sydney',
-    ]
-  }
-})()
-
 /** One label / value pair in the profile. */
-const Field = ({ label, children }: { label: string; children: ReactNode }) => (
-  <div className="flex flex-col gap-0.5">
+const Field = ({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) => (
+  <div className={wide ? 'flex flex-col gap-0.5 sm:col-span-2' : 'flex flex-col gap-0.5'}>
     <dt className="text-sm text-text-muted">{label}</dt>
     <dd className="text-sm break-words text-text">{children}</dd>
   </div>
 )
 
-/** The organization's profile, read-only, with an Edit button. */
-const ProfileView = ({ org, onEdit }: { org: Organization; onEdit: () => void }) => (
-  <>
-    <div className="mb-4 flex items-center justify-between gap-2">
-      <h2 className="font-semibold text-text">Profile</h2>
-      <LoadingButton variant="secondary" size="sm" icon={<Pencil size={14} />} onClick={onEdit}>
-        Edit
-      </LoadingButton>
-    </div>
-    <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <Field label="Name">
-        <span className="font-medium">{org.organizationName}</span>
-      </Field>
-      <Field label="Status">
-        <Badge tone={org.isActive ? 'signal' : 'danger'}>{org.isActive ? 'Active' : 'Suspended'}</Badge>
-      </Field>
-      <div className="sm:col-span-2">
-        <Field label="Description">{org.info.description || '—'}</Field>
-      </div>
-      <Field label="Website">
-        {org.info.website ? (
-          <a href={org.info.website} target="_blank" rel="noreferrer" className="text-signal hover:text-signal-strong">
-            {org.info.website.replace(/^https?:\/\//, '')}
-          </a>
-        ) : (
-          '—'
-        )}
-      </Field>
-      <Field label="Contact email">{org.info.contactEmail || '—'}</Field>
-      <Field label="Time zone">{org.info.timezone}</Field>
-      <Field label="Created">{formatDate(org.createdAt)}</Field>
-      <div className="sm:col-span-2">
-        <Field label="Organization ID">
+/** Shows a free-form `organization_info` value as text. */
+const renderValue = (value: unknown): string =>
+  typeof value === 'string' ? value || '—' : value === null ? '—' : JSON.stringify(value)
+
+/** Turns an `organization_info` key like "contact_email" into "Contact email". */
+const humanize = (key: string) => {
+  const words = key
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .toLowerCase()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+/** Name, id, creation date and whatever the operator stored in `organization_info`. */
+const ProfileCard = ({ org }: { org: OrgInfo }) => {
+  const extra = Object.entries(org.organizationInfo)
+  return (
+    <section className="rounded-xl border border-border bg-surface-raised p-5">
+      <h2 className="mb-1 font-semibold text-text">Profile</h2>
+      <p className="mb-4 text-sm text-text-muted">Set by your N-Ops operator. It can't be changed from here yet.</p>
+      <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Name">
+          <span className="font-medium">{org.organizationName}</span>
+        </Field>
+        <Field label="Created">{formatDate(org.createdAt)}</Field>
+        <Field label="Organization ID" wide>
           <span className="font-mono text-xs break-all">{org.organizationId}</span>
         </Field>
-      </div>
-    </dl>
-  </>
-)
-
-/** The profile as a form. Saves, then returns to the read-only view. */
-const ProfileForm = ({ org, onDone }: { org: Organization; onDone: () => void }) => {
-  const { mutateAsync: update } = useUpdateOrganization()
-  const [state, save] = useAsyncAction(
-    (v: OrganizationFormValues) =>
-      update({
-        organizationName: v.organizationName,
-        info: { description: v.description, website: v.website, contactEmail: v.contactEmail, timezone: v.timezone },
-      }),
-    { successMs: 500 },
-  )
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<OrganizationFormValues>({
-    resolver: yupResolver(organizationSchema),
-    defaultValues: { organizationName: org.organizationName, ...org.info },
-  })
-
-  const onSubmit = (values: OrganizationFormValues) =>
-    save(values)
-      .then(() => {
-        toast.success('Organization updated.')
-        setTimeout(onDone, 500)
-      })
-      .catch((error: Error) => toast.error(error.message))
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
-      <h2 className="font-semibold text-text">Edit profile</h2>
-      <FormField id="organizationName" label="Name" error={errors.organizationName?.message}>
-        <Input id="organizationName" hasError={!!errors.organizationName} {...register('organizationName')} />
-      </FormField>
-      <FormField id="description" label="Description" error={errors.description?.message}>
-        <Textarea id="description" hasError={!!errors.description} {...register('description')} />
-      </FormField>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <FormField id="website" label="Website" error={errors.website?.message}>
-          <Input id="website" type="url" placeholder="https://" hasError={!!errors.website} {...register('website')} />
-        </FormField>
-        <FormField id="contactEmail" label="Contact email" error={errors.contactEmail?.message}>
-          <Input id="contactEmail" type="email" hasError={!!errors.contactEmail} {...register('contactEmail')} />
-        </FormField>
-      </div>
-      <FormField id="timezone" label="Time zone" error={errors.timezone?.message}>
-        <Select id="timezone" {...register('timezone')}>
-          {TIME_ZONES.map((tz) => (
-            <option key={tz} value={tz}>
-              {tz}
-            </option>
-          ))}
-        </Select>
-      </FormField>
-      <div className="flex justify-end gap-2 pt-1">
-        <LoadingButton variant="ghost" onClick={onDone}>
-          Cancel
-        </LoadingButton>
-        <LoadingButton type="submit" state={state} loadingText="Saving" successText="Saved">
-          Save changes
-        </LoadingButton>
-      </div>
-    </form>
+        {extra.map(([key, value]) => (
+          <Field key={key} label={humanize(key)}>
+            {renderValue(value)}
+          </Field>
+        ))}
+      </dl>
+    </section>
   )
 }
 
+/** One plan limit that has no usage figure in the API. */
+const Limit = ({ label, value }: { label: string; value: number }) => (
+  <div className="flex items-baseline justify-between gap-2 border-t border-border py-2.5 text-sm first:border-t-0">
+    <dt className="text-text-muted">{label}</dt>
+    <dd className="text-text">{formatNumber(value)}</dd>
+  </div>
+)
+
 /** Usage against the plan's limits; the limits themselves are set by the N-Ops operator, not here. */
-const PlanCard = ({ org }: { org: Organization }) => (
+const PlanCard = ({ org }: { org: OrgInfo }) => (
   <section className="rounded-xl border border-border bg-surface-raised p-5">
     <h2 className="mb-1 font-semibold text-text">Plan and usage</h2>
     <p className="mb-5 text-sm text-text-muted">Limits are set on your plan. Contact your N-Ops operator to raise them.</p>
     <div className="flex flex-col gap-4">
-      <Meter label="Users" used={org.usage.users} total={org.limits.users} />
-      <Meter label="Servers" used={org.usage.servers} total={org.limits.servers} />
-      <Meter label="Workflows" used={org.usage.workflows} total={org.limits.workflows} />
-      <Meter label="Vault projects" used={org.usage.vaultProjects} total={org.limits.vaultProjects} />
+      <Meter label="Users" used={org.users.current} total={org.users.limit} />
+      <Meter label="Vault projects" used={org.vaultProjects.current} total={org.vaultProjects.limit} />
       <Meter label="AI credits" used={org.aiCredit.used} total={org.aiCredit.allocated} />
       <Meter label="Storage" used={org.storageBytes.used} total={org.storageBytes.allocated} format={formatBytes} />
     </div>
-    <dl className="mt-5 grid grid-cols-2 gap-3 border-t border-border pt-4 text-sm">
-      <div>
-        <dt className="text-text-muted">Secret keys per project</dt>
-        <dd className="text-text">{formatNumber(org.limits.vaultKeysPerProject)}</dd>
-      </div>
-      <div>
-        <dt className="text-text-muted">Notes per project</dt>
-        <dd className="text-text">{formatNumber(org.limits.vaultNotesPerProject)}</dd>
-      </div>
+    <dl className="mt-5 border-t border-border pt-3">
+      <Limit label="Servers" value={org.serverLimit} />
+      <Limit label="Workflows" value={org.workflowLimit} />
+      <Limit label="Secret keys per vault project" value={org.vaultKeysPerProjectLimit} />
+      <Limit label="Notes per vault project" value={org.vaultNotesPerProjectLimit} />
     </dl>
   </section>
 )
 
-/** Profile (view / edit) next to plan usage. */
+/** Profile next to plan usage. */
 export const AdminOrganizationPage = () => {
-  const { data: org, isLoading, error } = useOrganization()
-  const [editing, setEditing] = useState(false)
+  const { data: org, isLoading, error } = useOrgInfo()
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Organization" description="Your organization's profile and how much of your plan it uses." mock />
+      <PageHeader title="Organization" description="Your organization's profile and how much of your plan it uses." />
       {isLoading ? (
         <SkeletonText lines={8} />
       ) : error || !org ? (
         <p className="text-sm text-text-muted">Couldn't load the organization: {error?.message ?? 'no data'}</p>
       ) : (
         <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
-          <section className="rounded-xl border border-border bg-surface-raised p-5">
-            {editing ? (
-              <ProfileForm org={org} onDone={() => setEditing(false)} />
-            ) : (
-              <ProfileView org={org} onEdit={() => setEditing(true)} />
-            )}
-          </section>
+          <ProfileCard org={org} />
           <PlanCard org={org} />
         </div>
       )}

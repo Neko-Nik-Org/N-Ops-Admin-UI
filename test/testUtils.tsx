@@ -34,7 +34,7 @@ export const api = vi.mocked(apiClient)
 export const makeUser = (overrides: Partial<CurrentUser> = {}): CurrentUser => ({
   userId: 1,
   organizationId: 'org-1',
-  permissions: ['tag:view', 'tag:create', 'tag:edit', 'tag:delete'],
+  permissions: ['tag:create', 'tag:edit', 'tag:delete'],
   tags: [],
   userName: 'priya',
   displayName: 'Priya Rao',
@@ -119,3 +119,83 @@ export const passTurnstile = (token = 'turnstile-token') => {
   }
   return window.turnstile
 }
+
+/** Tags as `GET /tag/list` returns them: production (1), staging (2), development (3), internal (4). */
+export const RAW_TAGS = ['production', 'staging', 'development', 'internal'].map((tagName, i) => ({
+  tag_id: i + 1,
+  organization_id: 'org-1',
+  tag_name: tagName,
+  tag_description: '',
+}))
+
+/** A role as `GET /user/roles/list` returns it. */
+export const rawRole = (roleId: number, roleName: string, permissions: string[] = ['tag:create']) => ({
+  role_id: roleId,
+  role_name: roleName,
+  role_description: `${roleName} role`,
+  permissions,
+  allowed_linux_users: [],
+  allowed_tags: [],
+  can_bypass_approvals: false,
+  can_approve_approvals: false,
+  created_at: '2026-11-17T08:00:00Z',
+  updated_at: '2026-11-17T08:00:00Z',
+})
+
+/** Roles whose ids match the mock users and API keys (1 Owner … 6 CI deploy). */
+export const RAW_ROLES = ['Owner', 'Admin', 'Operator', 'Developer', 'Auditor', 'CI deploy'].map((name, i) =>
+  rawRole(i + 1, name, name === 'CI deploy' ? ['vault:keys:view', 'vault:config:view'] : ['tag:create']),
+)
+
+/** `GET /user/self/org-info` as the API returns it. */
+export const RAW_ORG_INFO = {
+  organization_id: 'org-123',
+  organization_name: 'Acme',
+  organization_info: { region: 'eu-west', support_tier: 'gold' },
+  allocated_ai_credit: 100,
+  utilized_ai_credit: 40,
+  allocated_storage_bytes: 1024 ** 3,
+  utilized_storage_bytes: 512 * 1024 ** 2,
+  user_limit: 25,
+  current_user_count: 10,
+  server_limit: 50,
+  workflow_limit: 20,
+  ss_project_limit: 10,
+  current_ss_project_count: 4,
+  ss_keys_limit: 200,
+  ss_notes_limit: 100,
+  created_at: '2026-01-02T00:00:00Z',
+}
+
+/** A vault project as `GET /vault/project/list` returns it. */
+export const rawProject = (projectId: number, projectName: string, description = '') => ({
+  project_id: projectId,
+  project_name: projectName,
+  details: (description ? { description } : {}) as Record<string, unknown>,
+  created_at: '2026-11-01T08:00:00Z',
+  updated_at: '2026-11-10T08:00:00Z',
+})
+
+/** Projects whose ids match the mock vault contents (1 payments-api … 4 internal-tools). */
+export const RAW_PROJECTS = [
+  rawProject(1, 'payments-api', 'Card payments and payouts.'),
+  rawProject(2, 'web', 'Customer site and dashboard.'),
+  rawProject(3, 'billing', 'Invoices and subscriptions.'),
+  rawProject(4, 'internal-tools', 'Grafana, status page and other in-house tools.'),
+]
+
+/**
+ * Answers the live read endpoints the admin and vault pages use (tags, roles, org-info, vault
+ * projects, with the list's `project_name` search); anything else gets [].
+ */
+export const serveLiveReads = ({ tags = RAW_TAGS, roles = RAW_ROLES, orgInfo = RAW_ORG_INFO, projects = RAW_PROJECTS } = {}) =>
+  api.get.mockImplementation(async (url: string, config?: { params?: unknown }) => {
+    if (url === '/tag/list') return { data: tags }
+    if (url === '/user/roles/list') return { data: roles }
+    if (url === '/user/self/org-info') return { data: orgInfo }
+    if (url === '/vault/project/list') {
+      const q = String((config?.params as { project_name?: string } | undefined)?.project_name ?? '').toLowerCase()
+      return { data: projects.filter((p) => p.project_name.toLowerCase().includes(q)) }
+    }
+    return { data: [] }
+  })

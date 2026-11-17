@@ -24,6 +24,12 @@ Include:
 
 Never include real production secrets, session tokens, private keys, or credentials. Use test values.
 
+## Dependency vulnerabilities
+
+Dependabot security alerts and security updates are enabled for this repository. When a
+dependency has a published vulnerability, Dependabot opens a pull request with the fixed version.
+There are no routine version-bump pull requests.
+
 ## What to expect
 
 - We aim to acknowledge reports within **3 business days**.

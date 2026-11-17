@@ -20,7 +20,9 @@
  * organization quotas, email verification, username/password changes and deactivation.
  */
 
+import { profileToCurrentUser, type CurrentUser, type RawUserProfile } from '@/features/auth/types'
 import { apiClient } from '@/lib/axios'
+import { ApiError } from '@/types/api'
 import { toBase64 } from '@/utils/base64'
 import type { JsonObject, OrgInfo } from '../types'
 
@@ -52,6 +54,59 @@ export const isJsonObject = (value: unknown): value is JsonObject =>
 const asObject = (value: unknown): JsonObject => (isJsonObject(value) ? value : {})
 
 /** `GET /user/self/ui-info` — the user's saved UI preferences. */
+/** Why getProfile refused to return a profile. */
+export class InactiveAccountError extends Error {
+  readonly reason: 'user' | 'organization'
+
+  constructor(reason: 'user' | 'organization') {
+    super(
+      reason === 'user'
+        ? 'Your account has been deactivated. Contact an admin to reactivate it.'
+        : 'Your organization has been deactivated. Contact N-Ops support.',
+    )
+    this.name = 'InactiveAccountError'
+    this.reason = reason
+  }
+}
+
+/**
+ * `GET /user/self/profile` — the signed-in user's identity and full access scope (permissions,
+ * tags, Linux users, approval flags), read fresh from the database. The session itself keeps the
+ * copy made at sign-in, so this is how the app notices a role change without signing in again.
+ * Rejects with InactiveAccountError if the user or their organization has been deactivated.
+ */
+export const getProfile = async (): Promise<CurrentUser> => {
+  const { data } = await apiClient.get<RawUserProfile | null>('/user/self/profile')
+  if (!data) throw new ApiError('Your account could not be found.', 404)
+  // only an explicit false signs the user out
+  if (data.is_user_active === false) throw new InactiveAccountError('user')
+  if (data.is_organization_active === false) throw new InactiveAccountError('organization')
+  if (!Array.isArray(data.permissions) || !Array.isArray(data.tags) || typeof data.user_id !== 'number') {
+    throw new Error('The API sent an unexpected profile.')
+  }
+  return profileToCurrentUser(data)
+}
+
+/** Fields of the signed-in user's profile that they can change themselves. */
+export interface ProfileUpdate {
+  displayName: string
+  /** Only pass a changed address: sending one, even the current one, marks the email unverified. */
+  primaryEmail?: string
+}
+
+/**
+ * `PUT /user/self/profile` — renames the user and, if `primaryEmail` is given, changes their email
+ * (which the API then marks unverified). The display name must be unique in the organization and
+ * the email unique overall; the API reports a clash only as a generic 417 database error. The two
+ * fields are saved one after the other, so a failed email change can still leave a new name saved.
+ */
+export const updateProfile = async ({ displayName, primaryEmail }: ProfileUpdate): Promise<void> => {
+  await apiClient.put('/user/self/profile', {
+    display_name: displayName,
+    ...(primaryEmail !== undefined && { primary_email: primaryEmail }),
+  })
+}
+
 export const getUiInfo = async (): Promise<JsonObject> => {
   const { data } = await apiClient.get<unknown>('/user/self/ui-info')
   return asObject(data)

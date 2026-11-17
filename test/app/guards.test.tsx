@@ -20,6 +20,7 @@ import { act, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { RequireAuth, RequireGuest } from '@/app/guards'
 import { sessionStatusAtom } from '@/features/auth/store/session'
+import { useTags } from '@/features/tags/hooks/useTags'
 import { api, makeUser, renderWithProviders } from '../testUtils'
 
 describe('RequireAuth', () => {
@@ -36,13 +37,65 @@ describe('RequireAuth', () => {
     expect(screen.queryByText('secret dashboard')).not.toBeInTheDocument()
   })
 
-  it('renders the page for signed-in users once the startup data has loaded', async () => {
+  it('renders the page for signed-in users once every startup request has finished', async () => {
     api.get.mockResolvedValue({ data: {} })
     renderWithProviders(<RequireAuth>secret dashboard</RequireAuth>, { route: '/tags', user: makeUser() })
-    expect(screen.getByText('Loading your preferences')).toBeInTheDocument()
+    expect(screen.getByText('Checking N-Ops services')).toBeInTheDocument()
     expect(screen.queryByText('secret dashboard')).not.toBeInTheDocument()
     expect(await screen.findByText('secret dashboard')).toBeInTheDocument()
-    expect(api.get).toHaveBeenCalledWith('/user/self/ui-info')
+    for (const url of [
+      '/health/service',
+      '/user/self/profile',
+      '/user/self/ui-info',
+      '/user/self/details',
+      '/user/self/org-info',
+      '/tag/list',
+    ]) {
+      expect(api.get).toHaveBeenCalledWith(url)
+    }
+  })
+
+  it('checks service health during the session check, before anything that needs sign-in', async () => {
+    api.get.mockReturnValue(new Promise(() => {}))
+    renderWithProviders(<RequireAuth>secret dashboard</RequireAuth>, { route: '/tags' })
+    expect(await screen.findByText('Checking your session')).toBeInTheDocument()
+    expect(api.get).toHaveBeenCalledWith('/health/service')
+    expect(api.get).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0')
+  })
+
+  it('keeps the page up when it refetches a startup query that failed', async () => {
+    let tagCalls = 0
+    api.get.mockImplementation(async (url: string) => {
+      if (url === '/tag/list') {
+        tagCalls++
+        throw new Error('SQL Database error')
+      }
+      return { data: {} }
+    })
+    const RefetchesTags = () => {
+      useTags()
+      return <>secret dashboard</>
+    }
+    renderWithProviders(
+      <RequireAuth>
+        <RefetchesTags />
+      </RequireAuth>,
+      { route: '/tags', user: makeUser() },
+    )
+    expect(await screen.findByText('secret dashboard')).toBeInTheDocument()
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(screen.getByText('secret dashboard')).toBeInTheDocument()
+    expect(tagCalls).toBeLessThanOrEqual(2) // the startup call, plus at most one refetch on mount
+  })
+
+  it('still opens the app when some startup requests fail', async () => {
+    api.get.mockImplementation(async (url: string) => {
+      if (url === '/health/service' || url === '/tag/list') throw new Error('boom')
+      return { data: {} }
+    })
+    renderWithProviders(<RequireAuth>secret dashboard</RequireAuth>, { route: '/tags', user: makeUser() })
+    expect(await screen.findByText('secret dashboard')).toBeInTheDocument()
   })
 })
 

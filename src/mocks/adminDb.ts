@@ -81,7 +81,6 @@ const seedRoles = (): Role[] => [
     roleName: 'Operator',
     roleDescription: 'Runs production and staging: SSH, commands and workflows.',
     permissions: [
-      'tag:view',
       'server:view',
       'server:ssh',
       'server:exec',
@@ -101,7 +100,7 @@ const seedRoles = (): Role[] => [
     roleId: 4,
     roleName: 'Developer',
     roleDescription: 'Reads secrets and configs for staging and development.',
-    permissions: ['tag:view', 'server:view', 'vault:keys:view', 'vault:notes:view', 'vault:config:view', 'workflow:view'],
+    permissions: ['server:view', 'vault:keys:view', 'vault:notes:view', 'vault:config:view', 'workflow:view'],
     tagIds: [2, 3],
     canApproveApprovals: false,
     canBypassApprovals: false,
@@ -176,6 +175,7 @@ const seedApiKeys = (): ApiKey[] => [
     keyPrefix: 'nk-1_Qm7v',
     roleId: 6,
     tagId: 1,
+    vaultProjectIds: [1],
     isActive: true,
     createdAt: ago(80, 'days'),
     updatedAt: ago(80, 'days'),
@@ -189,6 +189,7 @@ const seedApiKeys = (): ApiKey[] => [
     keyPrefix: 'nk-2_x9Lp',
     roleId: 4,
     tagId: 2,
+    vaultProjectIds: [1, 2],
     isActive: true,
     createdAt: ago(45, 'days'),
     updatedAt: ago(10, 'days'),
@@ -202,6 +203,7 @@ const seedApiKeys = (): ApiKey[] => [
     keyPrefix: 'nk-3_bT2e',
     roleId: 6,
     tagId: 4,
+    vaultProjectIds: [4],
     isActive: true,
     createdAt: ago(30, 'days'),
     updatedAt: ago(30, 'days'),
@@ -215,6 +217,7 @@ const seedApiKeys = (): ApiKey[] => [
     keyPrefix: 'nk-4_Hc0s',
     roleId: 6,
     tagId: 1,
+    vaultProjectIds: [1],
     isActive: false,
     createdAt: ago(200, 'days'),
     updatedAt: ago(70, 'days'),
@@ -445,6 +448,7 @@ export const recordAudit = (
   resourceType: string,
   resourceName: string,
   details = '',
+  outcome: AuditOutcome = 'success',
 ) => {
   db.auditLogs.unshift({
     auditId: db.nextId.audit++,
@@ -454,7 +458,7 @@ export const recordAudit = (
     resourceType,
     resourceName,
     ip: '203.0.113.24',
-    outcome: 'success',
+    outcome,
     details,
   })
 }

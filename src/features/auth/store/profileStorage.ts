@@ -18,8 +18,9 @@
 /**
  * Keeps the signed-in user's profile across page reloads.
  *
- * The profile only arrives with the sign-in response (`/auth/verify` answers 204 with no body), so
- * without this a reload would forget the username, email and permissions. It holds nothing secret
+ * The profile arrives with the sign-in response (`/auth/verify` answers 204 with no body), so
+ * without this a reload would forget the username, email and permissions until the startup screen
+ * reloads them from `/user/self/profile`. It holds nothing secret
  * (no token); permission data in it only hides UI, and the API enforces every permission itself.
  * It is removed together with the session token (see clearSessionToken).
  */
@@ -43,7 +44,12 @@ const isCurrentUser = (value: unknown): value is CurrentUser => {
     typeof v.displayName === 'string' &&
     typeof v.organizationName === 'string' &&
     typeof v.primaryEmail === 'string' &&
-    typeof v.isEmailVerified === 'boolean'
+    typeof v.isEmailVerified === 'boolean' &&
+    // optional, filled in once the full profile has loaded
+    (v.allowedLinuxUsers === undefined ||
+      (Array.isArray(v.allowedLinuxUsers) && v.allowedLinuxUsers.every((u) => typeof u === 'string'))) &&
+    (v.canApproveApprovals === undefined || typeof v.canApproveApprovals === 'boolean') &&
+    (v.canBypassApprovals === undefined || typeof v.canBypassApprovals === 'boolean')
   )
 }
 

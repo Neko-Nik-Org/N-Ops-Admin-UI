@@ -14,7 +14,10 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tests for the Admin pages (Organization, Users, Roles, API keys, Audit logs) on the mock backend. */
+/**
+ * Tests for the Admin pages. Roles and Organization run on the (mocked) live API; Users, API keys and
+ * Audit logs on the mock backend, with real tags and roles for their pickers.
+ */
 
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -24,36 +27,39 @@ import { AdminAuditLogsPage } from '@/pages/admin/AdminAuditLogsPage'
 import { AdminOrganizationPage } from '@/pages/admin/AdminOrganizationPage'
 import { AdminRolesPage } from '@/pages/admin/AdminRolesPage'
 import { AdminUsersPage } from '@/pages/admin/AdminUsersPage'
-import { api, makeUser, renderWithProviders } from '../../testUtils'
+import { api, makeUser, RAW_ORG_INFO, rawRole, renderWithProviders, serveLiveReads } from '../../testUtils'
 
-const render = (ui: React.ReactElement, route: string) => renderWithProviders(ui, { route, user: makeUser() })
+const render = (ui: React.ReactElement, route: string) =>
+  renderWithProviders(ui, { route, user: makeUser({ permissions: ['tag:create', 'user:role:view'] }) })
 
 /** The open <dialog>. */
 const dialog = () => screen.getByRole('dialog')
 
 beforeEach(() => {
   resetAdminMock()
-  // the real tag list is empty, so the forms fall back to the sample tags
-  api.get.mockResolvedValue({ data: [] })
+  serveLiveReads()
 })
 
 describe('AdminOrganizationPage', () => {
-  it('shows the profile and plan, and saves an edit', async () => {
+  it('shows the real org-info: profile, usage and limits, read-only', async () => {
     render(<AdminOrganizationPage />, '/admin/organization')
-    expect(await screen.findByText('Payments platform for independent retailers.')).toBeInTheDocument()
-    expect(screen.getByText('Mock data')).toBeInTheDocument()
+    expect(await screen.findByText('Acme')).toBeInTheDocument()
+    expect(api.get).toHaveBeenCalledWith('/user/self/org-info')
+    expect(screen.queryByText('Mock data')).not.toBeInTheDocument()
+    expect(screen.getByText('org-123')).toBeInTheDocument()
+    // free-form organization_info keys, made readable
+    expect(screen.getByText('Support tier')).toBeInTheDocument()
+    expect(screen.getByText('gold')).toBeInTheDocument()
     expect(screen.getByRole('meter', { name: 'Users' })).toHaveAttribute('aria-valuenow', '40')
+    expect(screen.getByRole('meter', { name: 'Vault projects' })).toHaveAttribute('aria-valuenow', '40')
+    expect(screen.getByText('Secret keys per vault project')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+  })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Acme Inc' } })
-    fireEvent.change(screen.getByLabelText('Website'), { target: { value: 'not a url' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
-    expect(await screen.findByText('Enter a full URL, like https://example.com.')).toBeInTheDocument()
-
-    fireEvent.change(screen.getByLabelText('Website'), { target: { value: 'https://acme.inc' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
-    expect(await screen.findByText('Organization updated.')).toBeInTheDocument()
-    expect(await screen.findByText('acme.inc', {}, { timeout: 2000 })).toBeInTheDocument()
+  it('explains when org-info fails', async () => {
+    api.get.mockRejectedValue(new Error('SQL Database error'))
+    render(<AdminOrganizationPage />, '/admin/organization')
+    expect(await screen.findByText("Couldn't load the organization: SQL Database error")).toBeInTheDocument()
   })
 })
 
@@ -96,56 +102,270 @@ describe('AdminUsersPage', () => {
     expect(await screen.findByText('@zoe · zoe@acme.dev')).toBeInTheDocument()
   })
 
-  it('shows why the last Owner cannot be removed', async () => {
+  it('takes seats from the real org-info and role names from the real roles', async () => {
+    serveLiveReads({ orgInfo: { ...RAW_ORG_INFO, current_user_count: 25 }, roles: [rawRole(4, 'Engineer')] })
     render(<AdminUsersPage />, '/admin/users')
-    fireEvent.click(await screen.findByRole('button', { name: 'Remove Neko Nik' }))
-    fireEvent.click(within(dialog()).getByRole('button', { name: 'Remove user' }))
-    expect(await screen.findByText(/You can't delete the last Owner/)).toBeInTheDocument()
+    expect(await screen.findByText('25 of 25 seats used. Each person signs in with one role.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add user' })).toBeDisabled()
+    const tomas = screen.getByText('Tomás Ruiz').closest('tr') as HTMLElement
+    expect(await within(tomas).findByText('Engineer')).toBeInTheDocument() // real role 4
+    const marcus = screen.getByText('Marcus Chen').closest('tr') as HTMLElement
+    expect(within(marcus).getByText('Role #3')).toBeInTheDocument() // no real role with that id
+  })
+
+  it('explains an empty role picker without user:role:view', async () => {
+    renderWithProviders(<AdminUsersPage />, { route: '/admin/users', user: makeUser({ permissions: [] }) })
+    fireEvent.click(await screen.findByRole('button', { name: 'Add user' }))
+    expect(within(dialog()).getByText(/You need the “View roles” permission/)).toBeInTheDocument()
+    expect(api.get).not.toHaveBeenCalledWith('/user/roles/list', expect.anything())
   })
 })
 
 describe('AdminRolesPage', () => {
-  it('lists roles with their scope and who uses them', async () => {
-    render(<AdminRolesPage />, '/admin/roles')
-    const row = (await screen.findByText('Operator')).closest('tr') as HTMLElement
-    expect(within(row).getByText('8 of 33')).toBeInTheDocument()
-    expect(within(row).getByText('production')).toBeInTheDocument()
-    expect(within(row).getByText('3 users')).toBeInTheDocument()
+  const ROLE_PERMS = ['user:role:view', 'user:role:create', 'user:role:update', 'user:role:delete']
+  const admin = (overrides: Parameters<typeof makeUser>[0] = {}) =>
+    makeUser({ permissions: ['tag:create', 'tag:edit', 'tag:delete', ...ROLE_PERMS], ...overrides })
+
+  const rawRole = (id: number, name: string, extra: Record<string, unknown> = {}) => ({
+    role_id: id,
+    role_name: name,
+    role_description: `${name} role`,
+    permissions: ['tag:create'],
+    allowed_linux_users: [],
+    allowed_tags: [],
+    can_bypass_approvals: false,
+    can_approve_approvals: false,
+    created_at: '2026-11-17T08:00:00Z',
+    updated_at: '2026-11-17T08:00:00Z',
+    ...extra,
   })
 
-  it('creates a role from a permission group and tags', async () => {
-    render(<AdminRolesPage />, '/admin/roles')
+  const tagsRaw = [
+    { tag_id: 1, organization_id: 'o', tag_name: 'production', tag_description: '' },
+    { tag_id: 2, organization_id: 'o', tag_name: 'staging', tag_description: '' },
+  ]
+
+  let roles: ReturnType<typeof rawRole>[] = []
+
+  /** Serves /tag/list, /user/roles/list and /user/roles/fetch/{id} from `roles`. */
+  const serve = () =>
+    api.get.mockImplementation(async (url: string) => {
+      if (url === '/tag/list') return { data: tagsRaw }
+      if (url === '/user/roles/list') return { data: roles }
+      if (url.startsWith('/user/roles/fetch/')) return { data: roles.find((r) => r.role_id === Number(url.split('/').pop())) }
+      return { data: [] }
+    })
+
+  const renderRoles = (user = admin()) => renderWithProviders(<AdminRolesPage />, { route: '/admin/roles', user })
+
+  beforeEach(() => {
+    roles = [
+      rawRole(1, 'Operator', {
+        permissions: ['tag:create', 'tag:edit'],
+        allowed_tags: [1],
+        can_approve_approvals: true,
+        allowed_linux_users: ['deploy'],
+      }),
+      rawRole(2, 'Auditor'),
+    ]
+    serve()
+  })
+
+  it('lists live roles with their permissions, tags and approval flags', async () => {
+    renderRoles()
+    const row = (await screen.findByText('Operator')).closest('tr') as HTMLElement
+    expect(within(row).getByText('2 of 36')).toBeInTheDocument()
+    expect(within(row).getByText('production')).toBeInTheDocument()
+    expect(within(row).getByText('Approver')).toBeInTheDocument()
+    expect(screen.queryByText('Mock data')).not.toBeInTheDocument()
+    expect(api.get).toHaveBeenCalledWith('/user/roles/list', { params: { limit: 100, offset: 0 } })
+  })
+
+  it('asks for user:role:view instead of loading roles without it', async () => {
+    renderRoles(admin({ permissions: ['tag:create'] }))
+    expect(await screen.findByText(/user:role:view/)).toBeInTheDocument()
+    expect(api.get).not.toHaveBeenCalledWith('/user/roles/list', expect.anything())
+    expect(screen.queryByRole('button', { name: 'New role' })).not.toBeInTheDocument()
+  })
+
+  it('hides actions the user has no permission for', async () => {
+    renderRoles(admin({ permissions: ['tag:create', 'user:role:view'] }))
+    await screen.findByText('Operator')
+    expect(screen.queryByRole('button', { name: 'New role' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Duplicate / })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Edit / })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Delete / })).not.toBeInTheDocument()
+  })
+
+  it('disables edit and delete on roles wider than your own', async () => {
+    roles.push(rawRole(3, 'Superuser', { permissions: ['tag:create', 'server:exec'] }))
+    renderRoles()
+    await screen.findByText('Superuser')
+    expect(screen.getByRole('button', { name: 'Edit Superuser' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete Superuser' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Edit Auditor' })).toBeEnabled()
+  })
+
+  it('creates a role, offering only permissions the user holds', async () => {
+    api.post.mockResolvedValue({ data: undefined })
+    renderRoles()
     fireEvent.click(await screen.findByRole('button', { name: 'New role' }))
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Create role' }))
     expect(await within(dialog()).findByText('Give the role at least one permission.')).toBeInTheDocument()
 
-    fireEvent.change(within(dialog()).getByLabelText('Name'), { target: { value: 'On-call' } })
-    fireEvent.click(within(dialog()).getByRole('checkbox', { name: 'All Servers permissions' }))
-    expect(within(dialog()).getByText('4 selected')).toBeInTheDocument()
-    fireEvent.click(within(dialog()).getByRole('checkbox', { name: 'production' }))
+    expect(within(dialog()).getByRole('checkbox', { name: /Run remote commands/ })).toBeDisabled()
+    expect(within(dialog()).getByRole('checkbox', { name: 'All Servers permissions' })).toBeDisabled()
+
+    fireEvent.change(within(dialog()).getByLabelText('Name'), { target: { value: 'Tagger' } })
+    fireEvent.click(within(dialog()).getByRole('checkbox', { name: 'All Tags permissions' }))
+    expect(within(dialog()).getByText('3 selected')).toBeInTheDocument()
+    fireEvent.click(within(dialog()).getByRole('checkbox', { name: 'staging' }))
+    fireEvent.change(within(dialog()).getByLabelText('Allowed Linux users'), { target: { value: 'deploy, ubuntu' } })
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Create role' }))
 
-    expect(await screen.findByText('Created On-call.')).toBeInTheDocument()
-    const row = (await screen.findByText('On-call')).closest('tr') as HTMLElement
-    expect(within(row).getByText('4 of 33')).toBeInTheDocument()
-    expect(within(row).getByText('production')).toBeInTheDocument()
+    expect(await screen.findByText('Created Tagger.')).toBeInTheDocument()
+    expect(api.post).toHaveBeenCalledWith('/user/roles/create', {
+      role_name: 'Tagger',
+      role_description: '',
+      permissions: ['tag:create', 'tag:edit', 'tag:delete'],
+      allowed_linux_users: ['deploy', 'ubuntu'],
+      allowed_tags: [2],
+      can_approve_approvals: false,
+      can_bypass_approvals: false,
+    })
+  })
+
+  it('catches a duplicate name before the API (which only says "SQL Database error")', async () => {
+    renderRoles()
+    fireEvent.click(await screen.findByRole('button', { name: 'New role' }))
+    fireEvent.change(within(dialog()).getByLabelText('Name'), { target: { value: 'Auditor ' } })
+    fireEvent.click(within(dialog()).getByRole('checkbox', { name: /Create tags/ }))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Create role' }))
+    expect(await within(dialog()).findByText('A role called "Auditor" already exists.')).toBeInTheDocument()
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('disables the approval switches the user cannot give', async () => {
+    renderRoles(admin({ allowedLinuxUsers: [], canApproveApprovals: true, canBypassApprovals: false }))
+    fireEvent.click(await screen.findByRole('button', { name: 'New role' }))
+    expect(within(dialog()).getByRole('switch', { name: /Can approve requests/ })).toBeEnabled()
+    expect(within(dialog()).getByRole('switch', { name: /Skips approvals/ })).toBeDisabled()
+    expect(within(dialog()).getByText(/Only someone who skips approvals can give this/)).toBeInTheDocument()
+  })
+
+  it("keeps Linux users within the user's own", async () => {
+    renderRoles(admin({ allowedLinuxUsers: ['deploy', 'ubuntu'], canApproveApprovals: false, canBypassApprovals: false }))
+    fireEvent.click(await screen.findByRole('button', { name: 'New role' }))
+    expect(within(dialog()).getByText(/You can give: deploy, ubuntu/)).toBeInTheDocument()
+    fireEvent.change(within(dialog()).getByLabelText('Name'), { target: { value: 'Shell' } })
+    fireEvent.click(within(dialog()).getByRole('checkbox', { name: /Create tags/ }))
+
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Create role' }))
+    expect(await within(dialog()).findByText('Pick from the Linux users you have yourself: deploy, ubuntu.')).toBeInTheDocument()
+
+    fireEvent.change(within(dialog()).getByLabelText('Allowed Linux users'), { target: { value: 'deploy, root' } })
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Create role' }))
+    expect(await within(dialog()).findByText(/Pick from the Linux users/)).toBeInTheDocument()
+    expect(api.post).not.toHaveBeenCalled()
+
+    api.post.mockResolvedValue({ data: undefined })
+    fireEvent.change(within(dialog()).getByLabelText('Allowed Linux users'), { target: { value: 'deploy' } })
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Create role' }))
+    expect(await screen.findByText('Created Shell.')).toBeInTheDocument()
+  })
+
+  it('disables edit on a role with an approval flag the user lacks', async () => {
+    renderRoles(admin({ allowedLinuxUsers: [], canApproveApprovals: false, canBypassApprovals: false }))
+    await screen.findByText('Operator') // Operator can approve requests
+    expect(screen.getByRole('button', { name: 'Edit Operator' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Edit Auditor' })).toBeEnabled()
+  })
+
+  it('makes a tag-limited user pick at least one tag', async () => {
+    renderRoles(admin({ tags: [1] }))
+    fireEvent.click(await screen.findByRole('button', { name: 'New role' }))
+    fireEvent.change(within(dialog()).getByLabelText('Name'), { target: { value: 'Scoped' } })
+    fireEvent.click(within(dialog()).getByRole('checkbox', { name: /Create tags/ }))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Create role' }))
+    expect(await within(dialog()).findByText("You're limited to some tags, so pick at least one.")).toBeInTheDocument()
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('edits a role from its latest saved copy, sending only what changed', async () => {
+    api.put.mockResolvedValue({ data: undefined })
+    api.patch.mockResolvedValue({ data: undefined })
+    renderRoles()
+    await screen.findByText('Operator')
+    // someone else renamed it since the list loaded
+    roles[0] = { ...roles[0], role_description: 'Updated elsewhere' }
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Operator' }))
+    await waitFor(() => expect(within(dialog()).getByLabelText('Description')).toHaveValue('Updated elsewhere'))
+    expect(api.get).toHaveBeenCalledWith('/user/roles/fetch/1')
+
+    fireEvent.click(within(dialog()).getByRole('checkbox', { name: /Delete tags/ }))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText('Saved Operator.')).toBeInTheDocument()
+    expect(api.put).toHaveBeenCalledWith('/user/roles/update/permissions/1', {
+      permissions: ['tag:create', 'tag:edit', 'tag:delete'],
+      allowed_linux_users: ['deploy'],
+      allowed_tags: [1],
+      can_approve_approvals: true,
+      can_bypass_approvals: false,
+    })
+    expect(api.patch).not.toHaveBeenCalled()
+  })
+
+  it('renames a role through the info endpoint only', async () => {
+    api.patch.mockResolvedValue({ data: undefined })
+    renderRoles()
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Auditor' }))
+    await waitFor(() => expect(within(dialog()).getByLabelText('Name')).toHaveValue('Auditor'))
+    fireEvent.change(within(dialog()).getByLabelText('Name'), { target: { value: 'Read-only' } })
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('Saved Read-only.')).toBeInTheDocument()
+    expect(api.patch).toHaveBeenCalledWith('/user/roles/update/info/2', {
+      role_name: 'Read-only',
+      role_description: 'Auditor role',
+    })
+    expect(api.put).not.toHaveBeenCalled()
   })
 
   it('duplicates a role as a new one', async () => {
-    render(<AdminRolesPage />, '/admin/roles')
-    fireEvent.click(await screen.findByRole('button', { name: 'Duplicate Auditor' }))
+    api.post.mockResolvedValue({ data: undefined })
+    renderRoles()
+    fireEvent.click(await screen.findByRole('button', { name: 'Duplicate Operator' }))
     expect(within(dialog()).getByRole('heading', { name: 'New role' })).toBeInTheDocument()
-    expect(within(dialog()).getByLabelText('Name')).toHaveValue('Auditor (copy)')
+    expect(within(dialog()).getByLabelText('Name')).toHaveValue('Operator (copy)')
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Create role' }))
-    expect(await screen.findByText('Auditor (copy)')).toBeInTheDocument()
-    expect(screen.getByText('Auditor')).toBeInTheDocument()
+    expect(await screen.findByText('Created Operator (copy).')).toBeInTheDocument()
+    expect(api.post).toHaveBeenCalledWith(
+      '/user/roles/create',
+      expect.objectContaining({ role_name: 'Operator (copy)', allowed_tags: [1] }),
+    )
   })
 
-  it('explains why a role in use cannot be deleted', async () => {
-    render(<AdminRolesPage />, '/admin/roles')
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete Developer' }))
+  it("shows the API's reason when a role in use cannot be deleted", async () => {
+    api.delete.mockRejectedValue(
+      new Error('Role cannot be deleted because there are users associated with it, delete those users first'),
+    )
+    renderRoles()
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete Auditor' }))
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Delete role' }))
-    expect(await screen.findByText(/still use "Developer". Move them to another role first./)).toBeInTheDocument()
+    expect(await screen.findByText(/there are users associated with it/)).toBeInTheDocument()
+    expect(api.delete).toHaveBeenCalledWith('/user/roles/delete/2')
+  })
+
+  it('deletes an unused role', async () => {
+    api.delete.mockImplementation(async () => {
+      roles = roles.filter((r) => r.role_id !== 2)
+      return { data: undefined }
+    })
+    renderRoles()
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete Auditor' }))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Delete role' }))
+    expect(await screen.findByText('Deleted Auditor.')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('cell', { name: /Auditor role/ })).not.toBeInTheDocument())
   })
 })
 
@@ -153,6 +373,9 @@ describe('AdminApiKeysPage', () => {
   it('shows key status, including keys about to expire', async () => {
     render(<AdminApiKeysPage />, '/admin/api-keys')
     expect(await screen.findByText('github-actions-prod')).toBeInTheDocument()
+    const syncRow = screen.getByText('staging-config-sync').closest('tr') as HTMLElement
+    expect(await within(syncRow).findByText('payments-api')).toBeInTheDocument()
+    expect(within(syncRow).getByText('web')).toBeInTheDocument()
     expect(screen.getByText('nk-1_Qm7v…')).toBeInTheDocument()
     expect(screen.getByText(/Expires in 6 days/)).toBeInTheDocument()
     expect(screen.getByText('Disabled')).toBeInTheDocument()
@@ -168,6 +391,11 @@ describe('AdminApiKeysPage', () => {
     fireEvent.change(within(dialog()).getByLabelText('Tag'), { target: { value: '2' } })
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Never' }))
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Create key' }))
+    expect(await within(dialog()).findByText('Pick at least one vault project.')).toBeInTheDocument()
+
+    fireEvent.click(await within(dialog()).findByRole('checkbox', { name: 'web' }))
+    fireEvent.click(within(dialog()).getByRole('checkbox', { name: 'billing' }))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Create key' }))
 
     expect(await screen.findByRole('heading', { name: 'deploy-bot is ready' })).toBeInTheDocument()
     expect(screen.getByTestId('api-key-secret').textContent).toMatch(/^nk-5_[A-Za-z0-9]{40}$/)
@@ -176,6 +404,8 @@ describe('AdminApiKeysPage', () => {
     await waitFor(() => expect(screen.queryByTestId('api-key-secret')).not.toBeInTheDocument())
     const row = screen.getByText('deploy-bot').closest('tr') as HTMLElement
     expect(within(row).getByText('staging')).toBeInTheDocument()
+    expect(within(row).getByText('web')).toBeInTheDocument()
+    expect(within(row).getByText('billing')).toBeInTheDocument()
     // never used, never expires
     expect(within(row).getAllByText('Never')).toHaveLength(2)
   })

@@ -21,12 +21,13 @@ import { Bell, Menu, Plus, Search } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { TagSelect } from '@/components/molecules/TagSelect'
-import { PAGE_TITLES } from '@/constants/routes'
+import { pageTrail } from '@/constants/routes'
 
 /** Sticky header above every authenticated page. `onMenuClick` opens the mobile nav drawer. */
 export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
   const { pathname } = useLocation()
-  const trail = PAGE_TITLES[pathname] ?? ['N-Ops']
+  const found = pageTrail(pathname)
+  const trail = found.length ? found : ['N-Ops']
 
   return (
     <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-border bg-surface px-4 py-3.5 sm:gap-4 sm:px-6">

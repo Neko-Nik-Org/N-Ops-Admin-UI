@@ -22,7 +22,10 @@ import type { AdminUser, AdminUserInput } from '../types'
 
 const findUser = (userId: number) => db.users.find((u) => u.userId === userId) ?? notFound('user')
 
-/** Rejects a username or email another user already has (both are unique in `app_user`). */
+/**
+ * Rejects a username or email another user already has (both are unique in `app_user`). Roles are
+ * real (`/user/roles/*`), so the role id isn't checked here; the API will when users go live.
+ */
 const assertUnique = (input: AdminUserInput, exceptId?: number) => {
   const others = db.users.filter((u) => u.userId !== exceptId)
   if (others.some((u) => u.userName.toLowerCase() === input.userName.toLowerCase())) {
@@ -31,7 +34,6 @@ const assertUnique = (input: AdminUserInput, exceptId?: number) => {
   if (others.some((u) => u.primaryEmail.toLowerCase() === input.primaryEmail.toLowerCase())) {
     throw new Error(`${input.primaryEmail} already belongs to another user.`)
   }
-  if (!db.roles.some((r) => r.roleId === input.roleId)) throw new Error('Pick a role.')
 }
 
 /** Future: `GET /user/admin/list`. */
@@ -59,7 +61,7 @@ export const createUser = async (input: AdminUserInput): Promise<AdminUser> => {
   }
   db.users.push(user)
   db.organization.usage.users = db.users.length
-  recordAudit('user.create', 'user', user.userName, `Role: ${db.roles.find((r) => r.roleId === user.roleId)?.roleName}`)
+  recordAudit('user.create', 'user', user.userName, `Role #${user.roleId}`)
   return clone(user)
 }
 
@@ -76,9 +78,6 @@ export const updateUser = async (userId: number, input: AdminUserInput): Promise
 export const deleteUser = async (userId: number): Promise<void> => {
   await mockDelay()
   const user = findUser(userId)
-  if (user.roleId === 1 && db.users.filter((u) => u.roleId === 1).length === 1) {
-    throw new Error("You can't delete the last Owner. Give someone else the Owner role first.")
-  }
   db.users = db.users.filter((u) => u.userId !== userId)
   db.organization.usage.users = db.users.length
   recordAudit('user.delete', 'user', user.userName)

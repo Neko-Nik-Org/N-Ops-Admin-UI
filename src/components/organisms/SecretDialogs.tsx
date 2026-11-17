@@ -14,12 +14,13 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Dialogs for the Keys store: new key / new version, version history, and .env import / export. */
+/** Dialogs for the Vault Env tab: new key / new version, version history, and .env import / export. */
 
 import { Eye, EyeOff, RotateCcw, Upload } from 'lucide-react'
 import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import { toast } from 'react-toastify'
 import { Badge } from '@/components/atoms/Badge'
+import { Switch } from '@/components/atoms/Switch'
 import { Input } from '@/components/atoms/Input'
 import { Select } from '@/components/atoms/Select'
 import { Textarea } from '@/components/atoms/Textarea'
@@ -40,7 +41,7 @@ import {
   useRollbackSecret,
   useSecretVersions,
 } from '@/features/vault/hooks/useVault'
-import type { SecretKey, VaultService } from '@/features/vault/types'
+import type { SecretKey, VaultProject } from '@/features/vault/types'
 import { downloadText } from '@/utils/download'
 import { formatDateTime, formatRelative } from '@/utils/format'
 
@@ -61,7 +62,7 @@ const TagSelect = ({
     <FormField id={id} label="Tag" error={error}>
       <Select id={id} value={value} onChange={(e) => onChange(Number(e.target.value))} hasError={!!error}>
         <option value={0} disabled>
-          Pick a tag
+          {options.length ? 'Pick a tag' : 'No tags yet: create one on the Tags page'}
         </option>
         {options.map((t) => (
           <option key={t.tagId} value={t.tagId}>
@@ -80,12 +81,12 @@ export type SecretDialogState = { kind: 'closed' } | { kind: 'create' } | { kind
 
 const SecretForm = ({
   state,
-  service,
+  project,
   defaultTagId,
   onClose,
 }: {
   state: Exclude<SecretDialogState, { kind: 'closed' }>
-  service: VaultService
+  project: VaultProject
   defaultTagId: number
   onClose: () => void
 }) => {
@@ -95,14 +96,16 @@ const SecretForm = ({
   const [value, setValue] = useState('')
   const [note, setNote] = useState('')
   const [show, setShow] = useState(false)
+  // a new version starts as hidden as the key is now; hiding is per version, so it can be changed
+  const [isHidden, setIsHidden] = useState(isVersion ? state.secret.isHidden : false)
   const [errors, setErrors] = useState<{ name?: string; tag?: string; value?: string }>({})
   const { mutateAsync: create } = useCreateSecret()
   const { mutateAsync: addVersion } = useAddSecretVersion()
   const [saveState, save] = useAsyncAction(
     () =>
       isVersion
-        ? addVersion({ secretId: state.secret.secretId, value, note })
-        : create({ serviceId: service.serviceId, input: { name, tagId, value, note } }).then(() => undefined),
+        ? addVersion({ secretId: state.secret.secretId, value, note, isHidden })
+        : create({ projectId: project.projectId, input: { name, tagId, value, note, isHidden } }).then(() => undefined),
     { successMs: 400 },
   )
 
@@ -180,10 +183,22 @@ const SecretForm = ({
           autoComplete="off"
         />
       </FormField>
+      <div className="rounded-lg border border-border p-3">
+        <Switch
+          label="Hide value"
+          description={
+            isHidden
+              ? 'Write-only: apps can still use it, but nobody can reveal, copy or export it from here. Keep a copy if you need one.'
+              : 'Anyone with access can reveal it later. Every reveal is recorded in the audit log.'
+          }
+          checked={isHidden}
+          onChange={(e) => setIsHidden(e.target.checked)}
+        />
+      </div>
       <p className="text-xs text-text-muted">
         {isVersion
           ? `Saved as v${state.secret.latestVersion + 1}. Earlier versions stay in the history, so you can roll back.`
-          : 'Stored encrypted (AES-256-GCM). Reading it later is recorded in the audit log.'}
+          : 'Stored encrypted (AES-256-GCM).'}
       </p>
       <div className="flex justify-end gap-2">
         <LoadingButton variant="ghost" onClick={onClose}>
@@ -197,32 +212,32 @@ const SecretForm = ({
   )
 }
 
-/** Adds a key to `service`, or a new version of `state.secret`. */
+/** Adds a key to `project`, or a new version of `state.secret`. */
 export const SecretDialog = ({
   state,
-  service,
+  project,
   defaultTagId,
   tagName,
   onClose,
 }: {
   state: SecretDialogState
-  service: VaultService | null
+  project: VaultProject | null
   defaultTagId: number
   tagName: (id: number) => string
   onClose: () => void
 }) => (
   <Dialog
-    open={state.kind !== 'closed' && !!service}
+    open={state.kind !== 'closed' && !!project}
     onClose={onClose}
-    title={state.kind === 'version' ? `New version of ${state.secret.name}` : `New key in ${service?.serviceName}`}
+    title={state.kind === 'version' ? `New version of ${state.secret.name}` : `New key in ${project?.projectName}`}
     description={
       state.kind === 'version'
         ? `Tag: ${tagName(state.secret.tagId)}`
         : 'Keys are environment variables. The same name can have a different value per tag.'
     }
   >
-    {state.kind !== 'closed' && service && (
-      <SecretForm state={state} service={service} defaultTagId={defaultTagId} onClose={onClose} />
+    {state.kind !== 'closed' && project && (
+      <SecretForm state={state} project={project} defaultTagId={defaultTagId} onClose={onClose} />
     )}
   </Dialog>
 )
@@ -265,18 +280,21 @@ const SecretHistory = ({ secret }: { secret: SecretKey }) => {
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-sm font-semibold text-text">v{v.version}</span>
               {current && <Badge tone="signal">In use</Badge>}
+              {v.isHidden && <Badge tone="neutral">Hidden</Badge>}
               {v.version === secret.latestVersion && !current && <Badge tone="warning">Latest, not in use</Badge>}
               <span className="text-xs text-text-muted" title={formatDateTime(v.createdAt)}>
                 {v.createdBy} · {formatRelative(v.createdAt)}
               </span>
               <span className="ml-auto flex gap-1">
-                <LoadingButton
-                  variant="ghost"
-                  size="sm"
-                  icon={revealed[v.version] !== undefined ? <EyeOff size={14} /> : <Eye size={14} />}
-                  aria-label={`${revealed[v.version] !== undefined ? 'Hide' : 'Reveal'} v${v.version}`}
-                  onClick={() => toggle(v.version)}
-                />
+                {!v.isHidden && (
+                  <LoadingButton
+                    variant="ghost"
+                    size="sm"
+                    icon={revealed[v.version] !== undefined ? <EyeOff size={14} /> : <Eye size={14} />}
+                    aria-label={`${revealed[v.version] !== undefined ? 'Hide' : 'Reveal'} v${v.version}`}
+                    onClick={() => toggle(v.version)}
+                  />
+                )}
                 {!current && (
                   <LoadingButton
                     variant="secondary"
@@ -335,12 +353,12 @@ export const SecretHistoryDialog = ({
 // ── .env import ──────────────────────────────────────────
 
 const ImportForm = ({
-  service,
+  project,
   existing,
   defaultTagId,
   onClose,
 }: {
-  service: VaultService
+  project: VaultProject
   existing: SecretKey[]
   defaultTagId: number
   onClose: () => void
@@ -350,7 +368,7 @@ const ImportForm = ({
   const [note, setNote] = useState('')
   const [tagError, setTagError] = useState<string>()
   const { mutateAsync: runImport } = useImportDotenv()
-  const [state, save] = useAsyncAction(() => runImport({ serviceId: service.serviceId, tagId, text, note }), { successMs: 500 })
+  const [state, save] = useAsyncAction(() => runImport({ projectId: project.projectId, tagId, text, note }), { successMs: 500 })
   const parsed = useMemo(() => parseDotenv(text), [text])
   const names = new Set(existing.filter((s) => s.tagId === tagId).map((s) => s.name))
   const fresh = parsed.entries.filter((e) => !names.has(e.key)).length
@@ -434,52 +452,57 @@ const ImportForm = ({
   )
 }
 
-/** Paste or upload a .env file into `service` under one tag. */
+/** Paste or upload a .env file into `project` under one tag. */
 export const ImportDotenvDialog = ({
   open,
-  service,
+  project,
   existing,
   defaultTagId,
   onClose,
 }: {
   open: boolean
-  service: VaultService | null
+  project: VaultProject | null
   existing: SecretKey[]
   defaultTagId: number
   onClose: () => void
 }) => (
   <Dialog
-    open={open && !!service}
+    open={open && !!project}
     onClose={onClose}
-    title={`Import .env into ${service?.serviceName}`}
+    title={`Import .env into ${project?.projectName}`}
     description="New names become keys; existing ones get a new version."
   >
-    {service && <ImportForm service={service} existing={existing} defaultTagId={defaultTagId} onClose={onClose} />}
+    {project && <ImportForm project={project} existing={existing} defaultTagId={defaultTagId} onClose={onClose} />}
   </Dialog>
 )
 
 // ── .env export ──────────────────────────────────────────
 
 const ExportForm = ({
-  service,
+  project,
   defaultTagId,
   tagName,
   onClose,
 }: {
-  service: VaultService
+  project: VaultProject
   defaultTagId: number
   tagName: (id: number) => string
   onClose: () => void
 }) => {
   const [tagId, setTagId] = useState(defaultTagId)
   const { mutateAsync: runExport } = useExportDotenv()
-  const [state, save] = useAsyncAction(() => runExport({ serviceId: service.serviceId, tagId }), { successMs: 500 })
+  const [state, save] = useAsyncAction(() => runExport({ projectId: project.projectId, tagId }), { successMs: 500 })
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
     save()
-      .then((body) => {
-        downloadText(`${service.serviceName}.${tagName(tagId)}.env`, body)
+      .then(({ body, skippedHidden }) => {
+        downloadText(`${project.projectName}.${tagName(tagId)}.env`, body)
+        if (skippedHidden.length) {
+          toast.info(
+            `Left out ${skippedHidden.length} hidden key${skippedHidden.length === 1 ? '' : 's'}: ${skippedHidden.join(', ')}.`,
+          )
+        }
         setTimeout(onClose, 500)
       })
       .catch((err: Error) => toast.error(err.message))
@@ -489,7 +512,7 @@ const ExportForm = ({
     <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
       <TagSelect id="exportTag" value={tagId} onChange={setTagId} />
       <p className="text-sm text-text-muted">
-        Downloads the value in use for every key with this tag. The export is recorded in the audit log.
+        Downloads the value in use for every key with this tag, except hidden ones. The export is recorded in the audit log.
       </p>
       <div className="flex justify-end gap-2">
         <LoadingButton variant="ghost" onClick={onClose}>
@@ -503,21 +526,21 @@ const ExportForm = ({
   )
 }
 
-/** Downloads one tag's keys from `service` as a .env file. */
+/** Downloads one tag's keys from `project` as a .env file. */
 export const ExportDotenvDialog = ({
   open,
-  service,
+  project,
   defaultTagId,
   tagName,
   onClose,
 }: {
   open: boolean
-  service: VaultService | null
+  project: VaultProject | null
   defaultTagId: number
   tagName: (id: number) => string
   onClose: () => void
 }) => (
-  <Dialog open={open && !!service} onClose={onClose} title={`Export ${service?.serviceName} as .env`}>
-    {service && <ExportForm service={service} defaultTagId={defaultTagId} tagName={tagName} onClose={onClose} />}
+  <Dialog open={open && !!project} onClose={onClose} title={`Export ${project?.projectName} as .env`}>
+    {project && <ExportForm project={project} defaultTagId={defaultTagId} tagName={tagName} onClose={onClose} />}
   </Dialog>
 )
