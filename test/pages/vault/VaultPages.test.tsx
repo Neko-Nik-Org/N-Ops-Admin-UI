@@ -25,7 +25,7 @@ import { VaultPage } from '@/pages/vault/VaultPage'
 import { ApiError } from '@/types/api'
 import { api, makeUser, RAW_ORG_INFO, RAW_PROJECTS, rawProject, renderWithProviders, serveLiveReads } from '../../testUtils'
 
-const PROJECT_PERMS = ['vault:project:view', 'vault:project:create', 'vault:project:edit', 'vault:project:delete']
+const PROJECT_PERMS = ['vault:project:view', 'vault:project:create', 'vault:project:edit', 'vault:project:delete', 'user:view']
 
 /** Opens the explorer at `route` (/vault, /vault/1 or /vault/1/env). Other URLs show the location probe. */
 const openAt = (route: string, user: CurrentUser = makeUser({ permissions: PROJECT_PERMS })) => {
@@ -112,6 +112,32 @@ describe('Vault explorer: the root and project folders', () => {
 
     openAt('/vault')
     expect(await screen.findByRole('grid', { name: 'Projects' })).toBeInTheDocument() // still Details
+  })
+
+  it('shows the selected item in the details pane, which can be closed', async () => {
+    openAt('/vault/1/env')
+    await list('Contents of Env')
+    expect(within(preview()).queryByRole('button', { name: 'Close details' })).not.toBeInTheDocument()
+
+    fireEvent.click(row('DATABASE_URL', 'staging'))
+    expect(within(preview()).getByRole('heading', { name: 'DATABASE_URL' })).toBeInTheDocument()
+    fireEvent.click(within(preview()).getByRole('button', { name: 'Close details' }))
+    expect(within(preview()).getByText('Select a key to see its value and history.')).toBeInTheDocument()
+    expect(row('DATABASE_URL', 'staging')).toHaveAttribute('aria-selected', 'false')
+  })
+
+  it('shows project descriptions under the names in Details view', async () => {
+    openAt('/vault')
+    await list('Projects')
+    showDetails()
+    expect(within(row('payments-api')).getByText('Card payments and payouts.')).toBeInTheDocument()
+  })
+
+  it('marks Env, Conf and Notes as not saved to the server yet', async () => {
+    openAt('/vault/1/conf')
+    await list('Contents of Conf')
+    expect(screen.getByText('Not saved to the server yet')).toBeInTheDocument()
+    expect(screen.queryByText('Mock data')).not.toBeInTheDocument()
   })
 
   it('filters the open folder with the search box', async () => {

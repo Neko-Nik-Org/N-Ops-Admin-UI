@@ -135,8 +135,6 @@ export const RootView = ({ projects }: { projects: readonly VaultProject[] }) =>
         <FolderHeader
           path={[]}
           title="Vault"
-          description="Projects are folders. Open one to find its Env secrets, Conf files and Notes."
-          mock={false}
           actions={
             actions.canCreate && (
               <LoadingButton
@@ -165,11 +163,20 @@ export const RootView = ({ projects }: { projects: readonly VaultProject[] }) =>
               rowId={(p) => p.projectId}
               name={(p) => p.projectName}
               text={(p) => p.projectName}
+              detailsSubtitle={(p) => p.description || 'No description'}
               bigIcon={(p) => <ProjectFolderIcon projectId={p.projectId} />}
               icon={() => <Folder size={16} className="text-warning" />}
               columns={[
-                { key: 'description', label: 'Description', render: (p) => p.description || '—', className: 'max-w-72 truncate' },
-                { key: 'modified', label: 'Modified', render: (p) => formatRelative(p.updatedAt) },
+                {
+                  key: 'created',
+                  label: 'Created',
+                  render: (p) => <span title={formatDateTime(p.createdAt)}>{formatRelative(p.createdAt)}</span>,
+                },
+                {
+                  key: 'modified',
+                  label: 'Modified',
+                  render: (p) => <span title={formatDateTime(p.updatedAt)}>{formatRelative(p.updatedAt)}</span>,
+                },
               ]}
               selectedId={selectedId}
               onSelect={select}
@@ -180,7 +187,7 @@ export const RootView = ({ projects }: { projects: readonly VaultProject[] }) =>
           </ListCard>
         }
         preview={
-          <PreviewCard>
+          <PreviewCard onClose={selected ? () => select(null) : undefined}>
             {selected ? (
               <ProjectPreview
                 project={selected}
@@ -279,7 +286,7 @@ export const ProjectView = ({ project }: { project: VaultProject }) => {
           </ListCard>
         }
         preview={
-          <PreviewCard>
+          <PreviewCard onClose={selected ? () => select(null) : undefined}>
             {selected ? (
               (() => {
                 const { label, purpose, icon: Icon } = SECTIONS[selected.section]

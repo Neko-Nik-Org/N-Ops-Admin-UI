@@ -80,8 +80,7 @@ describe('OverviewPage', () => {
     mockApi('ok')
     renderOverview()
 
-    expect(await screen.findByText('2 servers across 2 tags, updated just now')).toBeInTheDocument()
-    expect(screen.getByText('Servers online')).toBeInTheDocument()
+    expect(await screen.findByText('Servers online')).toBeInTheDocument()
     expect(screen.getByText('db-1 are offline')).toBeInTheDocument()
     expect(screen.getByText('The oldest has waited 17 minutes')).toBeInTheDocument()
     expect(screen.getByText('2 failed, 1 waiting for approval')).toBeInTheDocument()
@@ -102,7 +101,6 @@ describe('OverviewPage', () => {
 
     act(() => store.set(selectedTagIdAtom, 2))
     expect(await screen.findByText('1 of 2 servers')).toBeInTheDocument()
-    expect(screen.getByText(/servers tagged staging/)).toBeInTheDocument()
     expect(screen.queryByText('web-1')).not.toBeInTheDocument()
     expect(screen.getByText('db-1', { selector: 'p' })).toBeInTheDocument()
 

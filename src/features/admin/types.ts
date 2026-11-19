@@ -61,7 +61,13 @@ export interface AdminUser {
   hasEmail2fa: boolean
   hasIpRestriction: boolean
   allowedIps: string[]
+  hasGeoRestriction: boolean
+  allowedGeoLocations: string[]
+  /** Free-form JSON the API keeps with the user. */
+  userDetails: Record<string, unknown>
   createdAt: string
+  updatedAt: string
+  /** The API sets this to the creation time until the first sign-in. */
   lastLoginAt: string | null
 }
 

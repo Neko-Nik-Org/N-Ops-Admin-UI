@@ -147,6 +147,56 @@ export const RAW_ROLES = ['Owner', 'Admin', 'Operator', 'Developer', 'Auditor', 
   rawRole(i + 1, name, name === 'CI deploy' ? ['vault:keys:view', 'vault:config:view'] : ['tag:create']),
 )
 
+/** A user as `/user/admin/list` returns it. */
+export const rawAdminUser = (
+  userId: number,
+  userName: string,
+  displayName: string,
+  roleId: number,
+  extra: Record<string, unknown> = {},
+) => ({
+  user_id: userId,
+  user_name: userName,
+  display_name: displayName,
+  user_details: {},
+  primary_email: `${userName}@acme.dev`,
+  is_email_verified: true,
+  is_active: true,
+  role_id: roleId,
+  has_ip_restriction: false,
+  has_geo_restriction: false,
+  allowed_ips: [],
+  allowed_geo_locations: [],
+  has_totp_2fa: true,
+  has_email_2fa: false,
+  created_at: '2026-06-01T08:00:00Z',
+  updated_at: '2026-11-01T08:00:00Z',
+  last_login_at: '2026-11-18T08:00:00Z',
+  ...extra,
+})
+
+/** Users with the same ids and names as the Admin mock's (1 Neko Nik … 10 Sara Lindqvist). */
+export const RAW_USERS = [
+  rawAdminUser(1, 'neko', 'Neko Nik', 1),
+  rawAdminUser(2, 'priya', 'Priya Rao', 2, { has_email_2fa: true }),
+  rawAdminUser(3, 'marcus', 'Marcus Chen', 3, { has_ip_restriction: true, allowed_ips: ['203.0.113.0/24'] }),
+  rawAdminUser(4, 'aisha', 'Aisha Bello', 3, { has_totp_2fa: false, has_email_2fa: true }),
+  rawAdminUser(5, 'tomas', 'Tomás Ruiz', 4, { has_totp_2fa: false }),
+  rawAdminUser(6, 'lena', 'Lena Fischer', 4),
+  rawAdminUser(7, 'kenji', 'Kenji Watanabe', 4, {
+    is_email_verified: false,
+    has_totp_2fa: false,
+    last_login_at: '2026-06-01T08:00:00Z', // never signed in: same as created_at
+  }),
+  rawAdminUser(8, 'olivia', 'Olivia Hart', 5),
+  rawAdminUser(9, 'dev', 'Dev Malhotra', 3, { is_active: false, has_totp_2fa: false }),
+  rawAdminUser(10, 'sara', 'Sara Lindqvist', 4, {
+    has_geo_restriction: true,
+    allowed_geo_locations: ['SE', 'NO'],
+    user_details: { team: 'Platform', on_call: true },
+  }),
+]
+
 /** `GET /user/self/org-info` as the API returns it. */
 export const RAW_ORG_INFO = {
   organization_id: 'org-123',
@@ -185,14 +235,26 @@ export const RAW_PROJECTS = [
 ]
 
 /**
- * Answers the live read endpoints the admin and vault pages use (tags, roles, org-info, vault
- * projects, with the list's `project_name` search); anything else gets [].
+ * Answers the live read endpoints the admin and vault pages use (tags, roles, org-info, users, vault
+ * projects, with the lists' name searches); anything else gets [].
  */
-export const serveLiveReads = ({ tags = RAW_TAGS, roles = RAW_ROLES, orgInfo = RAW_ORG_INFO, projects = RAW_PROJECTS } = {}) =>
+export const serveLiveReads = ({
+  tags = RAW_TAGS,
+  roles = RAW_ROLES,
+  orgInfo = RAW_ORG_INFO,
+  projects = RAW_PROJECTS,
+  users = RAW_USERS,
+} = {}) =>
   api.get.mockImplementation(async (url: string, config?: { params?: unknown }) => {
     if (url === '/tag/list') return { data: tags }
     if (url === '/user/roles/list') return { data: roles }
     if (url === '/user/self/org-info') return { data: orgInfo }
+    if (url === '/user/admin/list') {
+      const q = String((config?.params as { user_name?: string } | undefined)?.user_name ?? '').toLowerCase()
+      return { data: users.filter((u) => u.user_name.toLowerCase().includes(q)) }
+    }
+    if (url.startsWith('/user/admin/fetch/'))
+      return { data: users.find((u) => u.user_id === Number(url.split('/').pop())) ?? null }
     if (url === '/vault/project/list') {
       const q = String((config?.params as { project_name?: string } | undefined)?.project_name ?? '').toLowerCase()
       return { data: projects.filter((p) => p.project_name.toLowerCase().includes(q)) }

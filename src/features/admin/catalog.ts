@@ -16,8 +16,8 @@
  */
 /**
  * Every permission a role can grant, grouped for the role editor, plus the audit log's
- * action types. Only the tag:* permissions exist in the API today (docs/Permissions.md);
- * the rest are the planned ones from the admin modules.
+ * action types. The tag:*, user:*, user:role:* and vault:project:* permissions exist in the API
+ * today (docs/Permissions.md); the rest are the planned ones from the admin modules.
  */
 
 /** A group of related permissions shown together in the role editor. */
@@ -113,6 +113,96 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
     ],
   },
 ]
+
+/** The four columns of the role editor's permission matrix. */
+export const MATRIX_ACTIONS = ['view', 'create', 'edit', 'delete'] as const
+export type MatrixAction = (typeof MATRIX_ACTIONS)[number]
+
+/** One row of the matrix: a module, its permission per column (absent = "—") and any others. */
+export interface PermissionRow {
+  label: string
+  actions: Partial<Record<MatrixAction, string>>
+  /** Permissions that don't fit View / Create / Edit / Delete, shown in the "More" column. */
+  more?: ReadonlyArray<{ key: string; label: string }>
+}
+
+export interface PermissionSection {
+  label: string
+  rows: readonly PermissionRow[]
+}
+
+/** The permissions laid out as the role editor's matrix. Covers every key in PERMISSION_GROUPS. */
+export const PERMISSION_MATRIX: readonly PermissionSection[] = [
+  {
+    label: 'Admin management',
+    rows: [
+      { label: 'Organization', actions: { view: 'org:view', edit: 'org:edit' } },
+      { label: 'Users', actions: { view: 'user:view', create: 'user:create', edit: 'user:edit', delete: 'user:delete' } },
+      {
+        label: 'Roles',
+        actions: { view: 'user:role:view', create: 'user:role:create', edit: 'user:role:update', delete: 'user:role:delete' },
+      },
+      {
+        label: 'API keys',
+        actions: { view: 'api_key:view', create: 'api_key:create', edit: 'api_key:edit', delete: 'api_key:delete' },
+      },
+      { label: 'Audit logs', actions: { view: 'audit:view' }, more: [{ key: 'audit:export', label: 'Export' }] },
+    ],
+  },
+  {
+    label: 'Infrastructure',
+    rows: [
+      // everyone can list tags, so there is no tag:view
+      { label: 'Tags', actions: { create: 'tag:create', edit: 'tag:edit', delete: 'tag:delete' } },
+      {
+        label: 'Servers',
+        actions: { view: 'server:view' },
+        more: [
+          { key: 'server:manage', label: 'Manage' },
+          { key: 'server:ssh', label: 'SSH' },
+          { key: 'server:exec', label: 'Run commands' },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Vault',
+    rows: [
+      {
+        label: 'Projects',
+        actions: {
+          view: 'vault:project:view',
+          create: 'vault:project:create',
+          edit: 'vault:project:edit',
+          delete: 'vault:project:delete',
+        },
+      },
+      { label: 'Secret keys', actions: { view: 'vault:keys:view', edit: 'vault:keys:edit' } },
+      { label: 'Secure notes', actions: { view: 'vault:notes:view', edit: 'vault:notes:edit' } },
+      { label: 'Config files', actions: { view: 'vault:config:view', edit: 'vault:config:edit' } },
+    ],
+  },
+  {
+    label: 'Automation',
+    rows: [
+      {
+        label: 'Workflows',
+        actions: { view: 'workflow:view', edit: 'workflow:edit' },
+        more: [{ key: 'workflow:run', label: 'Run' }],
+      },
+    ],
+  },
+]
+
+/** Every permission key in a matrix row. */
+export const rowKeys = (row: PermissionRow): string[] => [
+  ...MATRIX_ACTIONS.flatMap((a) => (row.actions[a] ? [row.actions[a]] : [])),
+  ...(row.more ?? []).map((m) => m.key),
+]
+
+/** A permission's human label, e.g. "Create tags". */
+export const permissionLabel = (key: string): string =>
+  PERMISSION_GROUPS.flatMap((g) => g.permissions).find((p) => p.key === key)?.label ?? key
 
 /** Every permission key. */
 export const ALL_PERMISSIONS: readonly string[] = PERMISSION_GROUPS.flatMap((g) => g.permissions.map((p) => p.key))

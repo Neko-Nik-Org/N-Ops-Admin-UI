@@ -15,19 +15,20 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Top bar of the dashboard: tag selector, breadcrumb, centered search, quick actions and notifications. */
+/** Top bar of the dashboard: tag selector and notifications (breadcrumb and global search are commented out for now). */
 
-import { Bell, Menu, Plus, Search } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { Bell, Menu } from 'lucide-react' // add Search back with the global search
+// import { useLocation } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { TagSelect } from '@/components/molecules/TagSelect'
-import { pageTrail } from '@/constants/routes'
+// import { pageTrail } from '@/constants/routes'
 
 /** Sticky header above every authenticated page. `onMenuClick` opens the mobile nav drawer. */
 export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
-  const { pathname } = useLocation()
-  const found = pageTrail(pathname)
-  const trail = found.length ? found : ['N-Ops']
+  // Breadcrumb trail, hidden for now:
+  // const { pathname } = useLocation()
+  // const found = pageTrail(pathname)
+  // const trail = found.length ? found : ['N-Ops']
 
   return (
     <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-border bg-surface px-4 py-3.5 sm:gap-4 sm:px-6">
@@ -40,6 +41,7 @@ export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
         {/* Every page is scoped to this tag */}
         <TagSelect />
 
+        {/* Breadcrumb: hidden for now
         <nav aria-label="Breadcrumb" className="hidden min-w-0 truncate text-sm sm:block">
           {trail.map((crumb, i) => (
             <span key={crumb}>
@@ -48,8 +50,10 @@ export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
             </span>
           ))}
         </nav>
+        */}
       </div>
 
+      {/* Global search: hidden for now
       <div className="hidden w-full max-w-sm shrink md:block">
         <div className="relative">
           <Search size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-text-muted" />
@@ -63,17 +67,9 @@ export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
           </kbd>
         </div>
       </div>
+      */}
 
       <div className="flex flex-1 items-center justify-end gap-3 sm:gap-4">
-        <button
-          type="button"
-          onClick={() => toast.info('Adding servers from here is coming soon.')}
-          className="flex items-center gap-1.5 rounded-md bg-signal px-2.5 py-2 text-sm font-semibold text-ink hover:bg-signal-strong sm:px-3.5"
-        >
-          <Plus size={15} />
-          <span className="hidden sm:inline">Add server</span>
-        </button>
-
         <button
           type="button"
           aria-label="Notifications"

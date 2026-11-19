@@ -14,15 +14,16 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tests for the mock-backed Admin API (src/features/admin/api/*). */
+/** Tests for the Admin API (src/features/admin/api/*): users on the (mocked) live API, the rest on the mock backend. */
 
 import moment from 'moment'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createApiKey, listApiKeys } from '@/features/admin/api/apiKeys'
 import { exportAuditLogs, listAuditLogs, retentionStart } from '@/features/admin/api/auditLogs'
-import { createUser, deleteUser, listUsers, updateUser } from '@/features/admin/api/users'
+import { createUser, deleteUser, getUser, listUsers, updateUser } from '@/features/admin/api/users'
 import { db, resetAdminMock } from '@/mocks/adminDb'
 import type { AdminUserInput } from '@/features/admin/types'
+import { api, rawAdminUser } from '../../testUtils'
 
 const newUser: AdminUserInput = {
   userName: 'zoe',
@@ -37,25 +38,26 @@ const newUser: AdminUserInput = {
 beforeEach(() => resetAdminMock())
 
 describe('users', () => {
-  it('creates a user, counts the seat and records it in the audit log', async () => {
-    const before = (await listUsers()).length
-    const user = await createUser(newUser)
-
-    expect(user).toMatchObject({ userName: 'zoe', isEmailVerified: false, lastLoginAt: null, allowedIps: [] })
-    expect(await listUsers()).toHaveLength(before + 1)
-    expect(db.auditLogs[0]).toMatchObject({ action: 'user.create', resourceName: 'zoe', details: 'Role #4' })
+  it('lists every user page by page from /user/admin/list', async () => {
+    const page = Array.from({ length: 100 }, (_, i) => rawAdminUser(i + 1, `u${i + 1}`, `User ${i + 1}`, 1))
+    api.get.mockResolvedValueOnce({ data: page }).mockResolvedValueOnce({ data: [rawAdminUser(101, 'last', 'Last', 2)] })
+    const users = await listUsers()
+    expect(users).toHaveLength(101)
+    expect(api.get).toHaveBeenNthCalledWith(2, '/user/admin/list', { params: { limit: 100, offset: 100 } })
+    expect(users[100]).toMatchObject({ userId: 101, userName: 'last', primaryEmail: 'last@acme.dev', allowedGeoLocations: [] })
   })
 
-  it('rejects a username or email someone else has', async () => {
-    await expect(createUser({ ...newUser, userName: 'Priya' })).rejects.toThrow('The username "Priya" is already taken.')
-    await expect(createUser({ ...newUser, primaryEmail: 'priya@acme.dev' })).rejects.toThrow('already belongs to another user')
-    // keeping your own username on edit is fine
-    await expect(updateUser(2, { ...newUser, userName: 'priya', primaryEmail: 'priya@acme.dev' })).resolves.toBeUndefined()
+  it('fetches one user, and explains when the API answers null', async () => {
+    api.get.mockResolvedValueOnce({ data: rawAdminUser(3, 'marcus', 'Marcus Chen', 3) })
+    expect(await getUser(3)).toMatchObject({ displayName: 'Marcus Chen', roleId: 3 })
+    api.get.mockResolvedValueOnce({ data: null })
+    await expect(getUser(99)).rejects.toThrow('That user no longer exists.')
   })
 
-  it('deletes a user', async () => {
-    await deleteUser(3)
-    expect((await listUsers()).some((u) => u.userId === 3)).toBe(false)
+  it("says creating, editing and removing users aren't available yet", async () => {
+    await expect(createUser(newUser)).rejects.toThrow("Adding users isn't available yet")
+    await expect(updateUser(1, newUser)).rejects.toThrow("Editing users isn't available yet")
+    await expect(deleteUser(1)).rejects.toThrow("Removing users isn't available yet")
   })
 })
 

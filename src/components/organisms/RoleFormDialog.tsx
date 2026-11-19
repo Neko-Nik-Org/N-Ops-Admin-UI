@@ -31,11 +31,12 @@ import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { Dialog } from '@/components/molecules/Dialog'
 import { Skeleton } from '@/components/molecules/Skeleton'
 import { FormField } from '@/components/molecules/FormField'
-import { ALL_PERMISSIONS, PERMISSION_GROUPS } from '@/features/admin/catalog'
+import { ALL_PERMISSIONS } from '@/features/admin/catalog'
 import { useCreateRole, useRole, useRoles, useUpdateRole } from '@/features/admin/hooks/useAdmin'
 import { isWithinLimit } from '@/features/auth/permissions'
 import { currentUserAtom } from '@/features/auth/store/session'
 import { useTags } from '@/features/tags/hooks/useTags'
+import { PermissionMatrix } from '@/components/organisms/PermissionMatrix'
 import { roleSchema, splitList, type RoleFormValues } from '@/features/admin/schema/adminSchemas'
 import type { Role, RoleInput } from '@/features/admin/types'
 import { cn } from '@/utils/cn'
@@ -87,12 +88,6 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
 
   const selected = useWatch({ control, name: 'permissions' }) ?? []
   const selectedTags = (useWatch({ control, name: 'tagIds' }) ?? []).map(Number)
-
-  /** Ticks or clears the grantable permissions of a group. */
-  const toggleGroup = (keys: string[], on: boolean) => {
-    const rest = selected.filter((p) => !keys.includes(p))
-    setValue('permissions', on ? [...rest, ...keys] : rest, { shouldDirty: true, shouldValidate: true })
-  }
 
   const onSubmit = (v: RoleFormValues) => {
     // role names are unique per organization (case-sensitive, like the database constraint)
@@ -157,55 +152,14 @@ const RoleForm = ({ role, template, onClose }: { role?: Role; template?: Role; o
         </legend>
         {user && ALL_PERMISSIONS.some((p) => !canGrant(p)) && (
           <p className="-mt-1 text-xs text-text-muted">
-            You can only grant permissions your own role has. The rest are greyed out.
+            You can only grant permissions your own role has, so only those modules are shown. The rest are greyed out.
           </p>
         )}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {PERMISSION_GROUPS.map((group) => {
-            const keys = group.permissions.map((p) => p.key).filter(canGrant)
-            const count = keys.filter((k) => selected.includes(k)).length
-            return (
-              <div key={group.label} className="rounded-lg border border-border p-3">
-                <label className="mb-2 flex cursor-pointer items-center gap-2 text-sm font-medium text-text">
-                  <input
-                    type="checkbox"
-                    className="size-4 accent-[var(--color-signal)]"
-                    checked={keys.length > 0 && count === keys.length}
-                    disabled={!keys.length}
-                    ref={(el) => {
-                      if (el) el.indeterminate = count > 0 && count < keys.length
-                    }}
-                    onChange={(e) => toggleGroup(keys, e.target.checked)}
-                    aria-label={`All ${group.label} permissions`}
-                  />
-                  {group.label}
-                </label>
-                <div className="flex flex-col gap-1.5 pl-6">
-                  {group.permissions.map((p) => (
-                    <label
-                      key={p.key}
-                      className={cn(
-                        'flex items-center gap-2 text-sm text-text-muted',
-                        canGrant(p.key) ? 'cursor-pointer' : 'cursor-not-allowed opacity-50',
-                      )}
-                      title={canGrant(p.key) ? undefined : "Your role doesn't have this permission"}
-                    >
-                      <input
-                        type="checkbox"
-                        value={p.key}
-                        disabled={!canGrant(p.key)}
-                        className="size-3.5 accent-[var(--color-signal)]"
-                        {...register('permissions')}
-                      />
-                      <span className="text-text">{p.label}</span>
-                      <code className="ml-auto hidden font-mono text-[0.6875rem] text-text-muted sm:inline">{p.key}</code>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+        <PermissionMatrix
+          selected={selected}
+          canGrant={canGrant}
+          onChange={(next) => setValue('permissions', next, { shouldDirty: true, shouldValidate: true })}
+        />
         {errors.permissions?.message && (
           <p className="text-sm text-danger" role="alert">
             {errors.permissions.message}
@@ -341,7 +295,7 @@ export const RoleFormDialog = ({
   <Dialog
     open={open}
     onClose={onClose}
-    size="lg"
+    size="xl"
     title={role ? `Edit ${role.roleName}` : 'New role'}
     description="A role is a set of permissions. Each user gets one role."
   >

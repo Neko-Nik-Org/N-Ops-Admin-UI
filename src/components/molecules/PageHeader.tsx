@@ -27,10 +27,12 @@ interface PageHeaderProps {
   actions?: ReactNode
   /** Shows a "Mock data" badge: the page runs on sample data until its API exists. */
   mock?: boolean
+  /** Any other badge beside the title. */
+  badge?: ReactNode
 }
 
 /** Title, description and actions, wrapping on small screens. */
-export const PageHeader = ({ title, description, actions, mock }: PageHeaderProps) => (
+export const PageHeader = ({ title, description, actions, mock, badge }: PageHeaderProps) => (
   <div className="flex flex-wrap items-start justify-between gap-4">
     <div className="flex min-w-0 flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
@@ -44,6 +46,7 @@ export const PageHeader = ({ title, description, actions, mock }: PageHeaderProp
             Mock data
           </span>
         )}
+        {badge}
       </div>
       {description && <p className="text-sm text-text-muted">{description}</p>}
     </div>

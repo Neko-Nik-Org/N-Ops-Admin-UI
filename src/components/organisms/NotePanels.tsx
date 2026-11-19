@@ -322,7 +322,16 @@ const ShareForm = ({ note }: { note: SecureNote }) => {
   const [shares, setShares] = useState(() => new Map(note.shares.map((s) => [s.userId, s.canEdit])))
   const { mutateAsync: saveShares } = useSetNoteShares()
   const [shareState, runShares] = useAsyncAction(
-    () => saveShares({ noteId: note.noteId, shares: [...shares].map(([userId, canEdit]) => ({ userId, canEdit })) }),
+    () =>
+      saveShares({
+        noteId: note.noteId,
+        shares: [...shares].map(([userId, canEdit]) => ({
+          userId,
+          canEdit,
+          displayName:
+            users?.find((u) => u.userId === userId)?.displayName ?? note.shares.find((s) => s.userId === userId)?.displayName,
+        })),
+      }),
     { successMs: 600 },
   )
   const [linkPassword, setLinkPassword] = useState('')

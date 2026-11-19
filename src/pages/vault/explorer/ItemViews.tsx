@@ -61,9 +61,18 @@ import {
 } from '@/features/vault/hooks/useVault'
 import type { ConfigFile, SecretKey, SecureNote, VaultProject } from '@/features/vault/types'
 import { formatBytes, formatDateTime, formatRelative } from '@/utils/format'
-import { FolderContents, FolderHeader, FolderLayout, FolderPage, ListCard, PreviewCard, PreviewHint } from './ExplorerParts'
+import {
+  FolderContents,
+  FolderHeader,
+  FolderLayout,
+  FolderPage,
+  ListCard,
+  LocalOnlyBadge,
+  PreviewCard,
+  PreviewHint,
+} from './ExplorerParts'
 import { FileGlyph } from './ExplorerIcons'
-import { plural, SECTIONS, vaultPath } from './sections'
+import { plural, vaultPath } from './sections'
 import { useSelectedItem } from './useSelectedItem'
 
 const matches = (search: string, ...values: string[]) => {
@@ -227,7 +236,7 @@ export const EnvView = ({ project }: { project: VaultProject }) => {
           <FolderHeader
             path={folderPath(project)}
             title="Env"
-            description={SECTIONS.env.purpose}
+            badge={<LocalOnlyBadge />}
             actions={
               <>
                 <LoadingButton variant="ghost" icon={<Upload size={14} />} onClick={() => setImporting(true)}>
@@ -309,7 +318,7 @@ export const EnvView = ({ project }: { project: VaultProject }) => {
             </ListCard>
           }
           preview={
-            <PreviewCard>
+            <PreviewCard onClose={selected ? () => select(null) : undefined}>
               {selected ? (
                 <KeyPreview
                   key={selected.secretId}
@@ -399,7 +408,7 @@ export const ConfView = ({ project }: { project: VaultProject }) => {
           <FolderHeader
             path={folderPath(project)}
             title="Conf"
-            description={SECTIONS.conf.purpose}
+            badge={<LocalOnlyBadge />}
             actions={
               <LoadingButton icon={<FilePlus2 size={15} />} onClick={() => setCreating(true)}>
                 New file
@@ -448,7 +457,7 @@ export const ConfView = ({ project }: { project: VaultProject }) => {
             </ListCard>
           }
           preview={
-            <PreviewCard>
+            <PreviewCard onClose={selected ? () => select(null) : undefined}>
               {selected ? (
                 <ConfigFilePanel key={selected.fileId} file={selected} onDelete={() => setDeleting(selected)} />
               ) : (
@@ -516,7 +525,7 @@ export const NotesView = ({ project }: { project: VaultProject }) => {
           <FolderHeader
             path={folderPath(project)}
             title="Notes"
-            description={SECTIONS.notes.purpose}
+            badge={<LocalOnlyBadge />}
             actions={
               <LoadingButton icon={<Plus size={15} />} onClick={() => setCreating(true)}>
                 New note
@@ -572,7 +581,7 @@ export const NotesView = ({ project }: { project: VaultProject }) => {
             </ListCard>
           }
           preview={
-            <PreviewCard>
+            <PreviewCard onClose={creating ? () => setCreating(false) : selected ? () => select(null) : undefined}>
               {creating ? (
                 <>
                   <h2 className="mb-4 font-semibold text-text">New note in {project.projectName}</h2>

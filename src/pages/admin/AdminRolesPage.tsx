@@ -16,7 +16,7 @@
  */
 /** Admin › Roles (/admin/roles): permission sets for users, backed by `/user/roles/*`. */
 
-import { Copy, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Copy, Eye, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useAtomValue } from 'jotai'
 import { useMemo, useState } from 'react'
 import { Badge } from '@/components/atoms/Badge'
@@ -26,6 +26,7 @@ import { ConfirmDialog } from '@/components/molecules/ConfirmDialog'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'
 import { RoleFormDialog } from '@/components/organisms/RoleFormDialog'
+import { RoleViewDialog } from '@/components/organisms/RoleViewDialog'
 import { ALL_PERMISSIONS } from '@/features/admin/catalog'
 import { useDeleteRole, useRoles } from '@/features/admin/hooks/useAdmin'
 import type { Role } from '@/features/admin/types'
@@ -35,7 +36,11 @@ import { useTags } from '@/features/tags/hooks/useTags'
 
 /** Which dialog is open. `copy` opens the editor pre-filled from another role. */
 type DialogState =
-  { kind: 'closed' } | { kind: 'create'; from?: Role } | { kind: 'edit'; role: Role } | { kind: 'delete'; role: Role }
+  | { kind: 'closed' }
+  | { kind: 'view'; role: Role }
+  | { kind: 'create'; from?: Role }
+  | { kind: 'edit'; role: Role }
+  | { kind: 'delete'; role: Role }
 
 /** Shown on edit / delete buttons for a role wider than the signed-in user's own access. */
 const OUT_OF_SCOPE = 'This role has permissions or tags your own role lacks, so you can’t change it.'
@@ -74,7 +79,6 @@ export const AdminRolesPage = () => {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Roles"
-        description="Each role is a set of permissions, optionally limited to some tags. Every user signs in with one role."
         actions={
           canCreate && (
             <LoadingButton icon={<Plus size={15} />} onClick={() => setDialog({ kind: 'create' })}>
@@ -115,7 +119,13 @@ export const AdminRolesPage = () => {
                     return (
                       <tr key={role.roleId} className="border-t border-border align-top">
                         <td className="max-w-xs py-3">
-                          <p className="text-sm font-medium text-text">{role.roleName}</p>
+                          <button
+                            type="button"
+                            onClick={() => setDialog({ kind: 'view', role })}
+                            className="text-left text-sm font-medium text-text hover:text-signal hover:underline"
+                          >
+                            {role.roleName}
+                          </button>
                           <p className="text-xs text-text-muted">{role.roleDescription || '—'}</p>
                         </td>
                         <td className="py-3">
@@ -149,6 +159,14 @@ export const AdminRolesPage = () => {
                         </td>
                         <td className="py-3">
                           <div className="flex justify-end gap-1">
+                            <LoadingButton
+                              variant="ghost"
+                              size="sm"
+                              icon={<Eye size={14} />}
+                              aria-label={`View ${role.roleName}`}
+                              title="View"
+                              onClick={() => setDialog({ kind: 'view', role })}
+                            />
                             {canCreate && (
                               <LoadingButton
                                 variant="ghost"
@@ -193,6 +211,46 @@ export const AdminRolesPage = () => {
         </section>
       )}
 
+      <RoleViewDialog
+        role={dialog.kind === 'view' ? dialog.role : null}
+        onClose={close}
+        actions={
+          dialog.kind === 'view' && (
+            <>
+              {canDelete && (
+                <LoadingButton
+                  variant="ghost"
+                  icon={<Trash2 size={15} />}
+                  disabled={!isRoleWithinScope(user, dialog.role)}
+                  title={isRoleWithinScope(user, dialog.role) ? undefined : OUT_OF_SCOPE}
+                  onClick={() => setDialog({ kind: 'delete', role: dialog.role })}
+                >
+                  Delete
+                </LoadingButton>
+              )}
+              {canCreate && (
+                <LoadingButton
+                  variant="secondary"
+                  icon={<Copy size={15} />}
+                  onClick={() => setDialog({ kind: 'create', from: dialog.role })}
+                >
+                  Duplicate
+                </LoadingButton>
+              )}
+              {canUpdate && (
+                <LoadingButton
+                  icon={<Pencil size={15} />}
+                  disabled={!isRoleWithinScope(user, dialog.role)}
+                  title={isRoleWithinScope(user, dialog.role) ? undefined : OUT_OF_SCOPE}
+                  onClick={() => setDialog({ kind: 'edit', role: dialog.role })}
+                >
+                  Edit
+                </LoadingButton>
+              )}
+            </>
+          )
+        }
+      />
       <RoleFormDialog
         // a copy must save as a new role, so it's passed as a template, not as the role being edited
         key={dialog.kind === 'create' && dialog.from ? `copy-${dialog.from.roleId}` : dialog.kind}

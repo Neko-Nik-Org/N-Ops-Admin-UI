@@ -162,13 +162,21 @@ export const deleteNote = async (noteId: number): Promise<void> => {
 }
 
 /** Future: `PUT /vault/note/shares` — replaces who in the org can read (or edit) the note. Owner only. */
-export const setNoteShares = async (noteId: number, shares: Array<Pick<NoteShare, 'userId' | 'canEdit'>>): Promise<void> => {
+export const setNoteShares = async (
+  noteId: number,
+  shares: Array<Pick<NoteShare, 'userId' | 'canEdit'> & { displayName?: string }>,
+): Promise<void> => {
   await mockDelay()
   const note = findNote(noteId)
   requireOwner(note, 'change who it is shared with')
   note.shares = shares
     .filter((s) => s.userId !== note.ownerId)
-    .map((s) => ({ ...s, displayName: adminDb.users.find((u) => u.userId === s.userId)?.displayName ?? notFound('user') }))
+    // names come from the real user list the dialog shows; the mock users are the fallback
+    .map((s) => ({
+      userId: s.userId,
+      canEdit: s.canEdit,
+      displayName: s.displayName ?? adminDb.users.find((u) => u.userId === s.userId)?.displayName ?? notFound('user'),
+    }))
   recordAudit('vault.note_share', 'vault', label(note), note.shares.length ? `${note.shares.length} people` : 'Private')
 }
 

@@ -109,7 +109,7 @@ export const AdminOrganizationPage = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Organization" description="Your organization's profile and how much of your plan it uses." />
+      <PageHeader title="Organization" />
       {isLoading ? (
         <SkeletonText lines={8} />
       ) : error || !org ? (

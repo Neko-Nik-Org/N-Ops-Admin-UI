@@ -47,6 +47,8 @@ export const ROUTES = {
   approvals: '/approvals',
   metrics: '/metrics',
   workflows: '/workflows',
+  /** One workflow: its flow and runs. */
+  workflowDetail: '/workflows/:workflowId',
   serviceLogs: '/service-logs',
   admin: '/admin',
   adminOrganization: '/admin/organization',

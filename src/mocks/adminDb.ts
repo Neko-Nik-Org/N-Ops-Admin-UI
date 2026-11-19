@@ -162,7 +162,11 @@ const seedUsers = (): AdminUser[] =>
       hasEmail2fa,
       hasIpRestriction,
       allowedIps: hasIpRestriction ? ['203.0.113.0/24', '198.51.100.7'] : [],
+      hasGeoRestriction: false,
+      allowedGeoLocations: [],
+      userDetails: {},
       createdAt: ago(230 - i * 18, 'days'),
+      updatedAt: ago(30, 'days'),
       lastLoginAt: lastLogin === null ? null : ago(lastLogin * 24, 'hours'),
     }),
   )

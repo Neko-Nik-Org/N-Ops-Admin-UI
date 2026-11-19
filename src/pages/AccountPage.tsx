@@ -29,9 +29,6 @@ export const AccountPage = () => (
   <div className="flex flex-col gap-6">
     <div>
       <h1 className="text-2xl font-bold text-text">Account</h1>
-      <p className="text-sm text-text-muted">
-        Your profile, security settings, preferences, what your role allows and your organization's quotas.
-      </p>
     </div>
 
     <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">

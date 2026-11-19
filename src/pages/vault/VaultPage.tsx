@@ -86,7 +86,7 @@ export const VaultPage = () => {
   else content = <RootView key={key} projects={projects ?? []} />
 
   return (
-    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[13rem_minmax(0,1fr)]">
       <NavTree projects={projects ?? []} projectId={project?.projectId ?? null} section={section} />
       <div className="min-w-0">{content}</div>
     </div>

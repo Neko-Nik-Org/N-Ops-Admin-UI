@@ -14,71 +14,97 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Users in the organization (CRUD). Mock until `/user/admin/*` is live. */
+/**
+ * Users in the organization (`/user/admin/*`). Listing and fetching one user are live (both need
+ * `user:view`). Creating, editing and removing users are still commented out in the API, so those
+ * calls fail with a clear message until they exist.
+ */
 
-import { db, recordAudit } from '@/mocks/adminDb'
-import { clone, mockDelay, notFound } from '@/mocks/helpers'
+import { apiClient } from '@/lib/axios'
 import type { AdminUser, AdminUserInput } from '../types'
 
-const findUser = (userId: number) => db.users.find((u) => u.userId === userId) ?? notFound('user')
-
-/**
- * Rejects a username or email another user already has (both are unique in `app_user`). Roles are
- * real (`/user/roles/*`), so the role id isn't checked here; the API will when users go live.
- */
-const assertUnique = (input: AdminUserInput, exceptId?: number) => {
-  const others = db.users.filter((u) => u.userId !== exceptId)
-  if (others.some((u) => u.userName.toLowerCase() === input.userName.toLowerCase())) {
-    throw new Error(`The username "${input.userName}" is already taken.`)
-  }
-  if (others.some((u) => u.primaryEmail.toLowerCase() === input.primaryEmail.toLowerCase())) {
-    throw new Error(`${input.primaryEmail} already belongs to another user.`)
-  }
+/** A user as `/user/admin/list` and `/user/admin/fetch/{id}` return it (`UserProfileListing`). */
+export interface RawAdminUser {
+  user_id: number
+  user_name: string
+  display_name: string
+  user_details: Record<string, unknown> | null
+  primary_email: string
+  is_email_verified: boolean
+  is_active: boolean
+  role_id: number
+  has_ip_restriction: boolean
+  has_geo_restriction: boolean
+  allowed_ips: string[] | null
+  allowed_geo_locations: string[] | null
+  has_totp_2fa: boolean
+  has_email_2fa: boolean
+  created_at: string
+  updated_at: string
+  last_login_at: string | null
 }
 
-/** Future: `GET /user/admin/list`. */
+export const toAdminUser = (u: RawAdminUser): AdminUser => ({
+  userId: u.user_id,
+  userName: u.user_name,
+  displayName: u.display_name,
+  primaryEmail: u.primary_email,
+  roleId: u.role_id,
+  isActive: u.is_active,
+  isEmailVerified: u.is_email_verified,
+  hasTotp2fa: u.has_totp_2fa,
+  hasEmail2fa: u.has_email_2fa,
+  hasIpRestriction: u.has_ip_restriction,
+  allowedIps: u.allowed_ips ?? [],
+  hasGeoRestriction: u.has_geo_restriction,
+  allowedGeoLocations: u.allowed_geo_locations ?? [],
+  userDetails: u.user_details ?? {},
+  createdAt: u.created_at,
+  updatedAt: u.updated_at,
+  lastLoginAt: u.last_login_at,
+})
+
+/** Users fetched per request when listing them all. */
+export const USER_PAGE_SIZE = 100
+
+/** `GET /user/admin/list` — one page, by username A–Z; `search` matches part of the username. Needs `user:view`. */
+export const listUsersPage = async ({
+  search,
+  limit = USER_PAGE_SIZE,
+  offset = 0,
+}: { search?: string; limit?: number; offset?: number } = {}): Promise<AdminUser[]> => {
+  const params: Record<string, string | number> = { limit, offset }
+  if (search?.trim()) params.user_name = search.trim()
+  const { data } = await apiClient.get<RawAdminUser[]>('/user/admin/list', { params })
+  return data.map(toAdminUser)
+}
+
+/** Every user in the organization (pages through the list). */
 export const listUsers = async (): Promise<AdminUser[]> => {
-  await mockDelay()
-  return clone(db.users)
-}
-
-/** Future: `POST /user/admin/create`. The new user gets an email to set their password. */
-export const createUser = async (input: AdminUserInput): Promise<AdminUser> => {
-  await mockDelay()
-  assertUnique(input)
-  if (db.users.length >= db.organization.limits.users) {
-    throw new Error(`Your plan allows ${db.organization.limits.users} users. Remove someone or raise the limit first.`)
+  const users: AdminUser[] = []
+  for (;;) {
+    const page = await listUsersPage({ offset: users.length })
+    users.push(...page)
+    if (page.length < USER_PAGE_SIZE) return users
   }
-  const user: AdminUser = {
-    ...input,
-    allowedIps: input.hasIpRestriction ? input.allowedIps : [],
-    userId: db.nextId.user++,
-    isEmailVerified: false,
-    hasTotp2fa: false,
-    hasEmail2fa: false,
-    createdAt: new Date().toISOString(),
-    lastLoginAt: null,
-  }
-  db.users.push(user)
-  db.organization.usage.users = db.users.length
-  recordAudit('user.create', 'user', user.userName, `Role #${user.roleId}`)
-  return clone(user)
 }
 
-/** Future: `PUT /user/admin/update`. */
-export const updateUser = async (userId: number, input: AdminUserInput): Promise<void> => {
-  await mockDelay()
-  const user = findUser(userId)
-  assertUnique(input, userId)
-  Object.assign(user, input, { allowedIps: input.hasIpRestriction ? input.allowedIps : [] })
-  recordAudit('user.update', 'user', user.userName)
+/** `GET /user/admin/fetch/{id}` — needs `user:view`. The API answers `null` (200) when there is no such user. */
+export const getUser = async (userId: number): Promise<AdminUser> => {
+  const { data } = await apiClient.get<RawAdminUser | null>(`/user/admin/fetch/${userId}`)
+  if (!data) throw new Error('That user no longer exists. Refresh and try again.')
+  return toAdminUser(data)
 }
 
-/** Future: `DELETE /user/admin/delete/{id}`. */
-export const deleteUser = async (userId: number): Promise<void> => {
-  await mockDelay()
-  const user = findUser(userId)
-  db.users = db.users.filter((u) => u.userId !== userId)
-  db.organization.usage.users = db.users.length
-  recordAudit('user.delete', 'user', user.userName)
+const notYet = (what: string): never => {
+  throw new Error(`${what} isn't available yet: the API has no endpoint for it.`)
 }
+
+/** Not in the API yet (`users::create_user` is commented out). */
+export const createUser = async (_input: AdminUserInput): Promise<AdminUser> => notYet('Adding users')
+
+/** Not in the API yet (`users::update_user` is commented out). */
+export const updateUser = async (_userId: number, _input: AdminUserInput): Promise<void> => notYet('Editing users')
+
+/** Not in the API yet (`users::delete_user` is commented out). */
+export const deleteUser = async (_userId: number): Promise<void> => notYet('Removing users')

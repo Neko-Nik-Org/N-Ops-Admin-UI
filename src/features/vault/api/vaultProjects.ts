@@ -22,6 +22,7 @@
 
 import { apiClient } from '@/lib/axios'
 import type { JsonObject } from '@/features/account/types'
+import { rememberProjects } from '@/mocks/vaultDb'
 import type { VaultContainerInput, VaultProject } from '../types'
 
 /** A vault project as the API returns it (`vault_project`). */
@@ -58,7 +59,9 @@ export const listVaultProjectsPage = async ({
   const params: Record<string, string | number> = { limit, offset }
   if (search?.trim()) params.project_name = search.trim()
   const { data } = await apiClient.get<RawVaultProject[]>('/vault/project/list', { params })
-  return data.map(toVaultProject)
+  const projects = data.map(toVaultProject)
+  rememberProjects(projects)
+  return projects
 }
 
 /** Every project in the organization, newest first (pages through the list). */
@@ -74,7 +77,9 @@ export const listVaultProjects = async (): Promise<VaultProject[]> => {
 /** `GET /vault/project/detail/{id}` — needs `vault:project:view`; 404 "Project not found". */
 export const getVaultProject = async (projectId: number): Promise<VaultProject> => {
   const { data } = await apiClient.get<RawVaultProject>(`/vault/project/detail/${projectId}`)
-  return toVaultProject(data)
+  const project = toVaultProject(data)
+  rememberProjects([project])
+  return project
 }
 
 /**

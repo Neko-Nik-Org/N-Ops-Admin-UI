@@ -227,7 +227,6 @@ export const AdminAuditLogsPage = () => {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Audit logs"
-        description={`Who did what, and when, over the last ${AUDIT_RETENTION_DAYS} days. Read-only.`}
         mock
         actions={
           <>

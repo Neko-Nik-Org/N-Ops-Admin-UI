@@ -15,9 +15,9 @@
  * <https://www.gnu.org/licenses/>.
  */
 /**
- * The mock side of vault projects. Projects themselves are live (./vaultProjects.ts); what's inside
- * them (Env keys, Conf files, Notes) is still mock data, keyed by project id. The sample contents
- * use ids 1–4, so a real project with one of those ids shows sample items and any other starts empty.
+ * The local side of vault projects. Projects themselves are live (./vaultProjects.ts); what's inside
+ * them (Env keys, Conf files, Notes) is kept in memory by project id until those endpoints exist.
+ * Every project starts empty.
  */
 
 import { db as adminDb } from '@/mocks/adminDb'

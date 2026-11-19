@@ -65,7 +65,6 @@ export const AdminApiKeysPage = () => {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="API keys"
-        description="Keys let scripts and pipelines read the Vault. Each acts with one of your roles, on one tag, in the vault projects you pick."
         mock
         actions={
           <LoadingButton icon={<Plus size={15} />} onClick={() => setDialog({ kind: 'create' })}>

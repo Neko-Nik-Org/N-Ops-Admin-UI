@@ -83,7 +83,6 @@ export const TagsPage = () => {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-text">Tags</h1>
-          <p className="text-sm text-text-muted">Group resources and scope role access. Keep it to around 25 tags or fewer.</p>
         </div>
         {canCreate && (
           <LoadingButton icon={<Plus size={15} />} onClick={() => setDialog({ kind: 'create' })}>
@@ -112,9 +111,9 @@ export const TagsPage = () => {
               <table className="w-full min-w-[32.5rem] border-collapse text-left">
                 <thead>
                   <tr className="text-xs tracking-wide text-text-muted uppercase">
+                    <th className="w-16 pb-2 font-medium">ID</th>
                     <th className="pb-2 font-medium">Name</th>
                     <th className="pb-2 font-medium">Description</th>
-                    <th className="pb-2 font-medium">ID</th>
                     <th className="pb-2 font-medium">
                       <span className="sr-only">Actions</span>
                     </th>
@@ -125,13 +124,13 @@ export const TagsPage = () => {
                     const accessible = hasTagAccess(tag.tagId)
                     return (
                       <tr key={tag.tagId} className="border-t border-border">
+                        <td className="py-3 font-mono text-xs text-text-muted">{tag.tagId}</td>
                         <td className="py-3">
                           <span className="rounded bg-ink px-1.5 py-0.5 font-mono text-xs text-accent-secondary">
                             {tag.tagName}
                           </span>
                         </td>
                         <td className="max-w-md py-3 text-sm text-text-muted">{tag.tagDescription || '—'}</td>
-                        <td className="py-3 font-mono text-xs text-text-muted">{tag.tagId}</td>
                         <td className="py-3">
                           <div className="flex justify-end gap-1">
                             {canEdit && accessible && (

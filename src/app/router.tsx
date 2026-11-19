@@ -42,6 +42,8 @@ import { OverviewPage } from '@/pages/OverviewPage'
 import { TagsPage } from '@/pages/TagsPage'
 import { TwoFactorPage } from '@/pages/TwoFactorPage'
 import { VaultPage } from '@/pages/vault/VaultPage'
+import { WorkflowDetailPage } from '@/pages/workflows/WorkflowDetailPage'
+import { WorkflowsPage } from '@/pages/workflows/WorkflowsPage'
 
 /** Sections that have a real page; every other sidebar section renders ComingSoonPage. */
 const BUILT_PAGES: Partial<Record<string, ReactNode>> = {
@@ -52,6 +54,7 @@ const BUILT_PAGES: Partial<Record<string, ReactNode>> = {
   [ROUTES.adminApiKeys]: <AdminApiKeysPage />,
   [ROUTES.adminRoles]: <AdminRolesPage />,
   [ROUTES.adminAuditLogs]: <AdminAuditLogsPage />,
+  [ROUTES.workflows]: <WorkflowsPage />,
 }
 
 /** All application routes. Sections that are not built yet render ComingSoonPage. */
@@ -106,6 +109,7 @@ export const AppRouter = () => (
         <Route path={ROUTES.vault} element={<VaultPage />} />
         <Route path={ROUTES.vaultProject} element={<VaultPage />} />
         <Route path={ROUTES.vaultSection} element={<VaultPage />} />
+        <Route path={ROUTES.workflowDetail} element={<WorkflowDetailPage />} />
         {VAULT_REDIRECTS.map((from) => (
           <Route key={from} path={from} element={<Navigate to={ROUTES.vault} replace />} />
         ))}

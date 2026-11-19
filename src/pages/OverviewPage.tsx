@@ -50,13 +50,6 @@ export const OverviewPage = () => {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold text-text">Overview</h1>
-        <p className="text-sm text-text-muted">
-          {overview
-            ? selectedTag
-              ? `${filteredFleet?.length ?? 0} of ${overview.serversTotal} servers tagged ${selectedTag.tagName}, updated ${overview.updatedLabel}`
-              : `${overview.serversTotal} servers across ${new Set(overview.fleet.map((s) => s.tagId)).size} tags, updated ${overview.updatedLabel}`
-            : 'Fleet, approvals and workflow activity, all in one place.'}
-        </p>
       </div>
 
       {isError || !overview ? (

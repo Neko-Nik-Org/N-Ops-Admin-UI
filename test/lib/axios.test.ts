@@ -19,7 +19,7 @@
 import { AxiosError, type AxiosAdapter, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getSessionToken, setSessionToken } from '@/features/auth/store/sessionToken'
-import { ApiError, errorStatus } from '@/types/api'
+import { ApiError, errorCode, errorStatus } from '@/types/api'
 
 // test/setup.ts mocks this module for everyone else; here we want the real client
 const { apiClient } = await vi.importActual<{ apiClient: AxiosInstance }>('@/lib/axios')
@@ -70,6 +70,32 @@ describe('apiClient', () => {
     apiClient.defaults.adapter = respond(403, { error: 'Missing permission tag:create', code: 403 })
     await expect(apiClient.post('/tag/create')).rejects.toThrow('Missing permission tag:create')
     expect(getSessionToken()).toBe('valid')
+  })
+
+  it('reads the error code, words the message for people and keeps the code', async () => {
+    apiClient.defaults.adapter = respond(403, { error: 'E221: Insufficient permissions', code: 'E221', status: 403 })
+    const error = await apiClient.get('/user/admin/list').catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).message).toBe("You don't have permission to do this. (E221)")
+    expect(errorCode(error)).toBe('E221')
+    expect(errorStatus(error)).toBe(403)
+
+    apiClient.defaults.adapter = respond(400, {
+      error: 'E212: Username can only contain alphanumeric characters and underscores',
+      code: 'E212',
+      status: 400,
+    })
+    await expect(apiClient.put('/user/self/username')).rejects.toThrow(
+      'Username can only contain alphanumeric characters and underscores (E212)',
+    )
+  })
+
+  it('ignores a "code" that is really the message (errors without an E-code prefix)', async () => {
+    // the API sets `code` to the text before the first ':', which is the whole message when there is no code
+    apiClient.defaults.adapter = respond(404, { error: 'Project not found', code: 'Project not found', status: 404 })
+    const error = await apiClient.get('/vault/project/detail/9').catch((e: unknown) => e)
+    expect((error as ApiError).message).toBe('Project not found')
+    expect(errorCode(error)).toBeUndefined()
   })
 
   it('falls back to the transport error message when the body has none', async () => {

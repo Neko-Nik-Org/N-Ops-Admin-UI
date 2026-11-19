@@ -30,7 +30,7 @@ import {
 import { PROFILE_KEY } from '@/features/account/hooks/useAccount'
 import { useHasPermissions } from '@/features/auth/permissions'
 import { createRole, deleteRole, fetchRole, listRoles, updateRole } from '../api/roles'
-import { createUser, deleteUser, listUsers, updateUser } from '../api/users'
+import { createUser, deleteUser, getUser, listUsers, updateUser } from '../api/users'
 import type {
   AdminUserInput,
   ApiKeyInput,
@@ -58,7 +58,18 @@ const useRefresh = (...keys: ReadonlyArray<readonly string[]>) => {
 
 // ── Users ────────────────────────────────────────────────
 
-export const useAdminUsers = () => useQuery({ queryKey: ADMIN_KEYS.users, queryFn: listUsers })
+/**
+ * Every user in the organization, from `/user/admin/list`. Only loads with `user:view` (the API's
+ * check), so pickers elsewhere don't hit a 403.
+ */
+export const useAdminUsers = () => {
+  const canView = useHasPermissions('user:view')
+  return useQuery({ queryKey: ADMIN_KEYS.users, queryFn: listUsers, enabled: canView })
+}
+
+/** One user, fresh from `/user/admin/fetch/{id}` (needs `user:view`). */
+export const useAdminUser = (userId: number | null) =>
+  useQuery({ queryKey: [...ADMIN_KEYS.users, userId], queryFn: () => getUser(userId!), enabled: userId !== null })
 
 export const useCreateUser = () => {
   const refresh = useRefresh(ADMIN_KEYS.users)

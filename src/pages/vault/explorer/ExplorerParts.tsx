@@ -16,11 +16,12 @@
  */
 /**
  * Building blocks of the Vault explorer, made from the app's usual parts: a page header whose title
- * is the open folder (with its path above), and cards for the details list and the preview.
+ * is the open folder (with its path above), a card with the folder's list, and the details pane on
+ * the right that shows whatever is selected.
  */
 
 import { useAtom } from 'jotai'
-import { ChevronRight, LayoutGrid, List } from 'lucide-react'
+import { ChevronRight, CloudOff, LayoutGrid, List, X } from 'lucide-react'
 import { useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/molecules/PageHeader'
@@ -43,15 +44,15 @@ export const FolderHeader = ({
   title,
   description,
   actions,
-  mock = true,
+  badge,
 }: {
   /** Ancestors of the open folder, outermost first. */
   path: readonly Crumb[]
   title: string
-  description: ReactNode
+  description?: ReactNode
   actions?: ReactNode
-  /** Shows the "Mock data" badge (folder contents still run on mock data). */
-  mock?: boolean
+  /** Shown beside the title. */
+  badge?: ReactNode
 }) => (
   <div className="flex flex-col gap-1">
     {path.length > 0 && (
@@ -69,7 +70,7 @@ export const FolderHeader = ({
         </span>
       </nav>
     )}
-    <PageHeader title={title} description={description} actions={actions} mock={mock} />
+    <PageHeader title={title} description={description} actions={actions} badge={badge} />
   </div>
 )
 
@@ -87,6 +88,8 @@ interface DetailsListProps<T> {
   rows: readonly T[]
   rowId: (row: T) => number
   name: (row: T) => ReactNode
+  /** A short muted line under the name (e.g. a project's description). */
+  subtitle?: (row: T) => ReactNode
   icon: (row: T) => ReactNode
   columns: ReadonlyArray<DetailsColumn<T>>
   selectedId: number | null
@@ -101,14 +104,16 @@ interface DetailsListProps<T> {
 }
 
 /**
- * The folder's contents as a table like the app's other lists, with Explorer behaviour: click to
- * select, double-click or Enter to open, arrow keys to move, Backspace to go up, Delete to delete.
+ * Explorer's "Details" view: the folder's contents as a table (icon, name and columns). Click to
+ * select and see it in the details pane, double-click or Enter to open, arrow keys to move,
+ * Backspace to go up, Delete to delete.
  */
 export const DetailsList = <T,>({
   label,
   rows,
   rowId,
   name,
+  subtitle,
   icon,
   columns,
   selectedId,
@@ -145,7 +150,7 @@ export const DetailsList = <T,>({
 
   return (
     <div className="-mx-5 overflow-x-auto px-5">
-      <table role="grid" aria-label={label} className="w-full min-w-[30rem] border-collapse text-left">
+      <table role="grid" aria-label={label} className="w-full min-w-[26rem] border-collapse text-left">
         <thead>
           <tr className="text-xs tracking-wide text-text-muted uppercase">
             <th className="w-[40%] min-w-44 pb-2 font-medium">Name</th>
@@ -183,8 +188,11 @@ export const DetailsList = <T,>({
                     <span className="shrink-0" aria-hidden="true">
                       {icon(row)}
                     </span>
-                    <span className={cn('truncate text-sm', selected ? 'font-medium text-signal' : 'text-text')}>
-                      {name(row)}
+                    <span className="flex min-w-0 flex-col">
+                      <span className={cn('truncate text-sm', selected ? 'font-medium text-signal' : 'text-text')}>
+                        {name(row)}
+                      </span>
+                      {subtitle && <span className="truncate text-xs text-text-muted">{subtitle(row)}</span>}
                     </span>
                   </span>
                 </td>
@@ -238,7 +246,7 @@ export const ListCard = ({
           value={search}
           onChange={onSearch}
           placeholder={`Search ${title.toLowerCase()}`}
-          className="flex-1 sm:w-60"
+          className="flex-1 sm:w-56"
         />
         <ViewToggle />
       </div>
@@ -247,9 +255,29 @@ export const ListCard = ({
   </section>
 )
 
-/** The preview card beside the list. */
-export const PreviewCard = ({ children }: { children: ReactNode }) => (
-  <aside aria-label="Preview" className="min-w-0 rounded-xl border border-border bg-surface-raised p-5">
+/**
+ * The details pane on the right of the list: shows the selected item. `onClose` adds a close
+ * button (shown when something is selected).
+ */
+export const PreviewCard = ({ children, onClose }: { children: ReactNode; onClose?: () => void }) => (
+  <aside
+    aria-label="Preview"
+    className="min-w-0 rounded-xl border border-border bg-surface-raised p-5 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-auto"
+  >
+    {onClose && (
+      <div className="-mt-2 mb-3 flex items-center justify-between border-b border-border pb-2">
+        <span className="text-xs font-medium tracking-wide text-text-muted uppercase">Details</span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close details"
+          title="Close details"
+          className="-mr-2 flex size-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-ink hover:text-text"
+        >
+          <X size={15} aria-hidden="true" />
+        </button>
+      </div>
+    )}
     {children}
   </aside>
 )
@@ -259,12 +287,15 @@ export const PreviewHint = ({ children }: { children: ReactNode }) => (
   <div className="flex min-h-40 flex-col items-center justify-center gap-1 text-center text-sm text-text-muted">{children}</div>
 )
 
-/** List and preview side by side (stacked on narrow screens). `wide` gives editors more room. */
+/**
+ * The list on the left and the details pane on the right (stacked on narrow screens). `wide` gives
+ * editors (Conf files, Notes) more room.
+ */
 export const FolderLayout = ({ list, preview, wide = false }: { list: ReactNode; preview: ReactNode; wide?: boolean }) => (
   <div
     className={cn(
       'grid grid-cols-1 items-start gap-4',
-      wide ? 'xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]' : 'xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]',
+      wide ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]' : 'lg:grid-cols-[minmax(0,1.4fr)_minmax(18rem,1fr)]',
     )}
   >
     {list}
@@ -278,6 +309,20 @@ export const FolderPage = ({ header, children }: { header: ReactNode; children: 
     {header}
     {children}
   </div>
+)
+
+/**
+ * Beside Env, Conf and Notes: the API has no endpoints for them yet, so what you add is kept in this
+ * browser tab only and is gone after a reload.
+ */
+export const LocalOnlyBadge = () => (
+  <span
+    className="inline-flex items-center gap-1 rounded-full border border-border bg-ink/40 px-2 py-0.5 text-xs font-medium text-text-muted"
+    title="The API can't store these yet. What you add here is kept in this tab until you reload."
+  >
+    <CloudOff size={12} aria-hidden="true" />
+    Not saved to the server yet
+  </span>
 )
 
 // ── Large icons ──────────────────────────────────────────
@@ -422,12 +467,13 @@ export const FolderContents = <T,>(
   props: DetailsListProps<T> & {
     /** Plain-text name, used for tiles and tooltips. */
     text: (row: T) => string
-    subtitle?: (row: T) => ReactNode
     bigIcon: (row: T) => ReactNode
+    /** The line under the name in Details view (tiles show `subtitle`; Details has columns for it). */
+    detailsSubtitle?: (row: T) => ReactNode
   },
 ) => {
   const [view] = useAtom(explorerViewAtom)
-  if (view === 'details') return <DetailsList {...props} />
+  if (view === 'details') return <DetailsList {...props} subtitle={props.detailsSubtitle} />
   return (
     <IconGrid
       label={props.label}

@@ -77,7 +77,7 @@ export const NavTree = ({
     })
 
   return (
-    <nav aria-label="Folders" className="sticky top-4 hidden max-h-[calc(100vh-6rem)] overflow-auto lg:block">
+    <nav aria-label="Folders" className="sticky top-4 hidden max-h-[calc(100vh-6rem)] overflow-auto xl:block">
       <p className="mb-2 px-2.5 text-xs font-medium tracking-wide text-text-muted uppercase">Folders</p>
       <ul role="tree" aria-label="Vault folders">
         <li role="treeitem" aria-expanded aria-selected={projectId === null}>

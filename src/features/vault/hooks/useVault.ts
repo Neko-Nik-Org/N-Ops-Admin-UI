@@ -50,15 +50,7 @@ import {
   revealSecret,
   rollbackSecret,
 } from '../api/secrets'
-import type {
-  ConfigFileInput,
-  NoteInput,
-  NoteLinkInput,
-  NoteShare,
-  SecretInput,
-  VaultContainerInput,
-  VaultProject,
-} from '../types'
+import type { ConfigFileInput, NoteInput, NoteLinkInput, SecretInput, VaultContainerInput, VaultProject } from '../types'
 
 /** Wraps a mutation function so success refreshes everything under ['vault'] and ['admin'] (audit log, usage). */
 const useVaultMutation = <V, R>(fn: (vars: V) => Promise<R>) => {
@@ -201,7 +193,7 @@ export const useUpdateNote = () =>
   useVaultMutation(({ noteId, input }: { noteId: number; input: NoteInput }) => updateNote(noteId, input))
 export const useDeleteNote = () => useVaultMutation((noteId: number) => deleteNote(noteId))
 export const useSetNoteShares = () =>
-  useVaultMutation(({ noteId, shares }: { noteId: number; shares: Array<Pick<NoteShare, 'userId' | 'canEdit'>> }) =>
+  useVaultMutation(({ noteId, shares }: { noteId: number; shares: Parameters<typeof setNoteShares>[1] }) =>
     setNoteShares(noteId, shares),
   )
 export const useCreateNoteLink = () =>

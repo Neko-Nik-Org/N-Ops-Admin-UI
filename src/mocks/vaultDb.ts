@@ -15,8 +15,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 /**
- * In-memory mock of the Vault API. The API has no vault endpoints yet (the /vault/* scopes are
- * commented out in N-Ops-Main-API/src/main.rs), so `features/vault/api/*.ts` call this. It shares the Admin
+ * In-memory store for what's inside vault projects. Projects are live (`/vault/project/*`), but the
+ * API has no Env/Conf/Notes endpoints yet (the /vault/secret/* scopes are commented out in
+ * N-Ops-Main-API/src/main.rs), so `features/vault/api/*.ts` call this. The app starts it empty; the
+ * sample data below is loaded only by `resetVaultMock()` in tests. It shares the Admin
  * mock's users, plan limits and audit log, keeps changes until reload, and treats versions as
  * immutable like `vault_secret_key_versions`.
  *
@@ -463,25 +465,42 @@ interface VaultState {
   nextId: { project: number; secret: number; config: number; note: number }
 }
 
-const createState = (): VaultState => {
+/** `withSamples` fills in the sample projects, keys, files and notes (tests only). */
+const createState = (withSamples: boolean): VaultState => {
   const state: VaultState = {
-    projects: seedProjects(),
-    secrets: seedSecrets(),
-    configs: seedConfigs(),
-    notes: seedNotes(),
-    nextId: { project: 5, secret: 0, config: 0, note: 6 },
+    projects: withSamples ? seedProjects() : [],
+    secrets: withSamples ? seedSecrets() : [],
+    configs: withSamples ? seedConfigs() : [],
+    notes: withSamples ? seedNotes() : [],
+    nextId: { project: 5, secret: 0, config: 0, note: 0 },
   }
   state.nextId.secret = state.secrets.length + 1
   state.nextId.config = state.configs.length + 1
+  state.nextId.note = state.notes.length + 1
   return state
 }
 
-/** The live vault mock. Mutated by ../api/*.ts. */
-export let vaultDb: VaultState = createState()
+/**
+ * The live vault store, mutated by ../api/*.ts. The app starts it empty: projects come from the
+ * API, and Env keys, Conf files and Notes added in the UI live here until reload.
+ */
+export let vaultDb: VaultState = createState(false)
 
-/** Fresh seed data; tests call this so each one starts from the same state. */
+/** Fresh sample data; tests call this so each one starts from the same state. */
 export const resetVaultMock = () => {
-  vaultDb = createState()
+  vaultDb = createState(true)
+}
+
+/**
+ * Records real projects fetched from the API, so audit labels and note paths show their names.
+ * Updates the name of a project already known.
+ */
+export const rememberProjects = (projects: VaultProject[]) => {
+  for (const project of projects) {
+    const known = vaultDb.projects.find((p) => p.projectId === project.projectId)
+    if (known) Object.assign(known, project)
+    else vaultDb.projects.push({ ...project })
+  }
 }
 
 /** Display name of the person the mock treats as signed in (the Admin mock's first user). */

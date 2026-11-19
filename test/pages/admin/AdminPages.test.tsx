@@ -15,7 +15,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 /**
- * Tests for the Admin pages. Roles and Organization run on the (mocked) live API; Users, API keys and
+ * Tests for the Admin pages. Users, Roles and Organization run on the (mocked) live API; API keys and
  * Audit logs on the mock backend, with real tags and roles for their pickers.
  */
 
@@ -27,7 +27,7 @@ import { AdminAuditLogsPage } from '@/pages/admin/AdminAuditLogsPage'
 import { AdminOrganizationPage } from '@/pages/admin/AdminOrganizationPage'
 import { AdminRolesPage } from '@/pages/admin/AdminRolesPage'
 import { AdminUsersPage } from '@/pages/admin/AdminUsersPage'
-import { api, makeUser, RAW_ORG_INFO, rawRole, renderWithProviders, serveLiveReads } from '../../testUtils'
+import { api, makeUser, rawRole, renderWithProviders, serveLiveReads } from '../../testUtils'
 
 const render = (ui: React.ReactElement, route: string) =>
   renderWithProviders(ui, { route, user: makeUser({ permissions: ['tag:create', 'user:role:view'] }) })
@@ -64,10 +64,15 @@ describe('AdminOrganizationPage', () => {
 })
 
 describe('AdminUsersPage', () => {
-  it('lists users and filters them by search, role and status', async () => {
-    render(<AdminUsersPage />, '/admin/users')
+  const renderUsers = (permissions = ['user:view', 'user:role:view']) =>
+    renderWithProviders(<AdminUsersPage />, { route: '/admin/users', user: makeUser({ permissions }) })
+
+  it('lists the real users and filters them by search, role and status', async () => {
+    renderUsers()
     expect(await screen.findByText('Priya Rao')).toBeInTheDocument()
-    expect(screen.getByText('10 of 25 seats used. Each person signs in with one role.')).toBeInTheDocument()
+    expect(api.get).toHaveBeenCalledWith('/user/admin/list', { params: { limit: 100, offset: 0 } })
+    expect(screen.queryByText('Mock data')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add user' })).not.toBeInTheDocument() // no create endpoint yet
 
     fireEvent.change(screen.getByLabelText('Search name, username or email'), { target: { value: 'marcus' } })
     expect(screen.getByText('Marcus Chen')).toBeInTheDocument()
@@ -79,45 +84,40 @@ describe('AdminUsersPage', () => {
     expect(screen.getByText('Dev Malhotra')).toBeInTheDocument()
   })
 
-  it('adds a user after validating the form', async () => {
-    render(<AdminUsersPage />, '/admin/users')
-    fireEvent.click(await screen.findByRole('button', { name: 'Add user' }))
-
-    fireEvent.click(within(dialog()).getByRole('button', { name: 'Add user' }))
-    expect(await within(dialog()).findByText('Enter a username.')).toBeInTheDocument()
-    expect(within(dialog()).getByText('Pick a role.')).toBeInTheDocument()
-
-    fireEvent.change(within(dialog()).getByLabelText('Name'), { target: { value: 'Zoe Park' } })
-    fireEvent.change(within(dialog()).getByLabelText('Username'), { target: { value: 'zoe' } })
-    fireEvent.change(within(dialog()).getByLabelText('Email'), { target: { value: 'zoe@acme.dev' } })
-    fireEvent.change(within(dialog()).getByLabelText('Role'), { target: { value: '4' } })
-    fireEvent.click(within(dialog()).getByRole('switch', { name: /Restrict by IP address/ }))
-    fireEvent.change(within(dialog()).getByLabelText('Allowed IP addresses'), { target: { value: '300.1.1.1' } })
-    fireEvent.click(within(dialog()).getByRole('button', { name: 'Add user' }))
-    expect(await within(dialog()).findByText('Use IPv4 addresses or ranges, like 203.0.113.0/24.')).toBeInTheDocument()
-
-    fireEvent.change(within(dialog()).getByLabelText('Allowed IP addresses'), { target: { value: '203.0.113.0/24' } })
-    fireEvent.click(within(dialog()).getByRole('button', { name: 'Add user' }))
-    expect(await screen.findByText("Added Zoe Park. They'll get an email to set a password.")).toBeInTheDocument()
-    expect(await screen.findByText('@zoe · zoe@acme.dev')).toBeInTheDocument()
+  it("shows a user's details in a dialog, fetched by id", async () => {
+    renderUsers()
+    const sara = (await screen.findByText('Sara Lindqvist')).closest('tr') as HTMLElement
+    expect(within(sara).getByText('Location limited')).toBeInTheDocument()
+    fireEvent.click(sara)
+    const pane = screen.getByRole('dialog', { name: 'User details' })
+    expect(await within(pane).findByText('sara@acme.dev')).toBeInTheDocument()
+    expect(api.get).toHaveBeenCalledWith('/user/admin/fetch/10')
+    expect(within(pane).getByText('SE')).toBeInTheDocument()
+    expect(within(pane).getByText('Platform')).toBeInTheDocument() // from user_details
+    fireEvent.click(within(pane).getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: 'User details' })).not.toBeInTheDocument()
   })
 
-  it('takes seats from the real org-info and role names from the real roles', async () => {
-    serveLiveReads({ orgInfo: { ...RAW_ORG_INFO, current_user_count: 25 }, roles: [rawRole(4, 'Engineer')] })
-    render(<AdminUsersPage />, '/admin/users')
-    expect(await screen.findByText('25 of 25 seats used. Each person signs in with one role.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add user' })).toBeDisabled()
-    const tomas = screen.getByText('Tomás Ruiz').closest('tr') as HTMLElement
+  it('shows Never for someone who has not signed in yet', async () => {
+    renderUsers()
+    const kenji = (await screen.findByText('Kenji Watanabe')).closest('tr') as HTMLElement
+    expect(within(kenji).getByText('Never')).toBeInTheDocument()
+    expect(within(kenji).getByText('Email unverified')).toBeInTheDocument()
+  })
+
+  it('takes role names from the real roles', async () => {
+    serveLiveReads({ roles: [rawRole(4, 'Engineer')] })
+    renderUsers()
+    const tomas = (await screen.findByText('Tomás Ruiz')).closest('tr') as HTMLElement
     expect(await within(tomas).findByText('Engineer')).toBeInTheDocument() // real role 4
     const marcus = screen.getByText('Marcus Chen').closest('tr') as HTMLElement
     expect(within(marcus).getByText('Role #3')).toBeInTheDocument() // no real role with that id
   })
 
-  it('explains an empty role picker without user:role:view', async () => {
-    renderWithProviders(<AdminUsersPage />, { route: '/admin/users', user: makeUser({ permissions: [] }) })
-    fireEvent.click(await screen.findByRole('button', { name: 'Add user' }))
-    expect(within(dialog()).getByText(/You need the “View roles” permission/)).toBeInTheDocument()
-    expect(api.get).not.toHaveBeenCalledWith('/user/roles/list', expect.anything())
+  it('asks for user:view instead of loading users without it', async () => {
+    renderUsers([])
+    expect(await screen.findByText(/You need the “View users” permission \(user:view\)/)).toBeInTheDocument()
+    expect(api.get).not.toHaveBeenCalledWith('/user/admin/list', expect.anything())
   })
 })
 
@@ -206,6 +206,22 @@ describe('AdminRolesPage', () => {
     expect(screen.getByRole('button', { name: 'Edit Auditor' })).toBeEnabled()
   })
 
+  it('opens a read-only view of a role from its name, with Edit leading to the editor', async () => {
+    renderRoles()
+    fireEvent.click(await screen.findByRole('button', { name: 'Operator' }))
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('/user/roles/fetch/1'))
+    const infra = await within(dialog()).findByRole('table', { name: 'Infrastructure permissions' })
+    expect(within(infra).getByRole('checkbox', { name: 'Create tags' })).toBeChecked()
+    expect(within(infra).getByRole('checkbox', { name: 'Delete tags' })).not.toBeChecked()
+    expect(within(infra).getByRole('checkbox', { name: 'Create tags' })).toBeDisabled()
+    expect(within(dialog()).queryByRole('table', { name: 'Vault permissions' })).not.toBeInTheDocument()
+    expect(within(dialog()).queryByRole('button', { name: /Select all/ })).not.toBeInTheDocument()
+
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Edit' }))
+    expect(await screen.findByRole('heading', { name: 'Edit Operator' })).toBeInTheDocument()
+    await waitFor(() => expect(within(dialog()).getByLabelText('Name')).toHaveValue('Operator'))
+  })
+
   it('creates a role, offering only permissions the user holds', async () => {
     api.post.mockResolvedValue({ data: undefined })
     renderRoles()
@@ -213,12 +229,22 @@ describe('AdminRolesPage', () => {
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Create role' }))
     expect(await within(dialog()).findByText('Give the role at least one permission.')).toBeInTheDocument()
 
-    expect(within(dialog()).getByRole('checkbox', { name: /Run remote commands/ })).toBeDisabled()
-    expect(within(dialog()).getByRole('checkbox', { name: 'All Servers permissions' })).toBeDisabled()
+    // only modules the user can grant in: Roles (Admin management) and Tags (Infrastructure)
+    const admin = within(dialog()).getByRole('table', { name: 'Admin management permissions' })
+    expect(
+      within(admin)
+        .getAllByRole('rowheader')
+        .map((h) => h.textContent),
+    ).toEqual(['Roles'])
+    expect(within(dialog()).queryByRole('table', { name: 'Vault permissions' })).not.toBeInTheDocument()
+    expect(within(dialog()).queryByRole('checkbox', { name: /Run remote commands/ })).not.toBeInTheDocument()
+    expect(within(dialog()).getByText('0/3')).toBeInTheDocument() // Infrastructure: the three tag permissions
 
     fireEvent.change(within(dialog()).getByLabelText('Name'), { target: { value: 'Tagger' } })
-    fireEvent.click(within(dialog()).getByRole('checkbox', { name: 'All Tags permissions' }))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Select all Infrastructure permissions' }))
     expect(within(dialog()).getByText('3 selected')).toBeInTheDocument()
+    expect(within(dialog()).getByText('3/3')).toBeInTheDocument()
+    expect(within(dialog()).getByRole('button', { name: 'Clear all Infrastructure permissions' })).toBeInTheDocument()
     fireEvent.click(within(dialog()).getByRole('checkbox', { name: 'staging' }))
     fireEvent.change(within(dialog()).getByLabelText('Allowed Linux users'), { target: { value: 'deploy, ubuntu' } })
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Create role' }))

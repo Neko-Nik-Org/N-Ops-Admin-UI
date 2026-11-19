@@ -20,7 +20,7 @@
 import axios, { type AxiosError } from 'axios'
 import { env } from '@/config/env'
 import { clearSessionToken, getSessionToken } from '@/features/auth/store/sessionToken'
-import { ApiError, type ApiErrorBody } from '@/types/api'
+import { ApiError, parseApiMessage, type ApiErrorBody } from '@/types/api'
 
 /** Axios instance pointed at the configured Main API base URL. Use this for every API call. */
 export const apiClient = axios.create({
@@ -40,16 +40,17 @@ apiClient.interceptors.request.use((config) => {
 const MAX_TEXT_MESSAGE = 200
 
 /**
- * The API's message for a failed response. Service errors send `{ error, code }` JSON, but some
- * routes (e.g. `/user/self/verify-email/*`) answer with a short plain-text body instead.
+ * The API's message and error code for a failed response. Service errors send
+ * `{ error: "E221: Insufficient permissions", code: "E221", status }` JSON, but some routes (e.g.
+ * `/user/self/verify-email/*`) answer with a short plain-text body instead.
  */
-const messageOf = (error: AxiosError<ApiErrorBody | string>): string => {
+const messageOf = (error: AxiosError<ApiErrorBody | string>): { message: string; code?: string } => {
   const data = error.response?.data
-  if (data && typeof data === 'object' && typeof data.error === 'string') return data.error
+  if (data && typeof data === 'object' && typeof data.error === 'string') return parseApiMessage(data.error, data.code)
   if (typeof data === 'string' && data.trim() && data.length <= MAX_TEXT_MESSAGE && !data.trimStart().startsWith('<')) {
-    return data.trim()
+    return parseApiMessage(data)
   }
-  return error.message
+  return { message: error.message }
 }
 
 /**
@@ -62,6 +63,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       clearSessionToken()
     }
-    return Promise.reject(new ApiError(messageOf(error), error.response?.status))
+    const { message, code } = messageOf(error)
+    return Promise.reject(new ApiError(message, error.response?.status, code))
   },
 )
