@@ -17,7 +17,11 @@
 /** Animated network canvas behind the sign-in screens. */
 
 import { useEffect, useRef } from 'react'
+import { LOW_POWER } from '@/lib/lowPower'
 import { cn } from '@/utils/cn'
+
+/** Decorative, so 30 frames a second is plenty: half the work of a 60 Hz screen, a quarter of 120 Hz. */
+const FRAME_MS = 1000 / 30
 
 export interface AuthBackgroundProps {
   /** 1 = default amount of points. 0.6 for calmer, 1.4 for busier. */
@@ -59,7 +63,8 @@ const PALETTES = {
  * The animated network behind the sign-in screens.
  * Points drift and link up when they come close; pulses of light hop along the links like
  * requests moving through the control plane. It sizes itself to its parent, pauses when hidden,
- * and draws one still frame when the person prefers reduced motion.
+ * draws at most 30 frames a second, and draws one still frame on low-power devices or when the
+ * person prefers reduced motion.
  */
 export function AuthBackground({ density = 1, interactive = true, tone = 'dark', className }: AuthBackgroundProps) {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -76,6 +81,8 @@ export function AuthBackground({ density = 1, interactive = true, tone = 'dark',
       return `rgba(${c[0]},${c[1]},${c[2]},${Math.min(1, a).toFixed(3)})`
     }
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)')
+    /** One still frame instead of animation. */
+    const still = () => LOW_POWER || reduce.matches
 
     let W = 1
     let H = 1
@@ -224,7 +231,8 @@ export function AuthBackground({ density = 1, interactive = true, tone = 'dark',
 
     const step = (now: number) => {
       raf = 0
-      const dt = Math.min(50, now - (last || now))
+      if (last && now - last < FRAME_MS - 1) return start() // skip this frame
+      const dt = Math.min(80, now - (last || now))
       last = now
       const f = dt / 16.7
       const m = 40
@@ -261,7 +269,7 @@ export function AuthBackground({ density = 1, interactive = true, tone = 'dark',
     }
 
     const start = () => {
-      if (!raf && onScreen && !document.hidden && !reduce.matches) raf = requestAnimationFrame(step)
+      if (!raf && onScreen && !document.hidden && !still()) raf = requestAnimationFrame(step)
     }
     const stop = () => {
       if (raf) cancelAnimationFrame(raf)
@@ -293,7 +301,7 @@ export function AuthBackground({ density = 1, interactive = true, tone = 'dark',
     }
     const onVisibility = () => (document.hidden ? stop() : start())
     const onMotionPref = () => {
-      if (reduce.matches) {
+      if (still()) {
         stop()
         pulses = []
         draw(performance.now())

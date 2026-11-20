@@ -14,7 +14,7 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Sign-in card: username, password, "Keep me signed in" and the Turnstile check. */
+/** Sign-in card: username, password, "Keep me signed in", the Turnstile check and the API health status. */
 
 import { yupResolver } from '@hookform/resolvers/yup'
 import { Lock, ShieldCheck, User } from 'lucide-react'
@@ -26,8 +26,10 @@ import { resolvedThemeAtom } from '@/app/theme'
 import { AuthBanner, AuthField } from '@/components/molecules/AuthField'
 import { AuthCard } from '@/components/molecules/AuthCard'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { ServiceHealthIndicator } from '@/components/molecules/ServiceHealthIndicator'
 import { TurnstileWidget } from '@/components/molecules/TurnstileWidget'
 import { useLogin } from '@/features/auth/hooks/useLogin'
+import { useServiceHealth } from '@/features/system/hooks/useServiceHealth'
 import { loginSchema, type LoginFormValues } from '@/features/auth/schema/loginSchema'
 import { NAVIGATE_DELAY_MS } from '@/constants/config'
 import { ROUTES } from '@/constants/routes'
@@ -41,6 +43,9 @@ export const LoginForm = () => {
   const theme = useAtomValue(resolvedThemeAtom)
   const [loginState, login] = useLogin()
   const navigate = useNavigate()
+  // Signing in only works when the API and its dependencies are up; the button waits for a healthy check.
+  const { data: health } = useServiceHealth()
+  const servicesUp = health?.status === 'up'
 
   const {
     register,
@@ -53,6 +58,7 @@ export const LoginForm = () => {
 
   const onSubmit = (values: LoginFormValues) => {
     setFormError(null)
+    if (!servicesUp) return
     if (!turnstileToken) {
       setFormError('Complete the verification check before signing in.')
       return
@@ -116,7 +122,7 @@ export const LoginForm = () => {
 
         <label className="n-auth-check">
           <input type="checkbox" {...register('rememberMe')} />
-          <span>Keep me signed in on this device</span>
+          <span>Extend your Login Session</span>
         </label>
 
         <div className="n-auth-turnstile">
@@ -133,6 +139,7 @@ export const LoginForm = () => {
           size="lg"
           className="n-auth-submit"
           state={loginState}
+          disabled={!servicesUp && loginState === 'idle'}
           loadingText="Signing in"
           successText="Verified"
         >
@@ -141,6 +148,7 @@ export const LoginForm = () => {
       </form>
 
       <div className="n-auth-note">
+        <ServiceHealthIndicator />
         <p>
           New here? Ask an admin in your organization to{' '}
           <a href="https://nops.app/contact" target="_blank" rel="noreferrer">

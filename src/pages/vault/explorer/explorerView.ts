@@ -17,8 +17,11 @@
 /** How the Vault explorer lists a folder's contents, remembered per browser. */
 
 import { atomWithStorage } from 'jotai/utils'
+import { secureJSONStorage } from '@/lib/secureStorage'
 
 export type ExplorerView = 'icons' | 'details'
 
 /** "Large icons" (the default, like Explorer) or "Details" (a table with columns). */
-export const explorerViewAtom = atomWithStorage<ExplorerView>('nops-vault-view', 'icons', undefined, { getOnInit: true })
+export const explorerViewAtom = atomWithStorage<ExplorerView>('nops-vault-view', 'icons', secureJSONStorage<ExplorerView>(), {
+  getOnInit: true,
+})

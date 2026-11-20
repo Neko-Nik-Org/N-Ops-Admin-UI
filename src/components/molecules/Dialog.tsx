@@ -18,7 +18,7 @@
 /** Modal dialog molecule. */
 
 import { X } from 'lucide-react'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 
 /** Props for Dialog. The dialog is fully controlled: the parent owns `open`. */
 interface DialogProps {
@@ -35,6 +35,8 @@ interface DialogProps {
 /** Modal built on the native <dialog>: focus trap, Escape-to-close and the top layer come for free. */
 export const Dialog = ({ open, title, description, onClose, children, size = 'md' }: DialogProps) => {
   const ref = useRef<HTMLDialogElement>(null)
+  // unique per dialog, so stacked dialogs each get their own accessible name
+  const titleId = useId()
 
   /** Mirror the `open` prop onto the native dialog element. */
   useEffect(() => {
@@ -54,7 +56,7 @@ export const Dialog = ({ open, title, description, onClose, children, size = 'md
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose() // backdrop click
       }}
-      aria-labelledby="dialog-title"
+      aria-labelledby={titleId}
       className={`m-auto w-[calc(100%-2rem)] ${{ md: 'max-w-md', lg: 'max-w-2xl', xl: 'max-w-5xl' }[size]} max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain rounded-xl border border-border bg-surface p-0 text-text backdrop:bg-ink/70`}
     >
       {/* Only render the content while open, so forms inside reset each time the dialog opens */}
@@ -62,7 +64,7 @@ export const Dialog = ({ open, title, description, onClose, children, size = 'md
         <div className="flex flex-col gap-5 p-6">
           <div className="flex items-start justify-between gap-4">
             <div className="flex flex-col gap-1">
-              <h2 id="dialog-title" className="text-lg font-semibold text-text">
+              <h2 id={titleId} className="text-lg font-semibold text-text">
                 {title}
               </h2>
               {description && <p className="text-sm text-text-muted">{description}</p>}

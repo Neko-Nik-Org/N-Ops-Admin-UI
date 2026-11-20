@@ -35,12 +35,14 @@ export const useTags = () => useQuery(tagsQuery)
 /**
  * The tag the dashboard is scoped to. A saved id that is not in the user's tag list (deleted, or
  * saved by another account on this browser) reads as null, i.e. "All tags".
+ * `showTag` is true only under "All tags": once one tag is picked every listed row has that tag,
+ * so listings drop their tag column.
  */
 export const useSelectedTag = () => {
   const { data: tags } = useTags()
   const [storedId, setSelectedTagId] = useAtom(selectedTagIdAtom)
   const selectedTag = tags?.find((t) => t.tagId === storedId) ?? null
-  return { tags, selectedTag, selectedTagId: selectedTag?.tagId ?? null, setSelectedTagId }
+  return { tags, selectedTag, selectedTagId: selectedTag?.tagId ?? null, setSelectedTagId, showTag: selectedTag === null }
 }
 
 /** Fetches one tag fresh from `GET /tag/get/{id}`, seeded from the list so the form fills instantly. */

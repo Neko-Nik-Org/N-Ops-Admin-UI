@@ -23,7 +23,20 @@ import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 import { ToastContainer } from 'react-toastify'
 import { queryClient } from '@/lib/queryClient'
+import { sessionStatusAtom } from '@/features/auth/store/session'
 import { resolvedThemeAtom } from './theme'
+
+/**
+ * Drops everything cached for the signed-in user once the session ends (sign-out, expiry, or a
+ * failed check of a saved session), so the next account on this browser never sees it. The API
+ * health check isn't per-user, so it stays.
+ */
+const useClearUserCacheOnSignOut = () => {
+  const status = useAtomValue(sessionStatusAtom)
+  useEffect(() => {
+    if (status === 'unauthenticated') queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'system' })
+  }, [status])
+}
 
 /**
  * Wraps the app in the React Query client and the toast container, and keeps
@@ -31,6 +44,7 @@ import { resolvedThemeAtom } from './theme'
  */
 export const AppProviders = ({ children }: { children: ReactNode }) => {
   const resolvedTheme = useAtomValue(resolvedThemeAtom)
+  useClearUserCacheOnSignOut()
 
   /** Every color token in index.css is keyed off this attribute. */
   useEffect(() => {

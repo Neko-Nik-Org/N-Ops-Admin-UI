@@ -24,6 +24,7 @@ import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'
 import { TableSkeleton } from '@/components/molecules/Skeleton'
 import { useTagOptions } from '@/features/admin/hooks/useTagOptions'
+import { preloadRoute } from '@/app/lazyPages'
 import { useSelectedTag } from '@/features/tags/hooks/useTags'
 import { describeTrigger, RUN_STATUS, TRIGGER_KINDS } from '@/features/workflows/describe'
 import { useSetWorkflowEnabled, useWorkflows } from '@/features/workflows/hooks/useWorkflows'
@@ -60,7 +61,7 @@ export const WorkflowsPage = () => {
   const navigate = useNavigate()
   const { data: workflows, isLoading, error } = useWorkflows()
   const { tagName } = useTagOptions()
-  const { selectedTag } = useSelectedTag()
+  const { selectedTag, showTag } = useSelectedTag()
   const [search, setSearch] = useState('')
 
   const q = search.trim().toLowerCase()
@@ -117,7 +118,7 @@ export const WorkflowsPage = () => {
                   <th className="pb-2 font-medium">Trigger</th>
                   <th className="pb-2 font-medium">Last run</th>
                   <th className="pb-2 font-medium">Next run</th>
-                  <th className="pb-2 font-medium">Tag</th>
+                  {showTag && <th className="pb-2 font-medium">Tag</th>}
                   <th className="pb-2 font-medium">Enabled</th>
                 </tr>
               </thead>
@@ -127,6 +128,9 @@ export const WorkflowsPage = () => {
                     key={w.workflowId}
                     tabIndex={0}
                     onClick={() => navigate(workflowPath(w.workflowId))}
+                    // rows aren't links, so preload the detail page here
+                    onPointerEnter={() => preloadRoute(workflowPath(w.workflowId))}
+                    onFocus={() => preloadRoute(workflowPath(w.workflowId))}
                     onKeyDown={(e) => e.key === 'Enter' && e.target === e.currentTarget && navigate(workflowPath(w.workflowId))}
                     className="cursor-pointer border-t border-border outline-none hover:bg-ink/50 focus-visible:ring-1 focus-visible:ring-signal focus-visible:ring-inset"
                   >
@@ -161,11 +165,13 @@ export const WorkflowsPage = () => {
                         'Disabled'
                       )}
                     </td>
-                    <td className="py-3 pr-4">
-                      <Badge tone="accent" mono>
-                        {tagName(w.tagId)}
-                      </Badge>
-                    </td>
+                    {showTag && (
+                      <td className="py-3 pr-4">
+                        <Badge tone="accent" mono>
+                          {tagName(w.tagId)}
+                        </Badge>
+                      </td>
+                    )}
                     <td className="py-3">
                       <EnabledToggle workflow={w} />
                     </td>

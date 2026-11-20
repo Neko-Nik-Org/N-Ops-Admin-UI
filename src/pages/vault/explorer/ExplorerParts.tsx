@@ -178,7 +178,7 @@ export const DetailsList = <T,>({
                 onDoubleClick={() => onOpen?.(row)}
                 onKeyDown={(e) => onKeyDown(e, row, index)}
                 className={cn(
-                  'cursor-default border-t border-border outline-none select-none',
+                  'cursor-pointer border-t border-border outline-none select-none',
                   selected ? 'bg-signal/10' : 'hover:bg-ink/50',
                   'focus-visible:ring-1 focus-visible:ring-signal focus-visible:ring-inset',
                 )}
@@ -282,20 +282,16 @@ export const PreviewCard = ({ children, onClose }: { children: ReactNode; onClos
   </aside>
 )
 
-/** Shown in the preview card when nothing is selected. */
-export const PreviewHint = ({ children }: { children: ReactNode }) => (
-  <div className="flex min-h-40 flex-col items-center justify-center gap-1 text-center text-sm text-text-muted">{children}</div>
-)
-
 /**
  * The list on the left and the details pane on the right (stacked on narrow screens). `wide` gives
  * editors (Conf files, Notes) more room.
  */
-export const FolderLayout = ({ list, preview, wide = false }: { list: ReactNode; preview: ReactNode; wide?: boolean }) => (
+export const FolderLayout = ({ list, preview, wide = false }: { list: ReactNode; preview?: ReactNode; wide?: boolean }) => (
   <div
     className={cn(
       'grid grid-cols-1 items-start gap-4',
-      wide ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]' : 'lg:grid-cols-[minmax(0,1.4fr)_minmax(18rem,1fr)]',
+      // No preview (nothing selected): the list takes the full width
+      !!preview && (wide ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]' : 'lg:grid-cols-[minmax(0,1.4fr)_minmax(18rem,1fr)]'),
     )}
   >
     {list}
@@ -440,7 +436,7 @@ export const IconGrid = <T,>({
             onDoubleClick={() => onOpen?.(row)}
             onKeyDown={(e) => onKeyDown(e, row, index)}
             className={cn(
-              'flex cursor-default flex-col items-center gap-1.5 rounded-lg border px-1.5 pt-3 pb-2 text-center outline-none select-none',
+              'flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border px-1.5 pt-3 pb-2 text-center outline-none select-none',
               selected ? 'border-signal/40 bg-signal/15' : 'border-transparent hover:bg-ink/60',
               'focus-visible:ring-1 focus-visible:ring-signal',
             )}

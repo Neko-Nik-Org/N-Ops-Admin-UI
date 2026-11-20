@@ -28,7 +28,7 @@ import {
   saveUiInfo,
   saveUserDetails,
 } from '../api/account'
-import { usernamePolicyError } from '../schema/accountSchemas'
+import { usernamePolicyError } from '../schema/policies'
 import type { JsonObject } from '../types'
 
 /** Query cache keys for the signed-in user's data. */

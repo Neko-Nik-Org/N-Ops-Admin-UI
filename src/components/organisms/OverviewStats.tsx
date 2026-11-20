@@ -20,7 +20,7 @@
 import { Bell, CheckCircle2, Server, Workflow } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Bar, BarChart, ResponsiveContainer } from 'recharts'
+import { RunTrendSparkline } from '@/components/molecules/RunTrendSparkline'
 import type { DashboardOverview } from '@/features/dashboard/types'
 import { cn } from '@/utils/cn'
 import { ROUTES } from '@/constants/routes'
@@ -41,8 +41,6 @@ const TileHeader = ({ icon: Icon, label }: { icon: typeof Server; label: string 
 /** Four tiles: servers online, pending approvals, workflow runs (with a 24h trend) and alerts. */
 export const OverviewStats = ({ overview }: { overview: DashboardOverview }) => {
   const offlineCount = overview.fleet.filter((s) => s.status === 'offline')
-  /** Recharts wants one object per bar. */
-  const trendData = overview.workflowRunTrend.map((runs, i) => ({ i, runs }))
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -76,11 +74,7 @@ export const OverviewStats = ({ overview }: { overview: DashboardOverview }) => 
           <p className="text-3xl font-bold text-text">{overview.workflowRuns24h.toLocaleString()}</p>
           {/* Sparkline of runs over the last 24 h; bars take the text color (signal) via currentColor */}
           <div className="h-7 min-w-0 flex-1 text-signal" aria-hidden="true">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={trendData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }} barCategoryGap={1}>
-                <Bar dataKey="runs" fill="currentColor" radius={[2, 2, 0, 0]} isAnimationActive={false} />
-              </BarChart>
-            </ResponsiveContainer>
+            <RunTrendSparkline runs={overview.workflowRunTrend} />
           </div>
         </div>
         <p className="text-xs text-danger">

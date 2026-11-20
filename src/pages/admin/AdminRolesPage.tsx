@@ -18,14 +18,13 @@
 
 import { Copy, Eye, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useAtomValue } from 'jotai'
-import { useMemo, useState } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import { Badge } from '@/components/atoms/Badge'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { TableSkeleton } from '@/components/molecules/Skeleton'
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'
-import { RoleFormDialog } from '@/components/organisms/RoleFormDialog'
 import { RoleViewDialog } from '@/components/organisms/RoleViewDialog'
 import { ALL_PERMISSIONS } from '@/features/admin/catalog'
 import { useDeleteRole, useRoles } from '@/features/admin/hooks/useAdmin'
@@ -33,6 +32,10 @@ import type { Role } from '@/features/admin/types'
 import { isRoleWithinScope, useHasPermissions } from '@/features/auth/permissions'
 import { currentUserAtom } from '@/features/auth/store/session'
 import { useTags } from '@/features/tags/hooks/useTags'
+import { lazyNamed, usePreloadWhenIdle } from '@/utils/lazyNamed'
+
+// the role editor brings react-hook-form and yup, which the table doesn't need: it loads after it
+const RoleFormDialog = lazyNamed(() => import('@/components/organisms/RoleFormDialog'), 'RoleFormDialog')
 
 /** Which dialog is open. `copy` opens the editor pre-filled from another role. */
 type DialogState =
@@ -44,6 +47,12 @@ type DialogState =
 
 /** Shown on edit / delete buttons for a role wider than the signed-in user's own access. */
 const OUT_OF_SCOPE = 'This role has permissions or tags your own role lacks, so you can’t change it.'
+
+/**
+ * Shown on a disabled Edit button. The API checks `user:role:update`, although its docs and seed
+ * data call it `user:role:edit`, so name the one that actually works.
+ */
+const NO_UPDATE = 'Editing roles needs the “Edit roles” permission (user:role:update), which your role doesn’t have.'
 
 /** Roles table: what each grants and where. Actions follow the `user:role:*` permissions. */
 export const AdminRolesPage = () => {
@@ -59,6 +68,7 @@ export const AdminRolesPage = () => {
   const [dialog, setDialog] = useState<DialogState>({ kind: 'closed' })
   const [search, setSearch] = useState('')
   const close = () => setDialog({ kind: 'closed' })
+  usePreloadWhenIdle(canView && (canCreate || canUpdate), RoleFormDialog.preload)
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -177,17 +187,15 @@ export const AdminRolesPage = () => {
                                 onClick={() => setDialog({ kind: 'create', from: role })}
                               />
                             )}
-                            {canUpdate && (
-                              <LoadingButton
-                                variant="ghost"
-                                size="sm"
-                                icon={<Pencil size={14} />}
-                                aria-label={`Edit ${role.roleName}`}
-                                title={inScope ? 'Edit' : OUT_OF_SCOPE}
-                                disabled={!inScope}
-                                onClick={() => setDialog({ kind: 'edit', role })}
-                              />
-                            )}
+                            <LoadingButton
+                              variant="ghost"
+                              size="sm"
+                              icon={<Pencil size={14} />}
+                              aria-label={`Edit ${role.roleName}`}
+                              title={!canUpdate ? NO_UPDATE : inScope ? 'Edit' : OUT_OF_SCOPE}
+                              disabled={!canUpdate || !inScope}
+                              onClick={() => setDialog({ kind: 'edit', role })}
+                            />
                             {canDelete && (
                               <LoadingButton
                                 variant="ghost"
@@ -237,28 +245,30 @@ export const AdminRolesPage = () => {
                   Duplicate
                 </LoadingButton>
               )}
-              {canUpdate && (
-                <LoadingButton
-                  icon={<Pencil size={15} />}
-                  disabled={!isRoleWithinScope(user, dialog.role)}
-                  title={isRoleWithinScope(user, dialog.role) ? undefined : OUT_OF_SCOPE}
-                  onClick={() => setDialog({ kind: 'edit', role: dialog.role })}
-                >
-                  Edit
-                </LoadingButton>
-              )}
+              <LoadingButton
+                icon={<Pencil size={15} />}
+                disabled={!canUpdate || !isRoleWithinScope(user, dialog.role)}
+                title={!canUpdate ? NO_UPDATE : isRoleWithinScope(user, dialog.role) ? undefined : OUT_OF_SCOPE}
+                onClick={() => setDialog({ kind: 'edit', role: dialog.role })}
+              >
+                Edit
+              </LoadingButton>
             </>
           )
         }
       />
-      <RoleFormDialog
-        // a copy must save as a new role, so it's passed as a template, not as the role being edited
-        key={dialog.kind === 'create' && dialog.from ? `copy-${dialog.from.roleId}` : dialog.kind}
-        open={dialog.kind === 'create' || dialog.kind === 'edit'}
-        role={dialog.kind === 'edit' ? dialog.role : undefined}
-        template={dialog.kind === 'create' ? editorRole : undefined}
-        onClose={close}
-      />
+      <Suspense fallback={null}>
+        {(dialog.kind === 'create' || dialog.kind === 'edit') && (
+          <RoleFormDialog
+            // a copy must save as a new role, so it's passed as a template, not as the role being edited
+            key={dialog.kind === 'create' && dialog.from ? `copy-${dialog.from.roleId}` : dialog.kind}
+            open
+            role={dialog.kind === 'edit' ? dialog.role : undefined}
+            template={dialog.kind === 'create' ? editorRole : undefined}
+            onClose={close}
+          />
+        )}
+      </Suspense>
       <ConfirmDialog
         open={dialog.kind === 'delete'}
         title="Delete role"

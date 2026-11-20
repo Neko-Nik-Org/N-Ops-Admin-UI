@@ -15,12 +15,14 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Top bar of the dashboard: tag selector and notifications (breadcrumb and global search are commented out for now). */
+/** Top bar of the dashboard: tag selector, theme, notifications and the profile menu (breadcrumb and global search are commented out for now). */
 
 import { Bell, Menu } from 'lucide-react' // add Search back with the global search
 // import { useLocation } from 'react-router-dom'
 import { toast } from 'react-toastify'
+import { ProfileMenu } from '@/components/molecules/ProfileMenu'
 import { TagSelect } from '@/components/molecules/TagSelect'
+import { ThemeMenu } from '@/components/molecules/ThemeMenu'
 // import { pageTrail } from '@/constants/routes'
 
 /** Sticky header above every authenticated page. `onMenuClick` opens the mobile nav drawer. */
@@ -37,9 +39,6 @@ export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
         <button type="button" aria-label="Open menu" onClick={onMenuClick} className="text-text-muted hover:text-text lg:hidden">
           <Menu size={20} />
         </button>
-
-        {/* Every page is scoped to this tag */}
-        <TagSelect />
 
         {/* Breadcrumb: hidden for now
         <nav aria-label="Breadcrumb" className="hidden min-w-0 truncate text-sm sm:block">
@@ -69,7 +68,11 @@ export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
       </div>
       */}
 
-      <div className="flex flex-1 items-center justify-end gap-3 sm:gap-4">
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-3 sm:gap-4">
+        {/* Every page is scoped to this tag */}
+        <TagSelect className="min-w-0 shrink" />
+        <ThemeMenu />
+
         <button
           type="button"
           aria-label="Notifications"
@@ -79,6 +82,10 @@ export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
           <Bell size={19} />
           <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-signal" />
         </button>
+
+        <div className="border-l border-border pl-2 sm:pl-3">
+          <ProfileMenu />
+        </div>
       </div>
     </header>
   )

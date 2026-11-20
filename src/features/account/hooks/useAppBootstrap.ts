@@ -22,7 +22,7 @@ import { useSetAtom } from 'jotai'
 import { useEffect } from 'react'
 import { toast } from 'react-toastify'
 import { currentUserAtom, sessionStatusAtom, type SessionStatus } from '@/features/auth/store/session'
-import { clearSessionToken } from '@/features/auth/store/sessionToken'
+import { clearSessionToken, getSessionToken } from '@/features/auth/store/sessionToken'
 import { healthQuery } from '@/features/system/hooks/useServiceHealth'
 import { tagsQuery } from '@/features/tags/hooks/useTags'
 import { InactiveAccountError } from '../api/account'
@@ -55,7 +55,7 @@ export interface AppBootstrapState {
 }
 
 /**
- * Runs the startup steps in parallel: `/auth/verify` (via the session status), `/health/service`,
+ * Runs the startup steps in parallel, alongside `/auth/verify` when a session is saved: `/health/service`,
  * `/user/self/profile`, `/user/self/ui-info`, `/user/self/details`, `/user/self/org-info` and `/tag/list`.
  *
  * The fresh profile replaces the copy saved at sign-in, so a role changed since then is reflected
@@ -68,17 +68,22 @@ export interface AppBootstrapState {
  */
 export const useAppBootstrap = (status: SessionStatus): AppBootstrapState => {
   const signedIn = status === 'authenticated'
+  // With a saved session, start loading alongside the session check instead of after it: one round
+  // trip less on every load. If the session turns out to be invalid these fail with 401, the user is
+  // signed out, and the cache is cleared (see AppProviders).
+  const canFetch = signedIn || (status === 'checking' && !!getSessionToken())
   const results = useQueries({
-    queries: STEPS.map(({ query, needsSession }) => ({ ...query, enabled: signedIn || !needsSession })),
+    queries: STEPS.map(({ query, needsSession }) => ({ ...query, enabled: canFetch || !needsSession })),
   })
 
   const setCurrentUser = useSetAtom(currentUserAtom)
   const setStatus = useSetAtom(sessionStatusAtom)
   // same cache entry as the profile step above (one request); read separately for its type
-  const { data: profile, error: profileError } = useQuery({ ...profileQuery, enabled: signedIn })
+  const { data: profile, error: profileError } = useQuery({ ...profileQuery, enabled: canFetch })
+  // applied once the session check is done, so its stored copy of the profile can't overwrite this one
   useEffect(() => {
-    if (profile) setCurrentUser(profile)
-  }, [profile, setCurrentUser])
+    if (profile && signedIn) setCurrentUser(profile)
+  }, [profile, signedIn, setCurrentUser])
   useEffect(() => {
     if (!(profileError instanceof InactiveAccountError)) return
     toast.error(profileError.message)
@@ -90,7 +95,7 @@ export const useAppBootstrap = (status: SessionStatus): AppBootstrapState => {
   const checking = status === 'checking'
   // A request that hasn't started (waiting for the session) is unfinished but gets no status line yet.
   const unfinished = STEPS.filter((_, i) => results[i].isPending)
-  const running = unfinished.filter((step) => signedIn || !step.needsSession)
+  const running = unfinished.filter((step) => canFetch || !step.needsSession)
   const total = STEPS.length + 1
   const remaining = unfinished.length + (checking ? 1 : 0)
 

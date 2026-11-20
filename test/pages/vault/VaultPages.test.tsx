@@ -38,6 +38,8 @@ const dialog = () => screen.getByRole('dialog')
 /** Switches to the Details view (a table with columns), like Explorer's View › Details. */
 const showDetails = () => fireEvent.click(screen.getByRole('button', { name: 'Details' }))
 const preview = () => screen.getByRole('complementary', { name: 'Preview' })
+/** True when the preview pane is hidden (nothing selected). */
+const noPreview = () => screen.queryByRole('complementary', { name: 'Preview' }) === null
 /** A list card's heading, e.g. "Keys 11". */
 const heading = (name: string) => screen.getByRole('heading', { name })
 /** A folder's contents: the icon grid (default) or, in Details view, the table. */
@@ -65,7 +67,7 @@ describe('Vault explorer: the root and project folders', () => {
     openAt('/vault')
     const grid = await list('Projects')
     expect(within(grid).getAllByRole('option')).toHaveLength(4)
-    expect(within(preview()).getByText("Select a project to see what's inside.")).toBeInTheDocument()
+    expect(noPreview()).toBe(true) // the details pane only appears once something is selected
     expect(heading('Projects 4')).toBeInTheDocument()
 
     fireEvent.click(row('payments-api'))
@@ -117,12 +119,12 @@ describe('Vault explorer: the root and project folders', () => {
   it('shows the selected item in the details pane, which can be closed', async () => {
     openAt('/vault/1/env')
     await list('Contents of Env')
-    expect(within(preview()).queryByRole('button', { name: 'Close details' })).not.toBeInTheDocument()
+    expect(noPreview()).toBe(true)
 
     fireEvent.click(row('DATABASE_URL', 'staging'))
     expect(within(preview()).getByRole('heading', { name: 'DATABASE_URL' })).toBeInTheDocument()
     fireEvent.click(within(preview()).getByRole('button', { name: 'Close details' }))
-    expect(within(preview()).getByText('Select a key to see its value and history.')).toBeInTheDocument()
+    expect(noPreview()).toBe(true)
     expect(row('DATABASE_URL', 'staging')).toHaveAttribute('aria-selected', 'false')
   })
 
@@ -247,7 +249,7 @@ describe('Vault explorer: the root and project folders', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/vault/1/conf')
   })
 
-  it('shows the folder path above the title, and a folder tree that follows the open folder', async () => {
+  it('shows the folder path above the title, without a folder tree', async () => {
     openAt('/vault/1/env')
     await list('Contents of Env')
     expect(screen.getByRole('heading', { level: 1, name: 'Env' })).toBeInTheDocument()
@@ -255,16 +257,8 @@ describe('Vault explorer: the root and project folders', () => {
     expect(within(path).getByRole('link', { name: 'Vault' })).toHaveAttribute('href', '/vault')
     expect(within(path).getByRole('link', { name: 'payments-api' })).toHaveAttribute('href', '/vault/1')
 
-    const tree = screen.getByRole('tree', { name: 'Vault folders' })
-    expect(within(tree).getByRole('link', { name: /Env/ })).toHaveAttribute('aria-current', 'page')
-    expect(within(tree).getByRole('link', { name: /Notes/ })).toHaveAttribute('href', '/vault/1/notes')
-    const hrefs = () =>
-      within(tree)
-        .getAllByRole('link')
-        .map((l) => l.getAttribute('href'))
-    expect(hrefs()).not.toContain('/vault/2/conf') // other projects stay collapsed
-    fireEvent.click(within(tree).getByRole('button', { name: 'Expand web' }))
-    expect(hrefs()).toContain('/vault/2/conf')
+    // no folder tree beside the open folder
+    expect(screen.queryByRole('tree')).not.toBeInTheDocument()
   })
 
   it('goes up a level with Backspace', async () => {
@@ -333,7 +327,7 @@ describe('Vault explorer: Env', () => {
     openAt('/vault/1/env')
     await list('Contents of Env')
     showDetails()
-    expect(within(preview()).queryByRole('button', { name: 'New version' })).not.toBeInTheDocument() // nothing selected
+    expect(noPreview()).toBe(true) // nothing selected
     fireEvent.click(row('LOG_LEVEL', 'production'))
     fireEvent.click(within(preview()).getByRole('button', { name: 'New version' }))
     fireEvent.change(within(dialog()).getByLabelText('New value'), { target: { value: 'error' } })
@@ -365,7 +359,7 @@ describe('Vault explorer: Conf', () => {
   it('opens the selected file in the preview pane, saves an edit and shows the diff', async () => {
     openAt('/vault/1/conf')
     await list('Contents of Conf')
-    expect(within(preview()).getByText(/Select a file to open it/)).toBeInTheDocument()
+    expect(noPreview()).toBe(true)
     fireEvent.click(row('app.yaml', 'production'))
     const editor = await screen.findByLabelText('Contents of app.yaml')
     expect((editor as HTMLTextAreaElement).value).toContain('replicas: 4')

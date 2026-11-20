@@ -23,7 +23,7 @@ import { getServiceHealth } from '../api/health'
 export const HEALTH_POLL_MS = 60_000
 
 /**
- * Shared definition: the startup screen runs it once (useAppBootstrap) and the sidebar indicator
+ * Shared definition: the startup screen runs it once (useAppBootstrap) and the login page
  * reads the same cache entry, then re-checks every minute.
  */
 export const healthQuery = queryOptions({ queryKey: ['system', 'health'], queryFn: getServiceHealth, retry: false })

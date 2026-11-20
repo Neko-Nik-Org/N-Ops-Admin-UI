@@ -17,6 +17,9 @@
 /** Layout state for the desktop sidebar. */
 
 import { atomWithStorage } from 'jotai/utils'
+import { secureJSONStorage } from '@/lib/secureStorage'
 
-/** True when the desktop sidebar is collapsed to an icon rail; persisted to localStorage under `nops-sidebar-collapsed`. */
-export const sidebarCollapsedAtom = atomWithStorage('nops-sidebar-collapsed', false)
+/** True when the desktop sidebar is collapsed to an icon rail; persisted, encrypted, to localStorage under `nops-sidebar-collapsed`. */
+export const sidebarCollapsedAtom = atomWithStorage('nops-sidebar-collapsed', false, secureJSONStorage<boolean>(), {
+  getOnInit: true,
+})

@@ -25,7 +25,7 @@ import { useOrgInfo } from '@/features/account/hooks/useAccount'
 import { useHasPermissions } from '@/features/auth/permissions'
 import type { VaultProject } from '@/features/vault/types'
 import { formatDateTime, formatRelative } from '@/utils/format'
-import { FolderContents, FolderHeader, FolderLayout, FolderPage, ListCard, PreviewCard, PreviewHint } from './ExplorerParts'
+import { FolderContents, FolderHeader, FolderLayout, FolderPage, ListCard, PreviewCard } from './ExplorerParts'
 import { FolderGlyph } from './ExplorerIcons'
 import { plural, SECTION_ORDER, SECTIONS, vaultPath, type VaultSection } from './sections'
 import { useSectionCounts } from './useSectionCounts'
@@ -60,7 +60,7 @@ const ProjectFolderIcon = ({ projectId }: { projectId: number }) => {
 }
 
 /**
- * A project in the preview card: what's inside (the same counts as the folder tree, so other
+ * A project in the preview card: what's inside (the same counts as the project's folder list, so other
  * people's private notes aren't counted) and what you can do with it.
  */
 const ProjectPreview = ({
@@ -187,8 +187,8 @@ export const RootView = ({ projects }: { projects: readonly VaultProject[] }) =>
           </ListCard>
         }
         preview={
-          <PreviewCard onClose={selected ? () => select(null) : undefined}>
-            {selected ? (
+          selected && (
+            <PreviewCard onClose={() => select(null)}>
               <ProjectPreview
                 project={selected}
                 canRename={actions.canRename}
@@ -197,13 +197,8 @@ export const RootView = ({ projects }: { projects: readonly VaultProject[] }) =>
                 onRename={() => actions.setRenaming(selected)}
                 onDelete={() => actions.setDeleting(selected)}
               />
-            ) : (
-              <PreviewHint>
-                <span>Select a project to see what's inside.</span>
-                <span className="text-xs">Double-click to open it.</span>
-              </PreviewHint>
-            )}
-          </PreviewCard>
+            </PreviewCard>
+          )
         }
       />
       <ProjectFormDialog open={actions.creating} onClose={() => actions.setCreating(false)} onCreated={(id) => select(id)} />
@@ -286,35 +281,32 @@ export const ProjectView = ({ project }: { project: VaultProject }) => {
           </ListCard>
         }
         preview={
-          <PreviewCard onClose={selected ? () => select(null) : undefined}>
-            {selected ? (
-              (() => {
-                const { label, purpose, icon: Icon } = SECTIONS[selected.section]
-                return (
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-3">
-                      <Icon size={30} className="shrink-0 text-signal" aria-hidden="true" />
-                      <div>
-                        <h2 className="font-semibold text-text">{label}</h2>
-                        <p className="text-xs text-text-muted">Folder · {countText(selected.section)}</p>
+          selected && (
+            <PreviewCard onClose={() => select(null)}>
+              {selected
+                ? (() => {
+                    const { label, purpose, icon: Icon } = SECTIONS[selected.section]
+                    return (
+                      <div className="flex flex-col gap-4">
+                        <div className="flex items-center gap-3">
+                          <Icon size={30} className="shrink-0 text-signal" aria-hidden="true" />
+                          <div>
+                            <h2 className="font-semibold text-text">{label}</h2>
+                            <p className="text-xs text-text-muted">Folder · {countText(selected.section)}</p>
+                          </div>
+                        </div>
+                        <p className="text-sm text-text">{purpose}</p>
+                        <div className="border-t border-border pt-4">
+                          <LoadingButton size="sm" icon={<FolderOpen size={14} />} onClick={() => open(selected.section)}>
+                            Open
+                          </LoadingButton>
+                        </div>
                       </div>
-                    </div>
-                    <p className="text-sm text-text">{purpose}</p>
-                    <div className="border-t border-border pt-4">
-                      <LoadingButton size="sm" icon={<FolderOpen size={14} />} onClick={() => open(selected.section)}>
-                        Open
-                      </LoadingButton>
-                    </div>
-                  </div>
-                )
-              })()
-            ) : (
-              <PreviewHint>
-                <span>Select a folder to preview it.</span>
-                <span className="text-xs">Double-click to open it.</span>
-              </PreviewHint>
-            )}
-          </PreviewCard>
+                    )
+                  })()
+                : null}
+            </PreviewCard>
+          )
         }
       />
       <ProjectFormDialog

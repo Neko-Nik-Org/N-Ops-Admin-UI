@@ -17,7 +17,7 @@
 
 /** Options passed to `turnstile.render`. */
 /**
- * Type declarations for the Cloudflare Turnstile script loaded by index.html
+ * Type declarations for the Cloudflare Turnstile script loaded on demand by TurnstileWidget
  * (see https://developers.cloudflare.com/turnstile/).
  */
 

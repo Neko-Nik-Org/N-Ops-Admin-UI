@@ -77,9 +77,14 @@ export interface AdminUserInput {
   displayName: string
   primaryEmail: string
   roleId: number
+  /** Sent base64-encoded, like at sign-in. */
+  password: string
   isActive: boolean
   hasIpRestriction: boolean
   allowedIps: string[]
+  hasGeoRestriction: boolean
+  /** Two-letter country codes, e.g. "IN". */
+  allowedGeoLocations: string[]
 }
 
 /** A role: a permission set, optionally scoped to tags (`user_role` + `role_tag`). */

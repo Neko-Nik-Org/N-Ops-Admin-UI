@@ -22,28 +22,32 @@
  * is rendered inside the AppShell layout behind RequireAuth.
  */
 
-import type { ReactNode } from 'react'
+import { Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth, RequireGuest } from './guards'
 import { AppShell } from '@/components/templates/AppShell'
+import { ScreenLoader } from '@/components/organisms/ScreenLoader'
 import { APP_PAGES, APP_SECTIONS, ROUTES, VAULT_REDIRECTS } from '@/constants/routes'
-import { AccountPage } from '@/pages/AccountPage'
-import { AdminApiKeysPage } from '@/pages/admin/AdminApiKeysPage'
-import { AdminAuditLogsPage } from '@/pages/admin/AdminAuditLogsPage'
-import { AdminOrganizationPage } from '@/pages/admin/AdminOrganizationPage'
-import { AdminRolesPage } from '@/pages/admin/AdminRolesPage'
-import { AdminUsersPage } from '@/pages/admin/AdminUsersPage'
-import { ComingSoonPage } from '@/pages/ComingSoonPage'
-import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage'
-import { InvitePage } from '@/pages/InvitePage'
-import { LoginPage } from '@/pages/LoginPage'
-import { NotFoundPage } from '@/pages/NotFoundPage'
-import { OverviewPage } from '@/pages/OverviewPage'
-import { TagsPage } from '@/pages/TagsPage'
-import { TwoFactorPage } from '@/pages/TwoFactorPage'
-import { VaultPage } from '@/pages/vault/VaultPage'
-import { WorkflowDetailPage } from '@/pages/workflows/WorkflowDetailPage'
-import { WorkflowsPage } from '@/pages/workflows/WorkflowsPage'
+import {
+  AccountPage,
+  AdminApiKeysPage,
+  AdminAuditLogsPage,
+  AdminOrganizationPage,
+  AdminRolesPage,
+  AdminUsersPage,
+  ComingSoonPage,
+  ForgotPasswordPage,
+  InvitePage,
+  LoginPage,
+  NotFoundPage,
+  preloadLinksOnIntent,
+  OverviewPage,
+  TagsPage,
+  TwoFactorPage,
+  VaultPage,
+  WorkflowDetailPage,
+  WorkflowsPage,
+} from './lazyPages'
 
 /** Sections that have a real page; every other sidebar section renders ComingSoonPage. */
 const BUILT_PAGES: Partial<Record<string, ReactNode>> = {
@@ -58,69 +62,77 @@ const BUILT_PAGES: Partial<Record<string, ReactNode>> = {
 }
 
 /** All application routes. Sections that are not built yet render ComingSoonPage. */
-export const AppRouter = () => (
-  <BrowserRouter>
-    <Routes>
-      {/* Public, signed-out only */}
-      <Route
-        path={ROUTES.login}
-        element={
-          <RequireGuest>
-            <LoginPage />
-          </RequireGuest>
-        }
-      />
-      <Route
-        path={ROUTES.twoFactor}
-        element={
-          <RequireGuest>
-            <TwoFactorPage />
-          </RequireGuest>
-        }
-      />
-      <Route
-        path={ROUTES.forgotPassword}
-        element={
-          <RequireGuest>
-            <ForgotPasswordPage />
-          </RequireGuest>
-        }
-      />
-      <Route
-        path={ROUTES.invite}
-        element={
-          <RequireGuest>
-            <InvitePage />
-          </RequireGuest>
-        }
-      />
-      {/* Authenticated area: sidebar + topbar layout around every page below */}
-      <Route
-        element={
-          <RequireAuth>
-            <AppShell />
-          </RequireAuth>
-        }
-      >
-        {APP_PAGES.filter(({ path }) => path !== ROUTES.vault).map(({ path, title }) => (
-          <Route key={path} path={path} element={BUILT_PAGES[path] ?? <ComingSoonPage title={title} />} />
-        ))}
-        {/* Vault: a file explorer whose URL is the open folder; older Vault URLs go to its root */}
-        <Route path={ROUTES.vault} element={<VaultPage />} />
-        <Route path={ROUTES.vaultProject} element={<VaultPage />} />
-        <Route path={ROUTES.vaultSection} element={<VaultPage />} />
-        <Route path={ROUTES.workflowDetail} element={<WorkflowDetailPage />} />
-        {VAULT_REDIRECTS.map((from) => (
-          <Route key={from} path={from} element={<Navigate to={ROUTES.vault} replace />} />
-        ))}
-        {/* A group's own URL (e.g. /vault) opens its first page */}
-        {APP_SECTIONS.filter((s) => s.children?.length).map(({ path, children }) => (
-          <Route key={path} path={path} element={<Navigate to={children![0].path} replace />} />
-        ))}
-        <Route path={ROUTES.account} element={<AccountPage />} />
-      </Route>
-      {/* Anything unmatched */}
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
-  </BrowserRouter>
-)
+export const AppRouter = () => {
+  // Hovering or focusing any in-app link starts loading that page's code
+  useEffect(preloadLinksOnIntent, [])
+
+  return (
+    <BrowserRouter>
+      {/* Full-screen loading screen while a page's code downloads (sign-in pages, not-found); AppShell has its own boundary so the sidebar stays put */}
+      <Suspense fallback={<ScreenLoader messages={['Loading page']} />}>
+        <Routes>
+          {/* Public, signed-out only */}
+          <Route
+            path={ROUTES.login}
+            element={
+              <RequireGuest>
+                <LoginPage />
+              </RequireGuest>
+            }
+          />
+          <Route
+            path={ROUTES.twoFactor}
+            element={
+              <RequireGuest>
+                <TwoFactorPage />
+              </RequireGuest>
+            }
+          />
+          <Route
+            path={ROUTES.forgotPassword}
+            element={
+              <RequireGuest>
+                <ForgotPasswordPage />
+              </RequireGuest>
+            }
+          />
+          <Route
+            path={ROUTES.invite}
+            element={
+              <RequireGuest>
+                <InvitePage />
+              </RequireGuest>
+            }
+          />
+          {/* Authenticated area: sidebar + topbar layout around every page below */}
+          <Route
+            element={
+              <RequireAuth>
+                <AppShell />
+              </RequireAuth>
+            }
+          >
+            {APP_PAGES.filter(({ path }) => path !== ROUTES.vault).map(({ path, title }) => (
+              <Route key={path} path={path} element={BUILT_PAGES[path] ?? <ComingSoonPage title={title} />} />
+            ))}
+            {/* Vault: a file explorer whose URL is the open folder; older Vault URLs go to its root */}
+            <Route path={ROUTES.vault} element={<VaultPage />} />
+            <Route path={ROUTES.vaultProject} element={<VaultPage />} />
+            <Route path={ROUTES.vaultSection} element={<VaultPage />} />
+            <Route path={ROUTES.workflowDetail} element={<WorkflowDetailPage />} />
+            {VAULT_REDIRECTS.map((from) => (
+              <Route key={from} path={from} element={<Navigate to={ROUTES.vault} replace />} />
+            ))}
+            {/* A group's own URL (e.g. /vault) opens its first page */}
+            {APP_SECTIONS.filter((s) => s.children?.length).map(({ path, children }) => (
+              <Route key={path} path={path} element={<Navigate to={children![0].path} replace />} />
+            ))}
+            <Route path={ROUTES.account} element={<AccountPage />} />
+          </Route>
+          {/* Anything unmatched */}
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  )
+}

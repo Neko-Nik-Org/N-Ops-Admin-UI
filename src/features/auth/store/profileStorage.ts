@@ -22,9 +22,11 @@
  * without this a reload would forget the username, email and permissions until the startup screen
  * reloads them from `/user/self/profile`. It holds nothing secret
  * (no token); permission data in it only hides UI, and the API enforces every permission itself.
- * It is removed together with the session token (see clearSessionToken).
+ * It is stored encrypted (see lib/secureStorage) and removed together with the session token (see
+ * clearSessionToken).
  */
 
+import { secureStorage } from '@/lib/secureStorage'
 import type { CurrentUser } from '../types'
 
 const PROFILE_KEY = 'nops_profile'
@@ -56,7 +58,7 @@ const isCurrentUser = (value: unknown): value is CurrentUser => {
 /** The saved profile, or null when there is none (or storage is unavailable or holds bad data). */
 export const loadStoredProfile = (): CurrentUser | null => {
   try {
-    const raw = localStorage.getItem(PROFILE_KEY)
+    const raw = secureStorage.getItem(PROFILE_KEY)
     const parsed: unknown = raw ? JSON.parse(raw) : null
     return isCurrentUser(parsed) ? parsed : null
   } catch {
@@ -67,8 +69,8 @@ export const loadStoredProfile = (): CurrentUser | null => {
 /** Saves the profile, or removes it when `user` is null. Storage failures are ignored. */
 export const storeProfile = (user: CurrentUser | null): void => {
   try {
-    if (user) localStorage.setItem(PROFILE_KEY, JSON.stringify(user))
-    else localStorage.removeItem(PROFILE_KEY)
+    if (user) secureStorage.setItem(PROFILE_KEY, JSON.stringify(user))
+    else secureStorage.removeItem(PROFILE_KEY)
   } catch {
     // Private mode or blocked storage: the profile simply won't survive a reload.
   }

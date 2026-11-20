@@ -15,23 +15,17 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Main navigation sidebar with section links and the signed-in profile section (theme, account, sign out). */
+/** Main navigation sidebar with the section links. */
 
-import { LogOut, PanelLeftClose, PanelLeftOpen, UserCircle, X } from 'lucide-react'
-import { useAtom, useAtomValue } from 'jotai'
-import { Link, useNavigate } from 'react-router-dom'
+import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
+import { useAtom } from 'jotai'
 import { sidebarCollapsedAtom } from '@/app/sidebar'
 import { NLogo } from '@/components/atoms/NLogo'
-import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { Logo } from '@/components/atoms/Logo'
 import { NavGroup } from '@/components/molecules/NavGroup'
 import { NavItem } from '@/components/molecules/NavItem'
-import { ThemeToggle } from '@/components/molecules/ThemeToggle'
 import { APP_SECTIONS, ROUTES } from '@/constants/routes'
-import { currentUserAtom } from '@/features/auth/store/session'
 import { useOverview } from '@/features/dashboard/hooks/useOverview'
-import { useLogout } from '@/features/auth/hooks/useLogout'
-import { ServiceHealthIndicator } from '@/components/molecules/ServiceHealthIndicator'
 import { cn } from '@/utils/cn'
 
 interface SidebarProps {
@@ -44,12 +38,11 @@ interface SidebarProps {
 }
 
 /**
- * Section links and the sign-out control.
+ * Section links.
  * Used as a fixed rail on desktop (collapsible to icons, remembered per browser) and inside the
  * slide-over drawer on mobile (always expanded).
  */
 export const Sidebar = ({ variant = 'desktop', onNavigate, onClose }: SidebarProps) => {
-  const currentUser = useAtomValue(currentUserAtom)
   const [collapsedPref, setCollapsed] = useAtom(sidebarCollapsedAtom)
   const collapsed = variant === 'desktop' && collapsedPref
   // Shares the Overview page's cached query — no extra request, just the counts once they land.
@@ -59,13 +52,6 @@ export const Sidebar = ({ variant = 'desktop', onNavigate, onClose }: SidebarPro
     [ROUTES.servers]: overview?.serversTotal,
     [ROUTES.approvals]: overview?.pendingApprovalsCount ? String(overview.pendingApprovalsCount) : undefined,
   }
-  const [logoutState, logout] = useLogout()
-  const navigate = useNavigate()
-
-  /** Signs out, then returns to the login page once the button has shown success. */
-  const handleLogout = () => {
-    logout().then(() => navigate(ROUTES.login, { replace: true }))
-  }
 
   return (
     <aside
@@ -73,7 +59,7 @@ export const Sidebar = ({ variant = 'desktop', onNavigate, onClose }: SidebarPro
       className={cn(
         'shrink-0 flex-col gap-6 bg-surface py-4 transition-[width] duration-200',
         collapsed ? 'w-16 px-2' : 'w-60 px-4',
-        // Header and footer stay put; only the <nav> between them scrolls
+        // Header stays put; only the <nav> below it scrolls
         variant === 'desktop' ? 'sticky top-0 hidden h-screen border-r border-border lg:flex' : 'flex h-full',
       )}
       // Close the mobile drawer once a link is followed (not when a group is toggled)
@@ -130,36 +116,6 @@ export const Sidebar = ({ variant = 'desktop', onNavigate, onClose }: SidebarPro
           ),
         )}
       </nav>
-
-      <div className={cn('flex shrink-0 flex-col gap-3 border-t border-border pt-4', collapsed ? 'items-center' : 'px-1')}>
-        <ServiceHealthIndicator compact={collapsed} />
-        {!collapsed && (
-          <div className="flex items-center justify-between gap-2 text-sm text-text-muted">
-            <span>Theme</span>
-            <ThemeToggle />
-          </div>
-        )}
-
-        <div className={cn('flex items-center gap-2.5', collapsed && 'flex-col')}>
-          <Link
-            to={ROUTES.account}
-            className="flex flex-1 items-center gap-2 truncate text-sm text-text-muted hover:text-text"
-            title="Account"
-            aria-label={collapsed ? 'Account' : undefined}
-          >
-            <UserCircle size={16} className="shrink-0" />
-            {!collapsed && <span className="truncate">{currentUser?.displayName ?? 'Account'}</span>}
-          </Link>
-          <LoadingButton
-            variant="ghost"
-            size="sm"
-            state={logoutState}
-            icon={<LogOut size={15} />}
-            aria-label="Sign out"
-            onClick={handleLogout}
-          />
-        </div>
-      </div>
     </aside>
   )
 }

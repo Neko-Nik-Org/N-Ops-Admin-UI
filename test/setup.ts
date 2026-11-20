@@ -26,7 +26,8 @@
 
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach, vi } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
+import { initSecureStorage, resetSecureStorageForTests } from '@/lib/secureStorage'
 
 window.__NOPS_ENV__ = { API_BASE_URL: 'https://api.test', TURNSTILE_SITE_KEY: 'test-site-key' }
 
@@ -69,6 +70,12 @@ globalThis.ResizeObserver ??= class {
 
 // jsdom has no 2D canvas: the sign-in background (AuthBackground) skips drawing when this returns null
 HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext
+
+// the app decrypts saved settings before it renders; tests start from empty, ready storage
+beforeEach(async () => {
+  resetSecureStorageForTests()
+  await initSecureStorage()
+})
 
 afterEach(() => {
   cleanup()

@@ -18,6 +18,7 @@
 
 import { fireEvent, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { secureStorage } from '@/lib/secureStorage'
 import { Sidebar } from '@/components/organisms/Sidebar'
 import { api, makeUser, renderWithProviders } from '../testUtils'
 
@@ -83,7 +84,7 @@ describe('Sidebar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
     expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('title', 'Overview')
     expect(screen.queryByText('Overview')).not.toBeInTheDocument()
-    expect(localStorage.getItem('nops-sidebar-collapsed')).toBe('true')
+    expect(secureStorage.getItem('nops-sidebar-collapsed')).toBe('true')
 
     // Clicking a group icon brings the full sidebar back with that group open
     fireEvent.click(screen.getByRole('button', { name: 'Admin' }))

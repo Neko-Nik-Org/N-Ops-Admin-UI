@@ -18,6 +18,7 @@
 
 import { act, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { secureStorage } from '@/lib/secureStorage'
 import { chooseThemeAtom, themeAtom, themeUnsyncedAtom } from '@/app/theme'
 import { useUiInfoSync } from '@/features/account/hooks/useUiInfoSync'
 import { api, makeUser, renderHookWithProviders } from '../../../testUtils'
@@ -58,8 +59,8 @@ describe('useUiInfoSync', () => {
     api.get.mockResolvedValue({ data: { theme: 'dark', other: 1 } })
     api.post.mockResolvedValue({ data: {} })
     // picked on the sign-in page, before the account's preferences were known
-    localStorage.setItem('nops-theme', '"light"')
-    localStorage.setItem('nops-theme-unsynced', 'true')
+    secureStorage.setItem('nops-theme', '"light"')
+    secureStorage.setItem('nops-theme-unsynced', 'true')
     const { store } = renderHookWithProviders(() => useUiInfoSync(), { user: makeUser() })
 
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/user/self/ui-info', { theme: 'light', other: 1 }))

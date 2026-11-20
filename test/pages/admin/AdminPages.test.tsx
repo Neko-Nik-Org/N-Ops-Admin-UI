@@ -27,7 +27,7 @@ import { AdminAuditLogsPage } from '@/pages/admin/AdminAuditLogsPage'
 import { AdminOrganizationPage } from '@/pages/admin/AdminOrganizationPage'
 import { AdminRolesPage } from '@/pages/admin/AdminRolesPage'
 import { AdminUsersPage } from '@/pages/admin/AdminUsersPage'
-import { api, makeUser, rawRole, renderWithProviders, serveLiveReads } from '../../testUtils'
+import { api, makeUser, RAW_ORG_INFO, rawRole, renderWithProviders, serveLiveReads } from '../../testUtils'
 
 const render = (ui: React.ReactElement, route: string) =>
   renderWithProviders(ui, { route, user: makeUser({ permissions: ['tag:create', 'user:role:view'] }) })
@@ -114,6 +114,137 @@ describe('AdminUsersPage', () => {
     expect(within(marcus).getByText('Role #3')).toBeInTheDocument() // no real role with that id
   })
 
+  const EDITOR = ['user:view', 'user:role:view', 'user:create', 'user:edit']
+  /** Also answers the username availability check (200 = free, 409 = taken). */
+  const serveWithUsernames = (taken: string[] = []) => {
+    const reads = api.get.getMockImplementation()!
+    api.get.mockImplementation(async (url: string, config?: unknown) =>
+      url.startsWith('/user/self/user-name/check/')
+        ? { data: null, status: taken.includes(url.split('/').pop()!) ? 409 : 200 }
+        : reads(url, config as never),
+    )
+  }
+  const openUser = async (name: string) => {
+    fireEvent.click(await screen.findByText(name))
+    return within(screen.getByRole('dialog', { name: 'User details' }))
+  }
+
+  it('adds a user after checking the username, with the API rules and a matching password', async () => {
+    serveWithUsernames(['zoe'])
+    api.post.mockResolvedValue({ data: 'User created successfully and a welcome email sent' })
+    renderUsers(EDITOR)
+    fireEvent.click(await screen.findByRole('button', { name: 'Add user' }))
+    const form = within(await screen.findByRole('dialog', { name: 'Add user' }))
+    fireEvent.change(form.getByLabelText('Name'), { target: { value: 'Zoe Park' } })
+    fireEvent.change(form.getByLabelText('Username'), { target: { value: '1zoe' } })
+    fireEvent.change(form.getByLabelText('Email'), { target: { value: 'zoe@acme.dev' } })
+    await waitFor(() => expect(form.getAllByRole('option').length).toBeGreaterThan(1))
+    fireEvent.change(form.getByLabelText('Role'), { target: { value: '4' } })
+    fireEvent.change(form.getByLabelText('Password'), { target: { value: 'weak' } })
+    fireEvent.change(form.getByLabelText('Confirm password'), { target: { value: 'weak' } })
+    fireEvent.click(form.getByRole('button', { name: 'Add user' }))
+    expect(await form.findByText("Don't start with a digit.")).toBeInTheDocument()
+    expect(form.getByText('Use between 8 and 64 characters.')).toBeInTheDocument()
+
+    fireEvent.change(form.getByLabelText('Username'), { target: { value: 'zoe' } })
+    fireEvent.change(form.getByLabelText('Password'), { target: { value: 'Start#Pass1' } })
+    fireEvent.change(form.getByLabelText('Confirm password'), { target: { value: 'Start#Pass1' } })
+    fireEvent.click(form.getByRole('button', { name: 'Add user' }))
+    expect(await form.findByText('That username is taken.')).toBeInTheDocument()
+    expect(api.post).not.toHaveBeenCalled()
+
+    fireEvent.change(form.getByLabelText('Username'), { target: { value: 'zoe_park' } })
+    fireEvent.click(form.getByRole('button', { name: 'Add user' }))
+    expect(await screen.findByText("Added Zoe Park. They've been sent a welcome email.")).toBeInTheDocument()
+    expect(api.post).toHaveBeenCalledWith(
+      '/user/admin/create',
+      expect.objectContaining({ user_name: 'zoe_park', role_id: 4, password: btoa('Start#Pass1'), is_active: true }),
+    )
+  })
+
+  it("won't add a user whose email someone already has", async () => {
+    serveWithUsernames()
+    renderUsers(EDITOR)
+    fireEvent.click(await screen.findByRole('button', { name: 'Add user' }))
+    const form = within(await screen.findByRole('dialog', { name: 'Add user' }))
+    fireEvent.change(form.getByLabelText('Name'), { target: { value: 'Copy' } })
+    fireEvent.change(form.getByLabelText('Username'), { target: { value: 'copycat' } })
+    fireEvent.change(form.getByLabelText('Email'), { target: { value: 'MARCUS@acme.dev' } })
+    await waitFor(() => expect(form.getAllByRole('option').length).toBeGreaterThan(1))
+    fireEvent.change(form.getByLabelText('Role'), { target: { value: '2' } })
+    fireEvent.change(form.getByLabelText('Password'), { target: { value: 'Start#Pass1' } })
+    fireEvent.change(form.getByLabelText('Confirm password'), { target: { value: 'Start#Pass1' } })
+    fireEvent.click(form.getByRole('button', { name: 'Add user' }))
+    expect(await form.findByText('Someone in your organization already uses this email.')).toBeInTheDocument()
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('hides Add user without user:create', async () => {
+    renderUsers()
+    await screen.findByText('Marcus Chen')
+    expect(screen.queryByRole('button', { name: 'Add user' })).not.toBeInTheDocument()
+  })
+
+  it('disables Add user when every seat is taken', async () => {
+    serveLiveReads({ orgInfo: { ...RAW_ORG_INFO, current_user_count: 25 } })
+    renderUsers(EDITOR)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add user' })).toBeDisabled())
+  })
+
+  it('deactivates and deletes a user from their details, but not yourself', async () => {
+    api.patch.mockResolvedValue({ data: undefined })
+    api.delete.mockResolvedValue({ data: undefined })
+    renderUsers(EDITOR)
+    let details = await openUser('Marcus Chen')
+    fireEvent.click(await details.findByRole('button', { name: 'Deactivate' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Deactivate user' })).getByRole('button', { name: 'Deactivate' }))
+    expect(await screen.findByText('Deactivated Marcus Chen.')).toBeInTheDocument()
+    expect(api.patch).toHaveBeenCalledWith('/user/admin/deactivate/3')
+
+    fireEvent.click(details.getByRole('button', { name: 'Delete' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete user' })).getByRole('button', { name: 'Delete user' }))
+    expect(await screen.findByText('Deleted Marcus Chen.')).toBeInTheDocument()
+    expect(api.delete).toHaveBeenCalledWith('/user/admin/delete/3')
+
+    // deleting closes their details
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'User details' })).not.toBeInTheDocument())
+    details = await openUser('Neko Nik') // the signed-in user (id 1)
+    expect(await details.findByRole('button', { name: 'Delete' })).toBeDisabled()
+    expect(details.getByRole('button', { name: 'Reset password' })).toBeDisabled()
+  })
+
+  it("changes a user's username and password, and marks their email verified", async () => {
+    serveWithUsernames()
+    api.put.mockResolvedValue({ data: undefined })
+    api.patch.mockResolvedValue({ data: undefined })
+    renderUsers(EDITOR)
+    const details = await openUser('Kenji Watanabe')
+    fireEvent.click(await details.findByRole('button', { name: 'Mark email verified' }))
+    expect(await screen.findByText(/^Marked .* as verified\.$/)).toBeInTheDocument()
+
+    fireEvent.click(details.getByRole('button', { name: 'Change username' }))
+    const rename = within(await screen.findByRole('dialog', { name: /username$/ }))
+    fireEvent.change(rename.getByLabelText('New username'), { target: { value: 'kenji_w' } })
+    fireEvent.click(rename.getByRole('button', { name: 'Change username' }))
+    expect(await screen.findByText('Kenji Watanabe now signs in as @kenji_w.')).toBeInTheDocument()
+    expect(api.put).toHaveBeenCalledWith('/user/admin/change-username/7', '"kenji_w"', expect.anything())
+
+    fireEvent.click(details.getByRole('button', { name: 'Reset password' }))
+    const reset = within(await screen.findByRole('dialog', { name: /password$/ }))
+    fireEvent.change(reset.getByLabelText('New password'), { target: { value: 'New#Pass12' } })
+    fireEvent.change(reset.getByLabelText('Confirm password'), { target: { value: 'New#Pass12' } })
+    fireEvent.click(reset.getByRole('button', { name: 'Set password' }))
+    expect(await screen.findByText('Set a new password for Kenji Watanabe.')).toBeInTheDocument()
+    expect(api.put).toHaveBeenCalledWith('/user/admin/reset/password/7', JSON.stringify(btoa('New#Pass12')), expect.anything())
+  })
+
+  it('shows no actions without user:edit', async () => {
+    renderUsers()
+    const details = await openUser('Marcus Chen')
+    await details.findByText('marcus@acme.dev')
+    expect(details.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+  })
+
   it('asks for user:view instead of loading users without it', async () => {
     renderUsers([])
     expect(await screen.findByText(/You need the “View users” permission \(user:view\)/)).toBeInTheDocument()
@@ -193,7 +324,10 @@ describe('AdminRolesPage', () => {
     await screen.findByText('Operator')
     expect(screen.queryByRole('button', { name: 'New role' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Duplicate / })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^Edit / })).not.toBeInTheDocument()
+    // Edit stays visible but disabled, naming the permission the API checks
+    const edit = screen.getAllByRole('button', { name: /^Edit / })[0]!
+    expect(edit).toBeDisabled()
+    expect(edit).toHaveAttribute('title', expect.stringContaining('user:role:update'))
     expect(screen.queryByRole('button', { name: /^Delete / })).not.toBeInTheDocument()
   })
 

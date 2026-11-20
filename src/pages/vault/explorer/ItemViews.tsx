@@ -61,16 +61,7 @@ import {
 } from '@/features/vault/hooks/useVault'
 import type { ConfigFile, SecretKey, SecureNote, VaultProject } from '@/features/vault/types'
 import { formatBytes, formatDateTime, formatRelative } from '@/utils/format'
-import {
-  FolderContents,
-  FolderHeader,
-  FolderLayout,
-  FolderPage,
-  ListCard,
-  LocalOnlyBadge,
-  PreviewCard,
-  PreviewHint,
-} from './ExplorerParts'
+import { FolderContents, FolderHeader, FolderLayout, FolderPage, ListCard, LocalOnlyBadge, PreviewCard } from './ExplorerParts'
 import { FileGlyph } from './ExplorerIcons'
 import { plural, vaultPath } from './sections'
 import { useSelectedItem } from './useSelectedItem'
@@ -85,6 +76,8 @@ const useTagFilter = () => {
   const { selectedTag } = useSelectedTag()
   return {
     selectedTag,
+    /** Tag column and tile subtitle only make sense under "All tags". */
+    show: !selectedTag,
     keep: (tagId: number) => !selectedTag || tagId === selectedTag.tagId,
     note: selectedTag ? `Filtered to tag ${selectedTag.tagName}` : 'All tags',
   }
@@ -270,21 +263,25 @@ export const EnvView = ({ project }: { project: VaultProject }) => {
                   rowId={(s) => s.secretId}
                   name={(s) => <span className="font-mono">{s.name}</span>}
                   text={(s) => s.name}
-                  subtitle={(s) => tagName(s.tagId)}
+                  subtitle={tags.show ? (s) => tagName(s.tagId) : undefined}
                   bigIcon={(s) => (s.isHidden ? <FileGlyph glyph={Lock} /> : <FileGlyph glyph={KeyRound} tone="signal" />)}
                   icon={(s) =>
                     s.isHidden ? <Lock size={15} className="text-text-muted" /> : <KeyRound size={15} className="text-signal" />
                   }
                   columns={[
-                    {
-                      key: 'tag',
-                      label: 'Tag',
-                      render: (s) => (
-                        <Badge tone="accent" mono>
-                          {tagName(s.tagId)}
-                        </Badge>
-                      ),
-                    },
+                    ...(tags.show
+                      ? [
+                          {
+                            key: 'tag',
+                            label: 'Tag',
+                            render: (s: SecretKey) => (
+                              <Badge tone="accent" mono>
+                                {tagName(s.tagId)}
+                              </Badge>
+                            ),
+                          },
+                        ]
+                      : []),
                     {
                       key: 'version',
                       label: 'Version',
@@ -318,8 +315,8 @@ export const EnvView = ({ project }: { project: VaultProject }) => {
             </ListCard>
           }
           preview={
-            <PreviewCard onClose={selected ? () => select(null) : undefined}>
-              {selected ? (
+            selected && (
+              <PreviewCard onClose={() => select(null)}>
                 <KeyPreview
                   key={selected.secretId}
                   secret={selected}
@@ -328,13 +325,8 @@ export const EnvView = ({ project }: { project: VaultProject }) => {
                   onHistory={() => setHistory(selected)}
                   onDelete={() => setDeleting(selected)}
                 />
-              ) : (
-                <PreviewHint>
-                  <span>Select a key to see its value and history.</span>
-                  <span className="text-xs">Double-click a key to open its history.</span>
-                </PreviewHint>
-              )}
-            </PreviewCard>
+              </PreviewCard>
+            )
           }
         />
       </FolderPage>
@@ -430,19 +422,23 @@ export const ConfView = ({ project }: { project: VaultProject }) => {
                   rowId={(f) => f.fileId}
                   name={(f) => <span className="font-mono">{f.fileName}</span>}
                   text={(f) => f.fileName}
-                  subtitle={(f) => tagName(f.tagId)}
+                  subtitle={tags.show ? (f) => tagName(f.tagId) : undefined}
                   bigIcon={() => <FileGlyph glyph={FileCode2} tone="accent" />}
                   icon={() => <FileCode2 size={15} className="text-accent-secondary" />}
                   columns={[
-                    {
-                      key: 'tag',
-                      label: 'Tag',
-                      render: (f) => (
-                        <Badge tone="accent" mono>
-                          {tagName(f.tagId)}
-                        </Badge>
-                      ),
-                    },
+                    ...(tags.show
+                      ? [
+                          {
+                            key: 'tag',
+                            label: 'Tag',
+                            render: (f: ConfigFile) => (
+                              <Badge tone="accent" mono>
+                                {tagName(f.tagId)}
+                              </Badge>
+                            ),
+                          },
+                        ]
+                      : []),
                     { key: 'version', label: 'Version', render: (f) => `v${f.currentVersion}` },
                     { key: 'size', label: 'Size', render: (f) => formatBytes(f.sizeBytes) },
                     { key: 'modified', label: 'Modified', render: (f) => formatRelative(f.updatedAt) },
@@ -457,13 +453,11 @@ export const ConfView = ({ project }: { project: VaultProject }) => {
             </ListCard>
           }
           preview={
-            <PreviewCard onClose={selected ? () => select(null) : undefined}>
-              {selected ? (
+            selected && (
+              <PreviewCard onClose={() => select(null)}>
                 <ConfigFilePanel key={selected.fileId} file={selected} onDelete={() => setDeleting(selected)} />
-              ) : (
-                <PreviewHint>Select a file to open it.</PreviewHint>
-              )}
-            </PreviewCard>
+              </PreviewCard>
+            )
           }
         />
       </FolderPage>
@@ -581,29 +575,29 @@ export const NotesView = ({ project }: { project: VaultProject }) => {
             </ListCard>
           }
           preview={
-            <PreviewCard onClose={creating ? () => setCreating(false) : selected ? () => select(null) : undefined}>
-              {creating ? (
-                <>
-                  <h2 className="mb-4 font-semibold text-text">New note in {project.projectName}</h2>
-                  <NoteForm
-                    projectId={project.projectId}
-                    onDone={() => setCreating(false)}
-                    onSaved={({ noteId }) => {
-                      if (noteId !== undefined) select(noteId)
-                    }}
+            (creating || selected) && (
+              <PreviewCard onClose={creating ? () => setCreating(false) : selected ? () => select(null) : undefined}>
+                {creating ? (
+                  <>
+                    <h2 className="mb-4 font-semibold text-text">New note in {project.projectName}</h2>
+                    <NoteForm
+                      projectId={project.projectId}
+                      onDone={() => setCreating(false)}
+                      onSaved={({ noteId }) => {
+                        if (noteId !== undefined) select(noteId)
+                      }}
+                    />
+                  </>
+                ) : selected ? (
+                  <NotePanel
+                    key={selected.noteId}
+                    note={selected}
+                    onShare={() => setSharing(selected.noteId)}
+                    onDelete={() => setDeleting(selected)}
                   />
-                </>
-              ) : selected ? (
-                <NotePanel
-                  key={selected.noteId}
-                  note={selected}
-                  onShare={() => setSharing(selected.noteId)}
-                  onDelete={() => setDeleting(selected)}
-                />
-              ) : (
-                <PreviewHint>Select a note to read it.</PreviewHint>
-              )}
-            </PreviewCard>
+                ) : null}
+              </PreviewCard>
+            )
           }
         />
       </FolderPage>

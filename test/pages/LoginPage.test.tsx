@@ -17,14 +17,17 @@
 /** Tests for src/pages/LoginPage.tsx (with LoginForm and the Turnstile widget). */
 
 import { fireEvent, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { getSessionToken } from '@/features/auth/store/sessionToken'
 import { LoginPage } from '@/pages/LoginPage'
+import { ApiError } from '@/types/api'
 import { api, passTurnstile, renderWithProviders } from '../testUtils'
 
 const renderLogin = () => renderWithProviders(<LoginPage />, { route: '/login' })
 
-const fillAndSubmit = (userName = 'priya', password = 'secret') => {
+/** Fills the form and submits once the health check has enabled the button. */
+const fillAndSubmit = async (userName = 'priya', password = 'secret') => {
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled())
   fireEvent.change(screen.getByLabelText('Username'), { target: { value: userName } })
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: password } })
   fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
@@ -48,18 +51,23 @@ const loginSuccess = {
 }
 
 describe('LoginPage', () => {
+  beforeEach(() => {
+    api.get.mockResolvedValue({ data: 'All services are running!' })
+  })
+
   it('shows the sign-in form', () => {
     renderLogin()
     expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
     // a plain text field: usernames don't need an @, so the browser must not demand an email address
     expect(screen.getByLabelText('Username')).toHaveAttribute('type', 'text')
     expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password')
-    expect(screen.getByLabelText('Keep me signed in on this device')).not.toBeChecked()
+    expect(screen.getByLabelText('Extend your Login Session')).not.toBeChecked()
   })
 
   it('validates required fields without calling the API', async () => {
     passTurnstile()
     renderLogin()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     expect(await screen.findByText('Enter your username.')).toBeInTheDocument()
     expect(screen.getByText('Enter your password.')).toBeInTheDocument()
@@ -68,9 +76,23 @@ describe('LoginPage', () => {
 
   it('requires the Turnstile check before signing in', async () => {
     renderLogin()
-    fillAndSubmit()
+    await fillAndSubmit()
     expect(await screen.findByText('Complete the verification check before signing in.')).toBeInTheDocument()
     expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('shows the API status and enables sign-in once services are up', async () => {
+    renderLogin()
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled()
+    expect(await screen.findByText('All systems normal')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled()
+  })
+
+  it('keeps sign-in disabled while a service is down', async () => {
+    api.get.mockRejectedValue(new ApiError('Redis cache is not healthy!', 412))
+    renderLogin()
+    expect(await screen.findByText('Service problem')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeDisabled()
   })
 
   it('toggles password visibility', () => {
@@ -83,7 +105,7 @@ describe('LoginPage', () => {
     passTurnstile('cf-ok')
     api.post.mockResolvedValue({ data: loginSuccess })
     renderLogin()
-    fillAndSubmit()
+    await fillAndSubmit()
 
     expect(await screen.findByTestId('location', {}, { timeout: 2000 })).toHaveTextContent(/^\/$/)
     expect(api.post).toHaveBeenCalledWith('/auth/login', expect.objectContaining({ user_name: 'priya' }), {
@@ -102,7 +124,7 @@ describe('LoginPage', () => {
       },
     })
     renderLogin()
-    fillAndSubmit()
+    await fillAndSubmit()
 
     expect(await screen.findByTestId('location', {}, { timeout: 2000 })).toHaveTextContent('/login/verify-2fa')
     expect(getSessionToken()).toBeUndefined()
@@ -112,7 +134,7 @@ describe('LoginPage', () => {
     const turnstile = passTurnstile()
     api.post.mockRejectedValue(new Error('Invalid username or password'))
     renderLogin()
-    fillAndSubmit()
+    await fillAndSubmit()
 
     // shown in the form's error banner, not a toast
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid username or password')

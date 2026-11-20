@@ -98,14 +98,18 @@ describe('OverviewPage', () => {
     mockApi('ok')
     const { store } = renderOverview()
     await screen.findByText('2 of 2 servers')
+    expect(screen.getByRole('columnheader', { name: 'Tag' })).toBeInTheDocument()
 
     act(() => store.set(selectedTagIdAtom, 2))
     expect(await screen.findByText('1 of 2 servers')).toBeInTheDocument()
     expect(screen.queryByText('web-1')).not.toBeInTheDocument()
     expect(screen.getByText('db-1', { selector: 'p' })).toBeInTheDocument()
+    // every row shares the picked tag, so the column is dropped
+    expect(screen.queryByRole('columnheader', { name: 'Tag' })).not.toBeInTheDocument()
 
     act(() => store.set(selectedTagIdAtom, null))
     expect(screen.getByText('2 of 2 servers')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Tag' })).toBeInTheDocument()
   })
 
   it('shows a "not wired up" notice for approval actions', async () => {

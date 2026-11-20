@@ -27,10 +27,19 @@ import {
   listAuditLogs,
   updateAuditExportSchedule,
 } from '../api/auditLogs'
-import { PROFILE_KEY } from '@/features/account/hooks/useAccount'
+import { orgInfoQuery, PROFILE_KEY } from '@/features/account/hooks/useAccount'
 import { useHasPermissions } from '@/features/auth/permissions'
 import { createRole, deleteRole, fetchRole, listRoles, updateRole } from '../api/roles'
-import { createUser, deleteUser, getUser, listUsers, updateUser } from '../api/users'
+import {
+  changeUserName,
+  createUser,
+  deactivateUser,
+  deleteUser,
+  getUser,
+  listUsers,
+  resetUserPassword,
+  verifyUserEmail,
+} from '../api/users'
 import type {
   AdminUserInput,
   ApiKeyInput,
@@ -71,23 +80,29 @@ export const useAdminUsers = () => {
 export const useAdminUser = (userId: number | null) =>
   useQuery({ queryKey: [...ADMIN_KEYS.users, userId], queryFn: () => getUser(userId!), enabled: userId !== null })
 
+/** Adds a user. Also refreshes the org info, whose seat count just changed. */
 export const useCreateUser = () => {
-  const refresh = useRefresh(ADMIN_KEYS.users)
+  const refresh = useRefresh(ADMIN_KEYS.users, orgInfoQuery.queryKey)
   return useMutation({ mutationFn: (input: AdminUserInput) => createUser(input), onSuccess: refresh })
 }
 
-export const useUpdateUser = () => {
-  const refresh = useRefresh(ADMIN_KEYS.users)
-  return useMutation({
-    mutationFn: ({ userId, input }: { userId: number; input: AdminUserInput }) => updateUser(userId, input),
-    onSuccess: refresh,
-  })
+/** A change to one user: refreshes the list (and the open user) afterwards, even when it failed half-way. */
+const useUserMutation = <T>(run: (args: T) => Promise<void>, ...extraKeys: ReadonlyArray<readonly string[]>) => {
+  const refresh = useRefresh(ADMIN_KEYS.users, ...extraKeys)
+  return useMutation({ mutationFn: run, onSettled: refresh })
 }
 
-export const useDeleteUser = () => {
-  const refresh = useRefresh(ADMIN_KEYS.users)
-  return useMutation({ mutationFn: (userId: number) => deleteUser(userId), onSuccess: refresh })
-}
+export const useChangeUserName = () =>
+  useUserMutation(({ userId, userName }: { userId: number; userName: string }) => changeUserName(userId, userName))
+
+export const useResetUserPassword = () =>
+  useUserMutation(({ userId, password }: { userId: number; password: string }) => resetUserPassword(userId, password))
+
+export const useVerifyUserEmail = () => useUserMutation((userId: number) => verifyUserEmail(userId))
+
+export const useDeactivateUser = () => useUserMutation((userId: number) => deactivateUser(userId))
+
+export const useDeleteUser = () => useUserMutation((userId: number) => deleteUser(userId), orgInfoQuery.queryKey)
 
 // ── Roles ────────────────────────────────────────────────
 

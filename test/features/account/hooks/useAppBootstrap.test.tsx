@@ -22,6 +22,7 @@ import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { useAppBootstrap } from '@/features/account/hooks/useAppBootstrap'
 import { currentUserAtom, sessionStatusAtom } from '@/features/auth/store/session'
+import { setSessionToken } from '@/features/auth/store/sessionToken'
 import { api, makeUser, renderHookWithProviders } from '../../../testUtils'
 
 const rawProfile = {
@@ -51,6 +52,19 @@ describe('useAppBootstrap', () => {
     const { result } = renderHookWithProviders(() => useAppBootstrap('checking'))
     expect(result.current.pendingLabels).toEqual(['Checking your session', 'Checking N-Ops services'])
     expect(result.current.ready).toBe(false)
+  })
+
+  it('starts the startup requests alongside the session check when a session is saved', async () => {
+    setSessionToken('saved', false)
+    serve(rawProfile)
+    const saved = makeUser({ permissions: ['tag:create'] })
+    const { result, store } = renderHookWithProviders(() => useAppBootstrap('checking'), { user: saved })
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('/user/self/profile'))
+    expect(api.get).toHaveBeenCalledWith('/tag/list')
+    await waitFor(() => expect(result.current.pendingLabels).toEqual(['Checking your session']))
+    expect(result.current.ready).toBe(false) // still waits for the session check
+    // the fresh profile is only applied once the session check has finished
+    expect(store.get(currentUserAtom)).toEqual(saved)
   })
 
   it('counts each finished step towards progress, and is ready once all seven are done', async () => {

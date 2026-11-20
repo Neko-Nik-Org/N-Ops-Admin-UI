@@ -20,7 +20,17 @@ import moment from 'moment'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createApiKey, listApiKeys } from '@/features/admin/api/apiKeys'
 import { exportAuditLogs, listAuditLogs, retentionStart } from '@/features/admin/api/auditLogs'
-import { createUser, deleteUser, getUser, listUsers, updateUser } from '@/features/admin/api/users'
+import {
+  changeUserName,
+  createUser,
+  deactivateUser,
+  deleteUser,
+  getUser,
+  listUsers,
+  resetUserPassword,
+  verifyUserEmail,
+} from '@/features/admin/api/users'
+import { ApiError } from '@/types/api'
 import { db, resetAdminMock } from '@/mocks/adminDb'
 import type { AdminUserInput } from '@/features/admin/types'
 import { api, rawAdminUser } from '../../testUtils'
@@ -30,9 +40,12 @@ const newUser: AdminUserInput = {
   displayName: 'Zoe Park',
   primaryEmail: 'zoe@acme.dev',
   roleId: 4,
+  password: 'Start#Pass1',
   isActive: true,
   hasIpRestriction: false,
   allowedIps: ['1.2.3.4'],
+  hasGeoRestriction: true,
+  allowedGeoLocations: ['IN'],
 }
 
 beforeEach(() => resetAdminMock())
@@ -54,10 +67,45 @@ describe('users', () => {
     await expect(getUser(99)).rejects.toThrow('That user no longer exists.')
   })
 
-  it("says creating, editing and removing users aren't available yet", async () => {
-    await expect(createUser(newUser)).rejects.toThrow("Adding users isn't available yet")
-    await expect(updateUser(1, newUser)).rejects.toThrow("Editing users isn't available yet")
-    await expect(deleteUser(1)).rejects.toThrow("Removing users isn't available yet")
+  it('creates a user with a base64 password, dropping lists whose restriction is off', async () => {
+    api.post.mockResolvedValueOnce({ data: 'User created successfully and a welcome email sent' })
+    expect(await createUser(newUser)).toEqual({ welcomeEmailSent: true })
+    expect(api.post).toHaveBeenCalledWith('/user/admin/create', {
+      user_name: 'zoe',
+      display_name: 'Zoe Park',
+      primary_email: 'zoe@acme.dev',
+      user_details: {},
+      is_active: true,
+      role_id: 4,
+      password: btoa('Start#Pass1'),
+      has_ip_restriction: false,
+      has_geo_restriction: true,
+      allowed_ips: [],
+      allowed_geo_locations: ['IN'],
+    })
+  })
+
+  it('treats a failed welcome email as created, and explains the bare database error', async () => {
+    api.post.mockRejectedValueOnce(new ApiError('Email sending error (E131)', 417, 'E131'))
+    expect(await createUser(newUser)).toEqual({ welcomeEmailSent: false })
+    api.post.mockRejectedValueOnce(new ApiError('SQL Database error (E112)', 417, 'E112'))
+    await expect(createUser(newUser)).rejects.toThrow(/username or email may already be in use/)
+    api.post.mockRejectedValueOnce(new ApiError('Failed to create user in the database', 400))
+    await expect(createUser(newUser)).rejects.toThrow('That role no longer exists.')
+  })
+
+  it('calls the per-user admin endpoints', async () => {
+    const json = { headers: { 'Content-Type': 'application/json' } }
+    await changeUserName(3, 'marcus_c')
+    expect(api.put).toHaveBeenCalledWith('/user/admin/change-username/3', '"marcus_c"', json)
+    await resetUserPassword(3, 'New#Pass1')
+    expect(api.put).toHaveBeenCalledWith('/user/admin/reset/password/3', JSON.stringify(btoa('New#Pass1')), json)
+    await verifyUserEmail(3)
+    expect(api.patch).toHaveBeenCalledWith('/user/admin/verify-email/3')
+    await deactivateUser(3)
+    expect(api.patch).toHaveBeenCalledWith('/user/admin/deactivate/3')
+    await deleteUser(3)
+    expect(api.delete).toHaveBeenCalledWith('/user/admin/delete/3')
   })
 })
 

@@ -22,48 +22,29 @@
  */
 
 import * as yup from 'yup'
+import { firstFailure, PASSWORD_RULES, USERNAME_RULES, type Rules } from './policies'
 
-/** Length in UTF-8 bytes, which is what the API's Rust `str::len()` counts. */
-const byteLength = (value: string): number => new TextEncoder().encode(value).length
-
-/** Password rules, in the order the API checks them. Each returns an error message or null. */
-const PASSWORD_RULES: Array<[test: (v: string) => boolean, message: string]> = [
-  [(v) => byteLength(v) >= 8 && byteLength(v) <= 64, 'Use between 8 and 64 characters.'],
-  [(v) => /\p{Lu}/u.test(v), 'Add at least one uppercase letter.'],
-  [(v) => /\p{Ll}/u.test(v), 'Add at least one lowercase letter.'],
-  [(v) => /[0-9]/.test(v), 'Add at least one digit.'],
-  [(v) => /[^\p{L}\p{N}]/u.test(v), 'Add at least one special character.'],
-]
-
-/** Username rules, in the order the API checks them. */
-const USERNAME_RULES: Array<[test: (v: string) => boolean, message: string]> = [
-  [(v) => v.length >= 3 && v.length <= 100, 'Use between 3 and 100 characters.'],
-  [(v) => /^[A-Za-z0-9_]+$/.test(v), 'Use only letters (A–Z), digits and underscores.'],
-  [(v) => !/^[0-9]/.test(v), "Don't start with a digit."],
-  [(v) => !v.includes('__'), "Don't use two underscores in a row."],
-  [(v) => !v.startsWith('_') && !v.endsWith('_'), "Don't start or end with an underscore."],
-]
-
-/** First rule a value breaks, or null when it passes them all. */
-const firstFailure = (rules: typeof PASSWORD_RULES, value: string): string | null =>
-  rules.find(([test]) => !test(value))?.[1] ?? null
-
-/** The policy message for an invalid username, or null when the API would accept it. */
-export const usernamePolicyError = (value: string): string | null => firstFailure(USERNAME_RULES, value)
+export { usernamePolicyError } from './policies'
 
 /**
  * Adds one yup test per rule, so the field shows the first rule it breaks.
  * Generic over the caller's exact string schema (e.g. `.required()`), so its type isn't widened.
  */
-const withRules = <S extends yup.StringSchema<any, any, any, any>>(schema: S, rules: typeof PASSWORD_RULES): S =>
+const withRules = <S extends yup.StringSchema<any, any, any, any>>(schema: S, rules: Rules): S =>
   schema.test('policy', function check(value: string | undefined) {
     const message = firstFailure(rules, value ?? '')
     return message ? this.createError({ message }) : true
   })
 
+/** A username field with the API's rules (also used when an admin adds or renames a user). */
+export const usernameField = (requiredMessage: string) => withRules(yup.string().trim().required(requiredMessage), USERNAME_RULES)
+
+/** A password field with the API's rules (also used when an admin adds a user or resets a password). */
+export const passwordField = (requiredMessage: string) => withRules(yup.string().required(requiredMessage), PASSWORD_RULES)
+
 /** New password plus confirmation. No current password: the API authorizes the change by session alone. */
 export const changePasswordSchema = yup.object({
-  newPassword: withRules(yup.string().required('Enter a new password.'), PASSWORD_RULES),
+  newPassword: passwordField('Enter a new password.'),
   confirmPassword: yup
     .string()
     .required('Type the new password again.')
@@ -75,7 +56,7 @@ export type ChangePasswordFormValues = yup.InferType<typeof changePasswordSchema
 
 /** New username; pass the current one as `context.currentUserName` to reject "no change". */
 export const changeUsernameSchema = yup.object({
-  userName: withRules(yup.string().trim().required('Enter a new username.'), USERNAME_RULES).test(
+  userName: usernameField('Enter a new username.').test(
     'changed',
     'That is already your username.',
     (value, ctx) => value !== (ctx.options.context as { currentUserName?: string } | undefined)?.currentUserName,

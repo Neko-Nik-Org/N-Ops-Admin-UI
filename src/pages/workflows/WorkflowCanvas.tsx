@@ -27,6 +27,7 @@ import { resolvedThemeAtom } from '@/app/theme'
 import { NODE_TYPES, nodeSummary } from '@/features/workflows/describe'
 import { NODE_HANDLES } from '@/features/workflows/api/workflows'
 import type { EdgeHandle, StepStatus, Workflow, WorkflowNode } from '@/features/workflows/types'
+import { LOW_POWER } from '@/lib/lowPower'
 import { cn } from '@/utils/cn'
 
 const STATUS_RING: Record<StepStatus, string> = {
@@ -134,7 +135,8 @@ export const WorkflowCanvas = ({
           strokeWidth: 1.5,
           strokeDasharray: e.sourceHandle === 'error' ? '5 4' : undefined,
         },
-        animated: statuses?.[e.source] === 'success' && statuses?.[e.target] === 'success',
+        // the moving dashes repaint every frame, so they're off on low-power devices
+        animated: !LOW_POWER && statuses?.[e.source] === 'success' && statuses?.[e.target] === 'success',
       })),
     [workflow.edges, statuses],
   )

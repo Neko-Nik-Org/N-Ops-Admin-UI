@@ -991,3 +991,28 @@
     transition: none;
   }
 }
+
+/*
+ * Low-power mode (<html data-low-power>, set at startup on older or weaker machines, see
+ * src/lib/lowPower.ts): no glass blur, which is re-computed whenever anything behind it changes,
+ * and no looping decoration. The panels get a little more opaque so text stays easy to read.
+ */
+:root[data-low-power] .n-auth {
+  --n-auth-glass: rgba(10, 14, 20, 0.92);
+  --n-auth-card-top: rgba(18, 25, 35, 0.97);
+  --n-auth-card-bottom: rgba(9, 13, 19, 0.98);
+}
+:root[data-low-power][data-theme='light'] .n-auth {
+  --n-auth-glass: rgba(255, 255, 255, 0.95);
+  --n-auth-card-top: rgba(255, 255, 255, 0.98);
+  --n-auth-card-bottom: rgba(248, 250, 252, 0.99);
+}
+:root[data-low-power] .n-auth * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+:root[data-low-power] .n-auth__dot,
+:root[data-low-power] .n-auth-card::after,
+:root[data-low-power] .n-auth-sent {
+  animation: none !important;
+}

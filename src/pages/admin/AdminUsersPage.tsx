@@ -16,24 +16,45 @@
  */
 /**
  * Admin › Users (/admin/users): people in the organization, from `/user/admin/list`. Click someone to
- * see their details on the right (from `/user/admin/fetch/{id}`). Adding, editing and removing users
- * come once the API has endpoints for them.
+ * see their details (from `/user/admin/fetch/{id}`) and act on them: change their username, set a new
+ * password, mark their email verified, deactivate or delete them (all need `user:edit`). Adding needs
+ * `user:create` + `user:role:view`. There's no endpoint yet for editing a user's name, email, role or
+ * sign-in restrictions.
  */
 
-import { Globe, Lock, Mail, ShieldCheck } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
+import { AtSign, Ban, BadgeCheck, Globe, KeyRound, Lock, Mail, ShieldCheck, Trash2, UserPlus } from 'lucide-react'
+import { Suspense, useMemo, useState, type ReactNode } from 'react'
 import { Badge } from '@/components/atoms/Badge'
 import { Select } from '@/components/atoms/Select'
+import { useAtomValue } from 'jotai'
+import { toast } from 'react-toastify'
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog'
 import { Dialog } from '@/components/molecules/Dialog'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { useOrgInfo } from '@/features/account/hooks/useAccount'
+import { currentUserAtom } from '@/features/auth/store/session'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'
 import { SkeletonText, TableSkeleton } from '@/components/molecules/Skeleton'
-import { useAdminUser, useAdminUsers, useRoleOptions } from '@/features/admin/hooks/useAdmin'
+import {
+  useAdminUser,
+  useAdminUsers,
+  useDeactivateUser,
+  useDeleteUser,
+  useRoleOptions,
+  useVerifyUserEmail,
+} from '@/features/admin/hooks/useAdmin'
 import type { AdminUser } from '@/features/admin/types'
 import { useHasPermissions } from '@/features/auth/permissions'
 import { errorStatus } from '@/types/api'
 import { cn } from '@/utils/cn'
 import { formatDateTime, formatRelative } from '@/utils/format'
+import { lazyNamed, usePreloadWhenIdle } from '@/utils/lazyNamed'
+
+// the form dialogs bring react-hook-form and yup, which the table doesn't need: they load after it
+const UserFormDialog = lazyNamed(() => import('@/components/organisms/UserFormDialog'), 'UserFormDialog')
+const RenameUserDialog = lazyNamed(() => import('@/components/organisms/UserActionDialogs'), 'RenameUserDialog')
+const ResetPasswordDialog = lazyNamed(() => import('@/components/organisms/UserActionDialogs'), 'ResetPasswordDialog')
 
 /** Initials for the avatar, e.g. "Priya Rao" → "PR". */
 const initials = (name: string) =>
@@ -87,7 +108,16 @@ const List = ({ items, empty }: { items: string[]; empty: string }) =>
   )
 
 /** The picked user, fetched fresh from the API. */
-const UserDetails = ({ userId, roleName }: { userId: number; roleName: (id: number) => string }) => {
+const UserDetails = ({
+  userId,
+  roleName,
+  actions,
+}: {
+  userId: number
+  roleName: (id: number) => string
+  /** Buttons for this user, under the details. */
+  actions?: (user: AdminUser) => ReactNode
+}) => {
   const { data: user, isLoading, error } = useAdminUser(userId)
   if (isLoading) return <SkeletonText lines={8} />
   if (error || !user) return <p className="text-sm text-danger">{error?.message ?? 'Could not load this user.'}</p>
@@ -154,6 +184,7 @@ const UserDetails = ({ userId, roleName }: { userId: number; roleName: (id: numb
         <dt className="text-text-muted">Joined</dt>
         <dd className="text-text">{formatDateTime(user.createdAt)}</dd>
       </dl>
+      {actions?.(user)}
     </div>
   )
 }
@@ -167,6 +198,19 @@ export const AdminUsersPage = () => {
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [action, setAction] = useState<{ kind: 'rename' | 'password' | 'deactivate' | 'delete'; user: AdminUser } | null>(null)
+  const me = useAtomValue(currentUserAtom)
+  const canCreate = useHasPermissions('user:view', 'user:create', 'user:role:view')
+  // every change to an existing user, deleting included, needs user:edit in the API
+  const canEdit = useHasPermissions('user:view', 'user:edit')
+  const { data: org } = useOrgInfo()
+  const seatsFull = !!org && org.users.current >= org.users.limit
+  const { mutateAsync: verifyEmail, isPending: verifying } = useVerifyUserEmail()
+  const { mutateAsync: deactivate } = useDeactivateUser()
+  const { mutateAsync: remove } = useDeleteUser()
+  const closeAction = () => setAction(null)
+  usePreloadWhenIdle(canView && (canCreate || canEdit), UserFormDialog.preload, RenameUserDialog.preload)
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -179,7 +223,92 @@ export const AdminUsersPage = () => {
   }, [users, search, roleFilter, statusFilter])
   const selected = visible.some((u) => u.userId === selectedId) ? selectedId : null
 
-  const header = <PageHeader title="Users" />
+  const header = (
+    <PageHeader
+      title="Users"
+      actions={
+        canView &&
+        canCreate && (
+          <LoadingButton
+            icon={<UserPlus size={15} />}
+            disabled={seatsFull}
+            title={seatsFull ? `Your plan's ${org?.users.limit} seats are all in use.` : undefined}
+            onClick={() => setAdding(true)}
+          >
+            Add user
+          </LoadingButton>
+        )
+      }
+    />
+  )
+
+  /** What the signed-in admin can do to `user`, shown under their details. */
+  const userActions = (user: AdminUser) => {
+    if (!canEdit) return null
+    const isMe = user.userId === me?.userId
+    const notSelf = isMe ? 'Use the Account page to change your own account.' : undefined
+    return (
+      <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+        <LoadingButton
+          variant="secondary"
+          size="sm"
+          icon={<AtSign size={14} />}
+          disabled={isMe}
+          title={notSelf}
+          onClick={() => setAction({ kind: 'rename', user })}
+        >
+          Change username
+        </LoadingButton>
+        <LoadingButton
+          variant="secondary"
+          size="sm"
+          icon={<KeyRound size={14} />}
+          disabled={isMe}
+          title={notSelf}
+          onClick={() => setAction({ kind: 'password', user })}
+        >
+          Reset password
+        </LoadingButton>
+        {!user.isEmailVerified && (
+          <LoadingButton
+            variant="secondary"
+            size="sm"
+            icon={<BadgeCheck size={14} />}
+            state={verifying ? 'loading' : 'idle'}
+            onClick={() =>
+              verifyEmail(user.userId)
+                .then(() => toast.success(`Marked ${user.primaryEmail} as verified.`))
+                .catch((error: Error) => toast.error(error.message))
+            }
+          >
+            Mark email verified
+          </LoadingButton>
+        )}
+        {user.isActive && (
+          <LoadingButton
+            variant="secondary"
+            size="sm"
+            icon={<Ban size={14} />}
+            disabled={isMe}
+            title={notSelf}
+            onClick={() => setAction({ kind: 'deactivate', user })}
+          >
+            Deactivate
+          </LoadingButton>
+        )}
+        <LoadingButton
+          variant="danger"
+          size="sm"
+          icon={<Trash2 size={14} />}
+          disabled={isMe}
+          title={notSelf}
+          onClick={() => setAction({ kind: 'delete', user })}
+        >
+          Delete
+        </LoadingButton>
+      </div>
+    )
+  }
 
   if (!canView || errorStatus(error) === 403)
     return (
@@ -291,8 +420,50 @@ export const AdminUsersPage = () => {
           </section>
 
           <Dialog open={selected !== null} onClose={() => setSelectedId(null)} size="lg" title="User details">
-            {selected !== null && <UserDetails key={selected} userId={selected} roleName={roleName} />}
+            {selected !== null && <UserDetails key={selected} userId={selected} roleName={roleName} actions={userActions} />}
           </Dialog>
+
+          <Suspense fallback={null}>
+            {adding && <UserFormDialog open onClose={() => setAdding(false)} />}
+            {action?.kind === 'rename' && <RenameUserDialog user={action.user} onClose={closeAction} />}
+            {action?.kind === 'password' && <ResetPasswordDialog user={action.user} onClose={closeAction} />}
+          </Suspense>
+          <ConfirmDialog
+            open={action?.kind === 'deactivate'}
+            title="Deactivate user"
+            confirmLabel="Deactivate"
+            successMessage={action ? `Deactivated ${action.user.displayName}.` : ''}
+            onConfirm={() => (action ? deactivate(action.user.userId) : Promise.resolve())}
+            onClose={closeAction}
+          >
+            {action && (
+              <p>
+                <span className="font-medium text-text">{action.user.displayName}</span> won't be able to sign in. Their data is
+                kept. There's no way to reactivate them from here yet.
+              </p>
+            )}
+          </ConfirmDialog>
+          <ConfirmDialog
+            open={action?.kind === 'delete'}
+            title="Delete user"
+            confirmLabel="Delete user"
+            successMessage={action ? `Deleted ${action.user.displayName}.` : ''}
+            onConfirm={() =>
+              action
+                ? remove(action.user.userId).then(() => {
+                    if (selectedId === action.user.userId) setSelectedId(null)
+                  })
+                : Promise.resolve()
+            }
+            onClose={closeAction}
+          >
+            {action && (
+              <p>
+                Permanently delete <span className="font-medium text-text">{action.user.displayName}</span> (@
+                {action.user.userName})? Their notes and everything else they own go too. This can't be undone.
+              </p>
+            )}
+          </ConfirmDialog>
         </>
       )}
     </div>

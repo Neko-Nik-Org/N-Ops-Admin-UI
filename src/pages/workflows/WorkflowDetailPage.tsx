@@ -20,7 +20,7 @@
  */
 
 import { Check, ChevronRight, Play, Trash2, X } from 'lucide-react'
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { Badge } from '@/components/atoms/Badge'
@@ -28,7 +28,7 @@ import { Switch } from '@/components/atoms/Switch'
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { PageHeader } from '@/components/molecules/PageHeader'
-import { SkeletonText } from '@/components/molecules/Skeleton'
+import { Skeleton, SkeletonText } from '@/components/molecules/Skeleton'
 import { useTagOptions } from '@/features/admin/hooks/useTagOptions'
 import { describeTrigger, RUN_STATUS, STEP_STATUS } from '@/features/workflows/describe'
 import {
@@ -44,7 +44,9 @@ import { cn } from '@/utils/cn'
 import { formatDateTime, formatRelative } from '@/utils/format'
 import { workflowPath } from './paths'
 import { StepDetails } from './StepDetails'
-import { WorkflowCanvas } from './WorkflowCanvas'
+
+// The canvas pulls in @xyflow/react (and its CSS): load it only once a workflow is on screen
+const WorkflowCanvas = lazy(() => import('./WorkflowCanvas').then((m) => ({ default: m.WorkflowCanvas })))
 
 /** The right-hand pane's title bar, with a close button when something is picked. */
 const PaneHeader = ({ title, onClose }: { title: string; onClose?: () => void }) => (
@@ -277,7 +279,13 @@ export const WorkflowDetailPage = () => {
       </div>
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <WorkflowCanvas workflow={workflow} statuses={statuses} selectedNodeId={nodeId} onSelect={setNodeId} />
+        <Suspense
+          fallback={
+            <Skeleton height="100%" radius={12} className="h-[28rem] lg:h-[34rem]" aria-label="Loading workflow canvas" />
+          }
+        >
+          <WorkflowCanvas workflow={workflow} statuses={statuses} selectedNodeId={nodeId} onSelect={setNodeId} />
+        </Suspense>
         <aside
           aria-label="Details"
           className="min-w-0 rounded-xl border border-border bg-surface-raised p-5 lg:max-h-[34rem] lg:overflow-auto"

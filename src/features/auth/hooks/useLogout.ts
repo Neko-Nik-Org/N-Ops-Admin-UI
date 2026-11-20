@@ -15,7 +15,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Sign-out hook used by the sidebar account row. */
+/** Sign-out hook used by the Topbar profile menu. */
 
 import { useSetAtom } from 'jotai'
 import { useAsyncAction } from '@/hooks/useAsyncAction'

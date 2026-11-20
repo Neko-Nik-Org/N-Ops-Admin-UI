@@ -15,12 +15,15 @@
  * <https://www.gnu.org/licenses/>.
  */
 /**
- * Users in the organization (`/user/admin/*`). Listing and fetching one user are live (both need
- * `user:view`). Creating, editing and removing users are still commented out in the API, so those
- * calls fail with a clear message until they exist.
+ * Users in the organization (`/user/admin/*`). Everything here needs `user:view`; creating also needs
+ * `user:create` + `user:role:view`, and every change to an existing user needs `user:edit` (deleting
+ * included: the API checks `user:edit`, not `user:delete`). There is no endpoint yet for editing a
+ * user's name, email, role or sign-in restrictions (`users::update_user` is still commented out).
  */
 
 import { apiClient } from '@/lib/axios'
+import { ApiError, errorCode } from '@/types/api'
+import { toBase64 } from '@/utils/base64'
 import type { AdminUser, AdminUserInput } from '../types'
 
 /** A user as `/user/admin/list` and `/user/admin/fetch/{id}` return it (`UserProfileListing`). */
@@ -96,15 +99,73 @@ export const getUser = async (userId: number): Promise<AdminUser> => {
   return toAdminUser(data)
 }
 
-const notYet = (what: string): never => {
-  throw new Error(`${what} isn't available yet: the API has no endpoint for it.`)
+/** Error codes the API returns when the welcome email fails, which happens after the user was saved. */
+const EMAIL_ERRORS = new Set(['E122', 'E131', 'E132'])
+
+/**
+ * `POST /user/admin/create`. The API saves the user, then sends a welcome email; if only the email
+ * fails it still answers with an error, so that case resolves with `welcomeEmailSent: false`.
+ */
+export const createUser = async (input: AdminUserInput): Promise<{ welcomeEmailSent: boolean }> => {
+  try {
+    await apiClient.post('/user/admin/create', {
+      user_name: input.userName,
+      display_name: input.displayName,
+      primary_email: input.primaryEmail,
+      user_details: {},
+      is_active: input.isActive,
+      role_id: input.roleId,
+      password: toBase64(input.password),
+      has_ip_restriction: input.hasIpRestriction,
+      has_geo_restriction: input.hasGeoRestriction,
+      allowed_ips: input.hasIpRestriction ? input.allowedIps : [],
+      allowed_geo_locations: input.hasGeoRestriction ? input.allowedGeoLocations : [],
+    })
+    return { welcomeEmailSent: true }
+  } catch (error) {
+    const code = errorCode(error)
+    if (code && EMAIL_ERRORS.has(code)) return { welcomeEmailSent: false }
+    // a taken username or email and a full plan all come back as a bare database error
+    if (code === 'E112')
+      throw new ApiError(
+        "Couldn't add the user. The username or email may already be in use, or your plan's user limit is reached. (E112)",
+        (error as ApiError).status,
+        code,
+      )
+    // the role isn't in this organization (deleted since the list loaded)
+    if (error instanceof ApiError && error.message.startsWith('Failed to create user'))
+      throw new ApiError('That role no longer exists. Refresh and pick another one.', error.status, code)
+    throw error
+  }
 }
 
-/** Not in the API yet (`users::create_user` is commented out). */
-export const createUser = async (_input: AdminUserInput): Promise<AdminUser> => notYet('Adding users')
+/** JSON-encoded string body, as the API's `web::Json<String>` endpoints expect. */
+const jsonString = (value: string) => [JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } }] as const
 
-/** Not in the API yet (`users::update_user` is commented out). */
-export const updateUser = async (_userId: number, _input: AdminUserInput): Promise<void> => notYet('Editing users')
+/** `PUT /user/admin/change-username/{id}`. The API applies the same username rules as sign-up. */
+export const changeUserName = async (userId: number, userName: string): Promise<void> => {
+  await apiClient.put(`/user/admin/change-username/${userId}`, ...jsonString(userName))
+}
 
-/** Not in the API yet (`users::delete_user` is commented out). */
-export const deleteUser = async (_userId: number): Promise<void> => notYet('Removing users')
+/** `PUT /user/admin/reset/password/{id}` — sets a new password for the user (sent base64-encoded). */
+export const resetUserPassword = async (userId: number, password: string): Promise<void> => {
+  await apiClient.put(`/user/admin/reset/password/${userId}`, ...jsonString(toBase64(password)))
+}
+
+/** `PATCH /user/admin/verify-email/{id}` — marks the user's email as verified without a code. */
+export const verifyUserEmail = async (userId: number): Promise<void> => {
+  await apiClient.patch(`/user/admin/verify-email/${userId}`)
+}
+
+/** `PATCH /user/admin/deactivate/{id}` — the user can no longer sign in. The API has no way to reactivate yet. */
+export const deactivateUser = async (userId: number): Promise<void> => {
+  await apiClient.patch(`/user/admin/deactivate/${userId}`)
+}
+
+/**
+ * `DELETE /user/admin/delete/{id}` — permanently deletes the user and their data (their notes too).
+ * A user who is already gone answers 226, which counts as done.
+ */
+export const deleteUser = async (userId: number): Promise<void> => {
+  await apiClient.delete(`/user/admin/delete/${userId}`)
+}

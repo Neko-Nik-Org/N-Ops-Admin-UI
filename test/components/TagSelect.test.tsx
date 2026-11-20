@@ -18,6 +18,7 @@
 
 import { fireEvent, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { secureStorage } from '@/lib/secureStorage'
 import { TagSelect } from '@/components/molecules/TagSelect'
 import { selectedTagIdAtom } from '@/features/tags/store/selectedTag'
 import { api, makeUser, renderWithProviders } from '../testUtils'
@@ -44,14 +45,14 @@ describe('TagSelect', () => {
     const { store } = renderSelect()
     fireEvent.change(await screen.findByRole('combobox', { name: 'Tag' }), { target: { value: '2' } })
     expect(store.get(selectedTagIdAtom)).toBe(2)
-    expect(localStorage.getItem('nops-selected-tag')).toBe('2')
+    expect(secureStorage.getItem('nops-selected-tag')).toBe('2')
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Tag' }), { target: { value: 'all' } })
     expect(store.get(selectedTagIdAtom)).toBeNull()
   })
 
   it('falls back to "All tags" when the saved tag no longer exists', async () => {
-    localStorage.setItem('nops-selected-tag', '99')
+    secureStorage.setItem('nops-selected-tag', '99')
     renderSelect()
     expect(await screen.findByRole('combobox', { name: 'Tag' })).toHaveDisplayValue('All tags')
   })

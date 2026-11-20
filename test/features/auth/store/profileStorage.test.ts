@@ -19,6 +19,7 @@
 
 import { createStore } from 'jotai'
 import { describe, expect, it } from 'vitest'
+import { secureStorage } from '@/lib/secureStorage'
 import { loadStoredProfile, storeProfile } from '@/features/auth/store/profileStorage'
 import { currentUserAtom } from '@/features/auth/store/session'
 import { clearSessionToken, setSessionToken } from '@/features/auth/store/sessionToken'
@@ -31,7 +32,7 @@ describe('profileStorage', () => {
   })
 
   it.each(['not json', '{"userName":"x"}', 'null', '[]'])('ignores bad stored data: %s', (raw) => {
-    localStorage.setItem('nops_profile', raw)
+    secureStorage.setItem('nops_profile', raw)
     expect(loadStoredProfile()).toBeNull()
   })
 
@@ -58,7 +59,7 @@ describe('profileStorage', () => {
   })
 
   it('ignores a saved profile whose scope fields have the wrong type', () => {
-    localStorage.setItem('nops_profile', JSON.stringify({ ...makeUser(), allowedLinuxUsers: 'deploy' }))
+    secureStorage.setItem('nops_profile', JSON.stringify({ ...makeUser(), allowedLinuxUsers: 'deploy' }))
     expect(loadStoredProfile()).toBeNull()
   })
 })

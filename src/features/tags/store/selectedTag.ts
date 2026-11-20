@@ -17,6 +17,9 @@
 /** The tag the whole dashboard is scoped to, chosen in the Topbar's TagSelect. */
 
 import { atomWithStorage } from 'jotai/utils'
+import { secureJSONStorage } from '@/lib/secureStorage'
 
-/** Selected tag id, or null for "All tags"; persisted to localStorage under `nops-selected-tag`. */
-export const selectedTagIdAtom = atomWithStorage<number | null>('nops-selected-tag', null)
+/** Selected tag id, or null for "All tags"; persisted, encrypted, to localStorage under `nops-selected-tag`. */
+export const selectedTagIdAtom = atomWithStorage<number | null>('nops-selected-tag', null, secureJSONStorage<number | null>(), {
+  getOnInit: true,
+})

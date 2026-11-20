@@ -14,7 +14,10 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Create / edit user dialog for Admin › Users. */
+/**
+ * Add-user dialog for Admin › Users (`POST /user/admin/create`). The API has no endpoint for editing
+ * a user's details yet, so this only adds; renaming and password resets have their own dialogs.
+ */
 
 import { yupResolver } from '@hookform/resolvers/yup'
 import { useForm, useWatch } from 'react-hook-form'
@@ -23,53 +26,80 @@ import { Input } from '@/components/atoms/Input'
 import { Select } from '@/components/atoms/Select'
 import { Switch } from '@/components/atoms/Switch'
 import { Textarea } from '@/components/atoms/Textarea'
-import { LoadingButton } from '@/components/molecules/LoadingButton'
-import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { Dialog } from '@/components/molecules/Dialog'
 import { FormField } from '@/components/molecules/FormField'
-import { useCreateUser, useRoleOptions, useUpdateUser } from '@/features/admin/hooks/useAdmin'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { isUsernameAvailable } from '@/features/account/api/account'
+import { useAdminUsers, useCreateUser, useRoleOptions } from '@/features/admin/hooks/useAdmin'
 import { splitList, userSchema, type UserFormValues } from '@/features/admin/schema/adminSchemas'
-import type { AdminUser, AdminUserInput } from '@/features/admin/types'
+import { useAsyncAction } from '@/hooks/useAsyncAction'
 
-/** The form itself; mounted only while the dialog is open, so it always starts from `user`. */
-const UserForm = ({ user, onClose }: { user?: AdminUser; onClose: () => void }) => {
+const UserForm = ({ onClose }: { onClose: () => void }) => {
   const { roles, canView: canViewRoles } = useRoleOptions()
+  const { data: users = [] } = useAdminUsers()
   const { mutateAsync: create } = useCreateUser()
-  const { mutateAsync: update } = useUpdateUser()
-  const [state, save] = useAsyncAction(
-    async (input: AdminUserInput): Promise<void> => {
-      if (user) await update({ userId: user.userId, input })
-      else await create(input)
-    },
-    { successMs: 500 },
-  )
+  const [state, save] = useAsyncAction(create, { successMs: 500 })
 
   const {
     register,
     handleSubmit,
     control,
+    setError,
     formState: { errors },
   } = useForm<UserFormValues>({
     resolver: yupResolver(userSchema),
     defaultValues: {
-      userName: user?.userName ?? '',
-      displayName: user?.displayName ?? '',
-      primaryEmail: user?.primaryEmail ?? '',
-      roleId: user?.roleId ?? 0,
-      isActive: user?.isActive ?? true,
-      hasIpRestriction: user?.hasIpRestriction ?? false,
-      allowedIps: user?.allowedIps.join('\n') ?? '',
+      userName: '',
+      displayName: '',
+      primaryEmail: '',
+      roleId: 0,
+      password: '',
+      confirmPassword: '',
+      isActive: true,
+      hasIpRestriction: false,
+      allowedIps: '',
+      hasGeoRestriction: false,
+      allowedGeoLocations: '',
     },
   })
   const hasIpRestriction = useWatch({ control, name: 'hasIpRestriction' })
+  const hasGeoRestriction = useWatch({ control, name: 'hasGeoRestriction' })
 
-  const onSubmit = (v: UserFormValues) =>
-    save({ ...v, roleId: Number(v.roleId), allowedIps: splitList(v.allowedIps) })
-      .then(() => {
-        toast.success(user ? `Saved ${v.displayName}.` : `Added ${v.displayName}. They'll get an email to set a password.`)
-        setTimeout(onClose, 500)
+  const onSubmit = async (v: UserFormValues) => {
+    // the API reports a taken username or email only as a bare database error, so check first
+    const email = v.primaryEmail.toLowerCase()
+    if (users.some((u) => u.primaryEmail.toLowerCase() === email)) {
+      setError('primaryEmail', { message: 'Someone in your organization already uses this email.' })
+      return
+    }
+    try {
+      if (!(await isUsernameAvailable(v.userName))) {
+        setError('userName', { message: 'That username is taken.' })
+        return
+      }
+    } catch {
+      // the check is only a courtesy; the API still refuses a taken username
+    }
+    try {
+      const { welcomeEmailSent } = await save({
+        userName: v.userName,
+        displayName: v.displayName,
+        primaryEmail: v.primaryEmail,
+        roleId: Number(v.roleId),
+        password: v.password,
+        isActive: v.isActive,
+        hasIpRestriction: v.hasIpRestriction,
+        allowedIps: splitList(v.allowedIps),
+        hasGeoRestriction: v.hasGeoRestriction,
+        allowedGeoLocations: splitList(v.allowedGeoLocations).map((c) => c.toUpperCase()),
       })
-      .catch((error: Error) => toast.error(error.message))
+      if (welcomeEmailSent) toast.success(`Added ${v.displayName}. They've been sent a welcome email.`)
+      else toast.warning(`Added ${v.displayName}, but the welcome email couldn't be sent. Share their sign-in details yourself.`)
+      setTimeout(onClose, 500)
+    } catch (error) {
+      toast.error((error as Error).message)
+    }
+  }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
@@ -100,6 +130,7 @@ const UserForm = ({ user, onClose }: { user?: AdminUser; onClose: () => void }) 
           id="primaryEmail"
           type="email"
           placeholder="priya@company.com"
+          autoComplete="off"
           hasError={!!errors.primaryEmail}
           {...register('primaryEmail')}
         />
@@ -123,9 +154,33 @@ const UserForm = ({ user, onClose }: { user?: AdminUser; onClose: () => void }) 
           </p>
         )}
       </FormField>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormField id="password" label="Password" error={errors.password?.message}>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            hasError={!!errors.password}
+            {...register('password')}
+          />
+        </FormField>
+        <FormField id="confirmPassword" label="Confirm password" error={errors.confirmPassword?.message}>
+          <Input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            hasError={!!errors.confirmPassword}
+            {...register('confirmPassword')}
+          />
+        </FormField>
+      </div>
+      <p className="-mt-2 text-xs text-text-muted">
+        8–64 characters with an uppercase letter, a lowercase letter, a digit and a symbol. The welcome email doesn't include it,
+        so share it with them yourself.
+      </p>
 
       <div className="flex flex-col gap-4 rounded-lg border border-border p-4">
-        <Switch label="Active" description="Inactive users can't sign in. Their history is kept." {...register('isActive')} />
+        <Switch label="Active" description="Inactive users can't sign in." {...register('isActive')} />
         <Switch
           label="Restrict by IP address"
           description="Only allow sign-in from the addresses below."
@@ -143,41 +198,45 @@ const UserForm = ({ user, onClose }: { user?: AdminUser; onClose: () => void }) 
             />
           </FormField>
         )}
+        <Switch
+          label="Restrict by country"
+          description="Only allow sign-in from the countries below."
+          {...register('hasGeoRestriction')}
+        />
+        {hasGeoRestriction && (
+          <FormField id="allowedGeoLocations" label="Allowed countries" error={errors.allowedGeoLocations?.message}>
+            <Input
+              id="allowedGeoLocations"
+              placeholder="IN, US"
+              className="font-mono"
+              hasError={!!errors.allowedGeoLocations}
+              {...register('allowedGeoLocations')}
+            />
+          </FormField>
+        )}
       </div>
 
       <div className="flex justify-end gap-2 pt-1">
         <LoadingButton variant="ghost" onClick={onClose}>
           Cancel
         </LoadingButton>
-        <LoadingButton
-          type="submit"
-          state={state}
-          loadingText={user ? 'Saving' : 'Adding'}
-          successText={user ? 'Saved' : 'Added'}
-        >
-          {user ? 'Save changes' : 'Add user'}
+        <LoadingButton type="submit" state={state} loadingText="Adding" successText="Added">
+          Add user
         </LoadingButton>
       </div>
     </form>
   )
 }
 
-/** Props for UserFormDialog. */
-interface UserFormDialogProps {
-  open: boolean
-  /** The user being edited; omit to add a new one. */
-  user?: AdminUser
-  onClose: () => void
-}
-
-/** Adds a user, or edits `user` when given. */
-export const UserFormDialog = ({ open, user, onClose }: UserFormDialogProps) => (
+/** Adds a user to the organization. */
+export const UserFormDialog = ({ open, onClose }: { open: boolean; onClose: () => void }) => (
   <Dialog
     open={open}
     onClose={onClose}
-    title={user ? `Edit ${user.displayName}` : 'Add user'}
-    description={user ? undefined : 'They get an email to set their password, and sign in with the role you pick.'}
+    size="lg"
+    title="Add user"
+    description="They sign in with the username and password you set here, and get the role you pick."
   >
-    <UserForm user={user} onClose={onClose} />
+    <UserForm onClose={onClose} />
   </Dialog>
 )

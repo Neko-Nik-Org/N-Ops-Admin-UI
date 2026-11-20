@@ -137,16 +137,18 @@ In local dev, `public/env.js` is an empty placeholder, so the `VITE_*` values fr
 
 ## CI/CD
 
-- **`.github/workflows/ci.yml`** runs on every PR and every push to `main`, with no secrets. It
-  lints, type-checks, tests, and builds. Then it builds the Docker image and smoke-tests it: the
-  container starts, writes `env.js`, serves the SPA including deep routes, and refuses to start
-  without config.
-- **`.github/workflows/docker-build-and-deploy.yaml`** runs on pushes to `main` and on tags. It
-  pushes `neko7nik/n-ops-admin-ui:latest` and `:<branch|tag>` to Docker Hub, then deploys to the
-  maintainers' server over SSH.
+**`.github/workflows/ci.yml`** is the whole pipeline, and it builds the Docker image once per run:
 
-  It needs these repo secrets: `DOCKER_USERNAME`, `DOCKER_PASSWORD`, `SSH_PRIVATE_KEY`,
-  `SERVER_IP`. Forks don't have them, so this workflow only does useful work in the upstream repo.
+1. **verify**: formats, lints, type-checks, tests and builds the app.
+2. **docker**: builds the image and smoke-tests it. The container must start, write `env.js`, serve
+   the SPA including deep routes, and refuse to start without config. On a push to `main` or a tag,
+   it then pushes that same image (taken from the build cache, not rebuilt) to Docker Hub as
+   `neko7nik/n-ops-admin-ui:latest` and `:<branch|tag>`.
+3. **deploy** (pushes only): pulls the new image on the maintainers' server over SSH.
+
+Pull requests run steps 1 and 2 without pushing and use no secrets. Pushes need these repo secrets:
+`DOCKER_USERNAME`, `DOCKER_PASSWORD`, `SSH_PRIVATE_KEY`, `SERVER_IP`. Forks don't have them, so
+publishing and deploying only work in the upstream repo.
 
 ### Self-hosting on a server
 

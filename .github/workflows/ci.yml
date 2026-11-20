@@ -1,15 +1,21 @@
-name: CI
+name: CI/CD
 
-# Checks only, no secrets: safe for pull requests. Publishing and deploying is in
-# docker-build-and-deploy.yaml (push to main / tags).
+# One pipeline, one image build:
+#   pull requests     -> verify, build the image and smoke-test it (no secrets used)
+#   push to main/tags -> the same, then push that image to Docker Hub and deploy it
 on:
   pull_request:
   push:
     branches: [main]
+    tags: ["*"]
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # superseded PR runs are cancelled; runs on main/tags queue so a deploy is never cut off halfway
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
@@ -38,6 +44,8 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
+      # The only real build. Its layers go to the GitHub Actions cache so the push step below
+      # reuses them instead of building again.
       - name: Build image
         uses: docker/build-push-action@v5
         with:
@@ -45,6 +53,8 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: n-ops-admin-ui:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       # the container must start, write env.js from its environment, and serve the app
       - name: Smoke test
@@ -63,3 +73,52 @@ jobs:
       - name: Container logs
         if: always()
         run: docker logs admin-ui || true
+
+      # Push-only from here: these steps use registry secrets, so they never run for pull requests.
+      - name: Login to Docker Hub
+        if: github.event_name == 'push'
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Every layer comes from the cache filled above, so this only exports the tested image
+      # (plus its SBOM and provenance, which a `load` build can't carry).
+      - name: Push image
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          sbom: true
+          provenance: true
+          cache-from: type=gha
+          tags: |
+            neko7nik/n-ops-admin-ui:latest
+            neko7nik/n-ops-admin-ui:${{ github.ref_name }}
+
+  deploy:
+    needs: docker
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure SSH
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy to Server
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+        run: |
+          ssh -o StrictHostKeyChecking=no root@$SERVER_IP << 'EOF'
+            set -e
+            cd /srv/n-ops-admin-ui
+            # The image has no URLs baked in; without runtime config the app can't reach the API.
+            test -f .env || { echo "Missing /srv/n-ops-admin-ui/.env"; exit 1; }
+            grep -q "env_file" docker-compose.y*ml || { echo "docker-compose on the server has no env_file: .env"; exit 1; }
+            docker compose pull
+            docker compose up -d
+            docker ps
+          EOF

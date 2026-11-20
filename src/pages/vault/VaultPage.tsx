@@ -20,7 +20,7 @@
  * - Env: deployment credentials and application secrets;
  * - Conf: deployable configuration files;
  * - Notes: human-readable sensitive information, docs, recovery instructions and procedures.
- * A folder tree sits beside the open folder, which is laid out like the app's other pages.
+ * The open folder is laid out like the app's other pages.
  */
 
 import type { ReactNode } from 'react'
@@ -31,10 +31,9 @@ import { useVaultProjects } from '@/features/vault/hooks/useVault'
 import { errorStatus } from '@/types/api'
 import { ProjectView, RootView } from './explorer/FolderViews'
 import { ConfView, EnvView, NotesView } from './explorer/ItemViews'
-import { NavTree } from './explorer/NavTree'
 import { isSection, vaultPath } from './explorer/sections'
 
-/** The folder tree beside the open folder. */
+/** The open Vault folder. */
 export const VaultPage = () => {
   const params = useParams<{ projectId?: string; section?: string }>()
   const { data: projects, isLoading, error } = useVaultProjects()
@@ -85,10 +84,5 @@ export const VaultPage = () => {
   else if (project) content = <ProjectView key={key} project={project} />
   else content = <RootView key={key} projects={projects ?? []} />
 
-  return (
-    <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[13rem_minmax(0,1fr)]">
-      <NavTree projects={projects ?? []} projectId={project?.projectId ?? null} section={section} />
-      <div className="min-w-0">{content}</div>
-    </div>
-  )
+  return <div className="min-w-0">{content}</div>
 }

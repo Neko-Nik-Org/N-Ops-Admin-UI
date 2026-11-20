@@ -17,8 +17,9 @@
 
 /** Layout for every signed-in page: sidebar, top bar and the routed page content. */
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { Outlet } from 'react-router-dom'
+import { ScreenLoader } from '@/components/organisms/ScreenLoader'
 import { Sidebar } from '@/components/organisms/Sidebar'
 import { Topbar } from '@/components/organisms/Topbar'
 import { useUiInfoSync } from '@/features/account/hooks/useUiInfoSync'
@@ -49,9 +50,12 @@ export const AppShell = () => {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onMenuClick={() => setMobileNavOpen(true)} />
-        <main className="flex-1 overflow-x-hidden p-4 sm:p-6">
+        <main className="relative flex-1 overflow-x-hidden p-4 sm:p-6">
           {/* The current route's page */}
-          <Outlet />
+          {/* While a page's code downloads: the loading screen over the content area; sidebar and top bar stay */}
+          <Suspense fallback={<ScreenLoader contained messages={['Loading page']} />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

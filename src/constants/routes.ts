@@ -90,7 +90,7 @@ export const APP_SECTIONS: readonly AppSection[] = [
     icon: Boxes,
     children: [{ path: ROUTES.postgres, title: 'Postgres' }],
   },
-  // one link: the Vault page is a file explorer with its own folder tree
+  // one link: the Vault page is a file explorer that navigates its own folders
   { path: ROUTES.vault, title: 'Vault', icon: Lock },
   { path: ROUTES.approvals, title: 'Approvals', icon: CheckCircle2 },
   { path: ROUTES.metrics, title: 'Metrics', icon: LineChart },

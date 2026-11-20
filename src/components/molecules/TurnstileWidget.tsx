@@ -32,7 +32,23 @@ interface TurnstileWidgetProps {
   theme?: 'light' | 'dark' | 'auto'
 }
 
-/** Renders the Cloudflare Turnstile widget via the global script tag loaded in index.html. */
+/** Cloudflare's script; added to the page the first time a widget mounts (sign-in only). */
+const TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+
+/**
+ * Adds the Turnstile script once. Loading it here instead of in index.html keeps the third-party
+ * script (and its cookies) off every page that doesn't sign in.
+ */
+const loadTurnstileScript = () => {
+  if (window.turnstile || document.querySelector(`script[src="${TURNSTILE_SRC}"]`)) return
+  const script = document.createElement('script')
+  script.src = TURNSTILE_SRC
+  script.async = true
+  script.defer = true
+  document.head.appendChild(script)
+}
+
+/** Renders the Cloudflare Turnstile widget, loading Cloudflare's script on first use. */
 export const TurnstileWidget = ({ onVerify, onExpire, resetKey = 0, theme = 'auto' }: TurnstileWidgetProps) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const widgetIdRef = useRef<string | undefined>(undefined)
@@ -58,6 +74,7 @@ export const TurnstileWidget = ({ onVerify, onExpire, resetKey = 0, theme = 'aut
     }
 
     /** The Turnstile script loads asynchronously: retry until it is ready, then render once. */
+    loadTurnstileScript()
     pollId = setInterval(render, 100)
     render()
 
