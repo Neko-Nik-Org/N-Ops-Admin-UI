@@ -38,7 +38,10 @@ const loaders = {
   InvitePage: () => import('@/pages/InvitePage'),
   LoginPage: () => import('@/pages/LoginPage'),
   NotFoundPage: () => import('@/pages/NotFoundPage'),
+  OrganizationDetailPage: () => import('@/pages/superAdmin/OrganizationDetailPage'),
+  OrganizationsPage: () => import('@/pages/superAdmin/OrganizationsPage'),
   OverviewPage: () => import('@/pages/OverviewPage'),
+  SuperAdminShell: () => import('@/pages/superAdmin/SuperAdminShell'),
   TagsPage: () => import('@/pages/TagsPage'),
   TwoFactorPage: () => import('@/pages/TwoFactorPage'),
   VaultPage: () => import('@/pages/vault/VaultPage'),
@@ -62,6 +65,9 @@ export const InvitePage = page(loaders.InvitePage, 'InvitePage')
 export const LoginPage = page(loaders.LoginPage, 'LoginPage')
 export const NotFoundPage = page(loaders.NotFoundPage, 'NotFoundPage')
 export const OverviewPage = page(loaders.OverviewPage, 'OverviewPage')
+export const SuperAdminShell = page(loaders.SuperAdminShell, 'SuperAdminShell')
+export const OrganizationsPage = page(loaders.OrganizationsPage, 'OrganizationsPage')
+export const OrganizationDetailPage = page(loaders.OrganizationDetailPage, 'OrganizationDetailPage')
 export const TagsPage = page(loaders.TagsPage, 'TagsPage')
 export const TwoFactorPage = page(loaders.TwoFactorPage, 'TwoFactorPage')
 export const VaultPage = page(loaders.VaultPage, 'VaultPage')
@@ -87,6 +93,8 @@ const ROUTE_LOADERS: Array<[pattern: string, load: () => Promise<unknown>]> = [
   [ROUTES.vaultProject, loaders.VaultPage],
   [ROUTES.vault, loaders.VaultPage],
   [ROUTES.account, loaders.AccountPage],
+  [ROUTES.superAdminOrganization, loaders.OrganizationDetailPage],
+  [ROUTES.superAdmin, loaders.OrganizationsPage],
 ]
 
 /** Sidebar sections without a real page yet open the "coming soon" page. */

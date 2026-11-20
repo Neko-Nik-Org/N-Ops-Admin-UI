@@ -35,6 +35,10 @@ interface NavItemProps {
 }
 
 /** Router link with an icon that highlights itself while its route is active. */
+/**
+ * Icons sit at the same spot whether the rail is collapsed or not (centred in the 4 rem rail), and
+ * the label and badge fade instead of disappearing, so collapsing and expanding animate smoothly.
+ */
 export const NavItem = ({ to, icon: Icon, label, badge, end, collapsed = false }: NavItemProps) => (
   <NavLink
     to={to}
@@ -43,25 +47,34 @@ export const NavItem = ({ to, icon: Icon, label, badge, end, collapsed = false }
     aria-label={collapsed ? label : undefined}
     className={({ isActive }) =>
       cn(
-        'relative flex items-center gap-3 rounded-md py-2 text-sm transition-colors duration-150',
-        collapsed ? 'justify-center px-0' : 'px-3',
+        'relative flex items-center gap-3 rounded-md py-2 pr-3 text-sm whitespace-nowrap transition-colors duration-150',
+        Icon ? 'pl-[15px]' : 'pl-3',
         isActive ? 'bg-signal/15 font-medium text-signal' : 'text-text-muted hover:bg-surface-raised hover:text-text',
       )
     }
   >
     {Icon && <Icon size={17} className="shrink-0" />}
-    {collapsed ? (
-      typeof badge === 'string' && <span className="absolute top-1.5 right-2.5 size-1.5 rounded-full bg-warning" />
-    ) : (
-      <>
-        <span className="flex-1 truncate">{label}</span>
-        {badge !== undefined &&
-          (typeof badge === 'number' ? (
-            <span className="text-xs text-text-muted">{badge}</span>
-          ) : (
-            <span className="rounded-full bg-warning/15 px-1.5 py-0.5 font-mono text-xs text-warning">{badge}</span>
-          ))}
-      </>
+    <span
+      aria-hidden={collapsed || undefined}
+      className={cn('flex flex-1 items-center gap-3 overflow-hidden transition-opacity duration-200', collapsed && 'opacity-0')}
+    >
+      <span className="flex-1 truncate">{label}</span>
+      {badge !== undefined &&
+        (typeof badge === 'number' ? (
+          <span className="text-xs text-text-muted">{badge}</span>
+        ) : (
+          <span className="rounded-full bg-warning/15 px-1.5 py-0.5 font-mono text-xs text-warning">{badge}</span>
+        ))}
+    </span>
+    {/* on the rail an accented badge becomes a dot */}
+    {typeof badge === 'string' && (
+      <span
+        aria-hidden="true"
+        className={cn(
+          'absolute top-1.5 left-[30px] size-1.5 rounded-full bg-warning transition-opacity duration-200',
+          collapsed ? 'opacity-100' : 'opacity-0',
+        )}
+      />
     )}
   </NavLink>
 )

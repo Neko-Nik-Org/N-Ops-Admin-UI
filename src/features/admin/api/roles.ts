@@ -105,7 +105,7 @@ export const createRole = async (input: RoleInput): Promise<void> => {
   })
 }
 
-/** `PATCH /user/roles/update/info/{id}` — renames / re-describes a role. Requires `user:role:view` + `user:role:update`. */
+/** `PATCH /user/roles/update/info/{id}` — renames / re-describes a role. Requires `user:role:view` + `user:role:edit`. */
 export const updateRoleInfo = async (roleId: number, input: Pick<RoleInput, 'roleName' | 'roleDescription'>): Promise<void> => {
   await apiClient.patch(`/user/roles/update/info/${roleId}`, {
     role_name: input.roleName,
@@ -115,7 +115,7 @@ export const updateRoleInfo = async (roleId: number, input: Pick<RoleInput, 'rol
 
 /**
  * `PUT /user/roles/update/permissions/{id}` — replaces the role's permissions, tags, Linux users and
- * approval flags. Requires `user:role:view` + `user:role:update`.
+ * approval flags. Requires `user:role:view` + `user:role:edit`.
  */
 export const updateRolePermissions = async (roleId: number, input: RoleInput): Promise<void> => {
   await apiClient.put(`/user/roles/update/permissions/${roleId}`, toRawPermissions(input))

@@ -22,7 +22,7 @@
  * sign-in restrictions.
  */
 
-import { AtSign, Ban, BadgeCheck, Globe, KeyRound, Lock, Mail, ShieldCheck, Trash2, UserPlus } from 'lucide-react'
+import { AtSign, Ban, BadgeCheck, KeyRound, Lock, Mail, ShieldCheck, Trash2, UserPlus } from 'lucide-react'
 import { Suspense, useMemo, useState, type ReactNode } from 'react'
 import { Badge } from '@/components/atoms/Badge'
 import { Select } from '@/components/atoms/Select'
@@ -31,6 +31,7 @@ import { toast } from 'react-toastify'
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog'
 import { Dialog } from '@/components/molecules/Dialog'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { ProfileDetailsView } from '@/components/organisms/ProfileDetailsView'
 import { useOrgInfo } from '@/features/account/hooks/useAccount'
 import { currentUserAtom } from '@/features/auth/store/session'
 import { PageHeader } from '@/components/molecules/PageHeader'
@@ -121,7 +122,6 @@ const UserDetails = ({
   const { data: user, isLoading, error } = useAdminUser(userId)
   if (isLoading) return <SkeletonText lines={8} />
   if (error || !user) return <p className="text-sm text-danger">{error?.message ?? 'Could not load this user.'}</p>
-  const details = Object.entries(user.userDetails).filter(([, v]) => v !== null && v !== '')
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
@@ -159,20 +159,14 @@ const UserDetails = ({
           <p className="text-sm text-text">Locations: {user.hasGeoRestriction ? 'restricted' : 'any'}</p>
           {user.hasGeoRestriction && <List items={user.allowedGeoLocations} empty="No locations allowed." />}
         </Section>
-
-        {details.length > 0 && (
-          <Section icon={<Globe size={13} aria-hidden="true" />} title="Details">
-            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
-              {details.map(([k, v]) => (
-                <div key={k} className="contents">
-                  <dt className="text-text-muted">{k.replace(/_/g, ' ')}</dt>
-                  <dd className="break-words text-text">{typeof v === 'string' ? v : JSON.stringify(v)}</dd>
-                </div>
-              ))}
-            </dl>
-          </Section>
-        )}
       </div>
+
+      {/* the person's own profile details (work, contact, availability, on call, engineering…) */}
+      {Object.keys(user.userDetails).length > 0 && (
+        <div className="border-t border-border pt-4">
+          <ProfileDetailsView raw={user.userDetails} />
+        </div>
+      )}
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 border-t border-border pt-4 text-sm">
         <dt className="text-text-muted">Last sign-in</dt>

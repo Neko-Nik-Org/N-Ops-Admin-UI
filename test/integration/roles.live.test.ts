@@ -23,8 +23,8 @@
  *
  * Needs a disposable database with tags production (1), staging (2) and development (3), and users
  * (password `Start#Pass1`), each with their own role:
- *   - `root`   — Root: tag:create/edit/delete + user:role:view/create/update/delete, all tags, both approval flags
- *   - `scoped` — Scoped: tag:create + user:role:view/create/update/delete, tag 1 only, Linux user `deploy`
+ *   - `root`   — Root: tag:create/edit/delete + user:role:view/create/edit/delete, all tags, both approval flags
+ *   - `scoped` — Scoped: tag:create + user:role:view/create/edit/delete, tag 1 only, Linux user `deploy`
  *   - `viewer` — Viewer: user:role:view only
  * plus a Turnstile verify URL that always succeeds. The API's ALLOWED_ORIGINS must include https://localhost.
  */

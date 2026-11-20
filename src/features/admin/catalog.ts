@@ -52,7 +52,7 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
     permissions: [
       { key: 'user:role:view', label: 'View roles' },
       { key: 'user:role:create', label: 'Create roles' },
-      { key: 'user:role:update', label: 'Edit roles' },
+      { key: 'user:role:edit', label: 'Edit roles' },
       { key: 'user:role:delete', label: 'Delete roles' },
     ],
   },
@@ -140,7 +140,7 @@ export const PERMISSION_MATRIX: readonly PermissionSection[] = [
       { label: 'Users', actions: { view: 'user:view', create: 'user:create', edit: 'user:edit', delete: 'user:delete' } },
       {
         label: 'Roles',
-        actions: { view: 'user:role:view', create: 'user:role:create', edit: 'user:role:update', delete: 'user:role:delete' },
+        actions: { view: 'user:role:view', create: 'user:role:create', edit: 'user:role:edit', delete: 'user:role:delete' },
       },
       {
         label: 'API keys',

@@ -21,6 +21,7 @@
  */
 
 import { apiClient } from '@/lib/axios'
+import { ApiError, errorCode, errorStatus } from '@/types/api'
 import type { JsonObject } from '@/features/account/types'
 import { rememberProjects } from '@/mocks/vaultDb'
 import type { VaultContainerInput, VaultProject } from '../types'
@@ -113,10 +114,21 @@ const toBody = (input: VaultContainerInput, details: JsonObject = {}) => ({
 
 /**
  * `POST /vault/project/create` — needs `vault:project:view` + `vault:project:create`. Responds 201
- * with no body (so no id); 422 "Organization has reached its project quota" when the plan is full.
+ * with no body (so no id). A full plan comes back as a bare "E112: SQL Database error" (the API's
+ * "Project limit reached" message is lost on the way), so that is explained here.
  */
 export const createVaultProject = async (input: VaultContainerInput): Promise<void> => {
-  await apiClient.post('/vault/project/create', toBody(input))
+  try {
+    await apiClient.post('/vault/project/create', toBody(input))
+  } catch (error) {
+    if (errorCode(error) === 'E112')
+      throw new ApiError(
+        "Couldn't create the project. Your plan's vault project limit may be reached: delete a project or raise the limit. (E112)",
+        errorStatus(error),
+        'E112',
+      )
+    throw error
+  }
 }
 
 /**

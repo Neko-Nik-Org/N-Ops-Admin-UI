@@ -17,11 +17,10 @@
 
 /** Main navigation sidebar with the section links. */
 
-import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
+import { PanelLeftClose, X } from 'lucide-react'
 import { useAtom } from 'jotai'
 import { sidebarCollapsedAtom } from '@/app/sidebar'
 import { NLogo } from '@/components/atoms/NLogo'
-import { Logo } from '@/components/atoms/Logo'
 import { NavGroup } from '@/components/molecules/NavGroup'
 import { NavItem } from '@/components/molecules/NavItem'
 import { APP_SECTIONS, ROUTES } from '@/constants/routes'
@@ -57,8 +56,9 @@ export const Sidebar = ({ variant = 'desktop', onNavigate, onClose }: SidebarPro
     <aside
       aria-label="Main navigation"
       className={cn(
-        'shrink-0 flex-col gap-6 bg-surface py-4 transition-[width] duration-200',
-        collapsed ? 'w-16 px-2' : 'w-60 px-4',
+        // only the width animates; padding stays the same so nothing inside shifts sideways
+        'shrink-0 flex-col gap-6 overflow-hidden bg-surface px-2 py-4 transition-[width] duration-200 ease-out',
+        collapsed ? 'w-16' : 'w-60',
         // Header stays put; only the <nav> below it scrolls
         variant === 'desktop' ? 'sticky top-0 hidden h-screen border-r border-border lg:flex' : 'flex h-full',
       )}
@@ -67,17 +67,33 @@ export const Sidebar = ({ variant = 'desktop', onNavigate, onClose }: SidebarPro
         if ((e.target as HTMLElement).closest('a')) onNavigate?.()
       }}
     >
-      <div className={cn('flex items-center gap-2', collapsed ? 'flex-col' : 'justify-between')}>
-        {collapsed ? <NLogo size={26} /> : <Logo iconSize={26} className="px-1" />}
+      {/* One layout in both states: the logo stays put, the name and the collapse button fade out */}
+      <div className="flex h-8 items-center gap-2.5 pl-[11px]">
+        <NLogo size={26} className="shrink-0" />
+        <span
+          aria-hidden={collapsed || undefined}
+          className={cn(
+            'text-lg font-semibold whitespace-nowrap text-text transition-opacity duration-200',
+            collapsed && 'opacity-0',
+          )}
+        >
+          N-Ops
+        </span>
+        {/* collapsed: the expand button and the name move to the top bar (see Topbar) */}
         {variant === 'desktop' && (
           <button
             type="button"
-            onClick={() => setCollapsed(!collapsed)}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className="rounded-md p-1.5 text-text-muted hover:bg-surface-raised hover:text-text"
+            onClick={() => setCollapsed(true)}
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+            aria-hidden={collapsed || undefined}
+            inert={collapsed}
+            className={cn(
+              'ml-auto shrink-0 rounded-md p-1.5 text-text-muted transition-opacity duration-200 hover:bg-surface-raised hover:text-text',
+              collapsed && 'opacity-0',
+            )}
           >
-            {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+            <PanelLeftClose size={17} />
           </button>
         )}
         {variant === 'mobile' && onClose && (
@@ -85,7 +101,7 @@ export const Sidebar = ({ variant = 'desktop', onNavigate, onClose }: SidebarPro
             type="button"
             onClick={onClose}
             aria-label="Close menu"
-            className="rounded-md p-1.5 text-text-muted hover:bg-surface-raised hover:text-text"
+            className="ml-auto rounded-md p-1.5 text-text-muted hover:bg-surface-raised hover:text-text"
           >
             <X size={18} />
           </button>

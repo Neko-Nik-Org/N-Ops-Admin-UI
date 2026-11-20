@@ -83,8 +83,13 @@ describe('Sidebar', () => {
     renderSidebar()
     fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
     expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('title', 'Overview')
-    expect(screen.queryByText('Overview')).not.toBeInTheDocument()
+    // labels fade out rather than unmount (so the change animates); screen readers skip them
+    expect(screen.getByText('Overview').closest('[aria-hidden]')).not.toBeNull()
     expect(secureStorage.getItem('nops-sidebar-collapsed')).toBe('true')
+    // the rail shows only the logo; expanding happens from the top bar
+    expect(screen.queryByRole('button', { name: 'Expand sidebar' })).not.toBeInTheDocument()
+    expect(screen.getByText('N-Ops')).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.queryByRole('button', { name: 'Collapse sidebar' })).not.toBeInTheDocument()
 
     // Clicking a group icon brings the full sidebar back with that group open
     fireEvent.click(screen.getByRole('button', { name: 'Admin' }))

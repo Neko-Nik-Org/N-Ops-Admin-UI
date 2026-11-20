@@ -17,16 +17,20 @@
 
 /** Top bar of the dashboard: tag selector, theme, notifications and the profile menu (breadcrumb and global search are commented out for now). */
 
-import { Bell, Menu } from 'lucide-react' // add Search back with the global search
+import { useAtom } from 'jotai'
+import { Bell, Menu, PanelLeftOpen } from 'lucide-react' // add Search back with the global search
 // import { useLocation } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { ProfileMenu } from '@/components/molecules/ProfileMenu'
 import { TagSelect } from '@/components/molecules/TagSelect'
 import { ThemeMenu } from '@/components/molecules/ThemeMenu'
 // import { pageTrail } from '@/constants/routes'
+import { sidebarCollapsedAtom } from '@/app/sidebar'
+import { cn } from '@/utils/cn'
 
 /** Sticky header above every authenticated page. `onMenuClick` opens the mobile nav drawer. */
 export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useAtom(sidebarCollapsedAtom)
   // Breadcrumb trail, hidden for now:
   // const { pathname } = useLocation()
   // const found = pageTrail(pathname)
@@ -39,6 +43,27 @@ export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
         <button type="button" aria-label="Open menu" onClick={onMenuClick} className="text-text-muted hover:text-text lg:hidden">
           <Menu size={20} />
         </button>
+
+        {/* Desktop sidebar collapsed to its icon rail: its expand button and the product name slide in here */}
+        <div
+          aria-hidden={!sidebarCollapsed || undefined}
+          inert={!sidebarCollapsed}
+          className={cn(
+            'hidden items-center gap-2 overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-out lg:flex',
+            sidebarCollapsed ? 'max-w-40 opacity-100' : 'max-w-0 opacity-0',
+          )}
+        >
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed(false)}
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+            className="shrink-0 rounded-md p-1.5 text-text-muted hover:bg-surface-raised hover:text-text"
+          >
+            <PanelLeftOpen size={17} />
+          </button>
+          <span className="text-lg font-semibold text-text">N-Ops</span>
+        </div>
 
         {/* Breadcrumb: hidden for now
         <nav aria-label="Breadcrumb" className="hidden min-w-0 truncate text-sm sm:block">

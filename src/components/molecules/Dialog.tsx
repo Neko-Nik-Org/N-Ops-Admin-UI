@@ -18,6 +18,7 @@
 /** Modal dialog molecule. */
 
 import { X } from 'lucide-react'
+import { raiseToasts } from '@/lib/toastLayer'
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 
 /** Props for Dialog. The dialog is fully controlled: the parent owns `open`. */
@@ -42,7 +43,10 @@ export const Dialog = ({ open, title, description, onClose, children, size = 'md
   useEffect(() => {
     const dialog = ref.current
     if (!dialog) return
-    if (open && !dialog.open) dialog.showModal()
+    if (open && !dialog.open) {
+      dialog.showModal()
+      raiseToasts() // toasts already showing stay in front of the new dialog
+    }
     if (!open && dialog.open) dialog.close()
   }, [open])
 

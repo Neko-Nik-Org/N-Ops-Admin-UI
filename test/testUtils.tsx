@@ -95,12 +95,19 @@ export const renderWithProviders = (ui: ReactElement, { route = '/', state, path
 }
 
 /** renderHook with the same providers; returns the store and query client for assertions. */
-export const renderHookWithProviders = <T,>(hook: () => T, { user }: { user?: CurrentUser | null } = {}) => {
+export const renderHookWithProviders = <T,>(
+  hook: () => T,
+  { user, route = '/' }: { user?: CurrentUser | null; route?: string } = {},
+) => {
   const { queryClient, store } = createTestState(user)
+  // the probe shows where the hook navigated (screen.getByTestId('location'))
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>
       <Provider store={store}>
-        <MemoryRouter>{children}</MemoryRouter>
+        <MemoryRouter initialEntries={[route]}>
+          {children}
+          <LocationProbe />
+        </MemoryRouter>
       </Provider>
     </QueryClientProvider>
   )

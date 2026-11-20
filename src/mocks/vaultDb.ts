@@ -118,9 +118,9 @@ const SECRET_ROWS = (): SecretRow[] => [
     'STRIPE_SECRET_KEY',
     1,
     history([
-      ['sk_live_51Hc2f…old1', 200, 'Neko Nik', 'Initial'],
-      ['sk_live_51Hc2f9QpZt4mK2lYv8Rx', 120, 'Priya Rao', 'Rolled after Stripe dashboard change', true],
-      ['sk_live_51Hc2f7WqLp0dJ6nUe3Ta', 40, 'Priya Rao', 'Rotated after leak drill', true],
+      ['example_stripe_key_51Hc2f…old1', 200, 'Neko Nik', 'Initial'],
+      ['example_stripe_key_51Hc2f9QpZt4mK2lYv8Rx', 120, 'Priya Rao', 'Rolled after Stripe dashboard change', true],
+      ['example_stripe_key_51Hc2f7WqLp0dJ6nUe3Ta', 40, 'Priya Rao', 'Rotated after leak drill', true],
     ]),
   ],
   [1, 'STRIPE_SECRET_KEY', 2, history([['sk_test_51Hc2fA8bC3dE4fG5hI6j', 150, 'Marcus Chen', 'Initial']])],

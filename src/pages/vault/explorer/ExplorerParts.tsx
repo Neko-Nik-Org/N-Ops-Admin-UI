@@ -45,6 +45,7 @@ export const FolderHeader = ({
   description,
   actions,
   badge,
+  pathOnly = false,
 }: {
   /** Ancestors of the open folder, outermost first. */
   path: readonly Crumb[]
@@ -53,6 +54,8 @@ export const FolderHeader = ({
   actions?: ReactNode
   /** Shown beside the title. */
   badge?: ReactNode
+  /** Only the path, no visible title row (the title stays for screen readers). */
+  pathOnly?: boolean
 }) => (
   <div className="flex flex-col gap-1">
     {path.length > 0 && (
@@ -70,7 +73,11 @@ export const FolderHeader = ({
         </span>
       </nav>
     )}
-    <PageHeader title={title} description={description} actions={actions} badge={badge} />
+    {pathOnly ? (
+      <h1 className="sr-only">{title}</h1>
+    ) : (
+      <PageHeader title={title} description={description} actions={actions} badge={badge} />
+    )}
   </div>
 )
 
@@ -296,6 +303,14 @@ export const FolderLayout = ({ list, preview, wide = false }: { list: ReactNode;
   >
     {list}
     {preview}
+  </div>
+)
+
+/** Top of a project tab: notes on the left (e.g. the local-only badge), the tab's buttons on the right. */
+export const SectionToolbar = ({ badge, actions }: { badge?: ReactNode; actions?: ReactNode }) => (
+  <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex items-center gap-2">{badge}</div>
+    {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
   </div>
 )
 

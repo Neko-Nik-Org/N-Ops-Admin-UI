@@ -17,7 +17,9 @@
 
 /** Sign-out hook used by the Topbar profile menu. */
 
+import { useQueryClient } from '@tanstack/react-query'
 import { useSetAtom } from 'jotai'
+import { flushLastPage } from '@/features/account/hooks/useUiInfoSync'
 import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { logout } from '../api/session'
 import { currentUserAtom, sessionStatusAtom } from '../store/session'
@@ -27,9 +29,12 @@ import { clearSessionToken } from '../store/sessionToken'
 export const useLogout = () => {
   const setCurrentUser = useSetAtom(currentUserAtom)
   const setSessionStatus = useSetAtom(sessionStatusAtom)
+  const queryClient = useQueryClient()
 
   return useAsyncAction(
     async () => {
+      // remember the page they're on, to come back to it after the next sign-in
+      await flushLastPage(queryClient)
       try {
         await logout()
       } catch {

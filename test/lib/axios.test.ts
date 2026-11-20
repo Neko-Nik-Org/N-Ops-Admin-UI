@@ -22,7 +22,9 @@ import { getSessionToken, setSessionToken } from '@/features/auth/store/sessionT
 import { ApiError, errorCode, errorStatus } from '@/types/api'
 
 // test/setup.ts mocks this module for everyone else; here we want the real client
-const { apiClient } = await vi.importActual<{ apiClient: AxiosInstance }>('@/lib/axios')
+const { apiClient, superAdminClient } = await vi.importActual<{ apiClient: AxiosInstance; superAdminClient: AxiosInstance }>(
+  '@/lib/axios',
+)
 
 let lastRequest: InternalAxiosRequestConfig | undefined
 
@@ -120,5 +122,15 @@ describe('apiClient', () => {
     const error = await apiClient.post('/user/self/verify-email/send').catch((e: unknown) => e)
     expect(error).toBeInstanceOf(ApiError)
     expect(errorStatus(error)).toBe(409)
+  })
+
+  it('keeps super-admin calls apart from the session: no token sent, a 401 signs nobody out', async () => {
+    setSessionToken('valid', false)
+    superAdminClient.defaults.adapter = respond(401, 'Unauthorized: Missing or Invalid Admin Key')
+    const error = await superAdminClient.get('/super-admin/organization/list').catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(ApiError)
+    expect(errorStatus(error)).toBe(401)
+    expect(lastRequest?.headers.has('x-nops-token')).toBe(false)
+    expect(getSessionToken()).toBe('valid')
   })
 })

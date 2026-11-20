@@ -61,7 +61,7 @@ import {
 } from '@/features/vault/hooks/useVault'
 import type { ConfigFile, SecretKey, SecureNote, VaultProject } from '@/features/vault/types'
 import { formatBytes, formatDateTime, formatRelative } from '@/utils/format'
-import { FolderContents, FolderHeader, FolderLayout, FolderPage, ListCard, LocalOnlyBadge, PreviewCard } from './ExplorerParts'
+import { FolderContents, FolderLayout, FolderPage, ListCard, LocalOnlyBadge, PreviewCard, SectionToolbar } from './ExplorerParts'
 import { FileGlyph } from './ExplorerIcons'
 import { plural, vaultPath } from './sections'
 import { useSelectedItem } from './useSelectedItem'
@@ -85,12 +85,6 @@ const useTagFilter = () => {
 
 /** Loading placeholder for a folder's list. */
 const Loading = () => <SkeletonText lines={6} />
-
-/** "Vault / <project>" above a folder's title. */
-const folderPath = (project: VaultProject) => [
-  { label: 'Vault', to: vaultPath() },
-  { label: project.projectName, to: vaultPath(project.projectId) },
-]
 
 // ── Env ──────────────────────────────────────────────────
 
@@ -226,9 +220,7 @@ export const EnvView = ({ project }: { project: VaultProject }) => {
     <>
       <FolderPage
         header={
-          <FolderHeader
-            path={folderPath(project)}
-            title="Env"
+          <SectionToolbar
             badge={<LocalOnlyBadge />}
             actions={
               <>
@@ -308,7 +300,7 @@ export const EnvView = ({ project }: { project: VaultProject }) => {
                   onSelect={select}
                   onOpen={setHistory}
                   onDelete={setDeleting}
-                  onUp={() => navigate(vaultPath(project.projectId))}
+                  onUp={() => navigate(vaultPath())}
                   empty={secrets?.length ? 'No keys match your search or tag.' : 'No keys yet. Add one or import a .env file.'}
                 />
               )}
@@ -397,9 +389,7 @@ export const ConfView = ({ project }: { project: VaultProject }) => {
     <>
       <FolderPage
         header={
-          <FolderHeader
-            path={folderPath(project)}
-            title="Conf"
+          <SectionToolbar
             badge={<LocalOnlyBadge />}
             actions={
               <LoadingButton icon={<FilePlus2 size={15} />} onClick={() => setCreating(true)}>
@@ -446,7 +436,7 @@ export const ConfView = ({ project }: { project: VaultProject }) => {
                   selectedId={selectedId}
                   onSelect={select}
                   onDelete={setDeleting}
-                  onUp={() => navigate(vaultPath(project.projectId))}
+                  onUp={() => navigate(vaultPath())}
                   empty={files?.length ? 'No files match your search or tag.' : 'No config files yet.'}
                 />
               )}
@@ -516,9 +506,7 @@ export const NotesView = ({ project }: { project: VaultProject }) => {
     <>
       <FolderPage
         header={
-          <FolderHeader
-            path={folderPath(project)}
-            title="Notes"
+          <SectionToolbar
             badge={<LocalOnlyBadge />}
             actions={
               <LoadingButton icon={<Plus size={15} />} onClick={() => setCreating(true)}>
@@ -568,7 +556,7 @@ export const NotesView = ({ project }: { project: VaultProject }) => {
                     select(id)
                   }}
                   onDelete={(n) => n.myAccess === 'owner' && setDeleting(n)}
-                  onUp={() => navigate(vaultPath(project.projectId))}
+                  onUp={() => navigate(vaultPath())}
                   empty={notes?.length ? 'No notes match your search.' : 'No notes yet. Yours stay private until you share them.'}
                 />
               )}

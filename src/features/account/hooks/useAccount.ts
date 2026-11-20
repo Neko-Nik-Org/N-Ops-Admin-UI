@@ -17,8 +17,8 @@
 
 /** React Query hooks for account data. */
 
-import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { queryOptions, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useState } from 'react'
 import {
   getOrgInfo,
   getProfile,
@@ -30,6 +30,7 @@ import {
 } from '../api/account'
 import { usernamePolicyError } from '../schema/policies'
 import type { JsonObject } from '../types'
+import { parseUiInfo, serializeUiInfo, type UiInfo } from '../uiInfo'
 
 /** Query cache keys for the signed-in user's data. */
 const UI_INFO_KEY = ['user-self', 'ui-info'] as const
@@ -50,19 +51,38 @@ export const profileQuery = queryOptions({ queryKey: PROFILE_KEY, queryFn: getPr
 /** Organization name, quotas and usage for the Account page. */
 export const useOrgInfo = () => useQuery(orgInfoQuery)
 
-/** Saved UI preferences. Loaded once per session and only changed through useSaveUiInfo. */
+/** Saved UI preferences. Loaded once per session and only changed through updateUiInfo. */
 export const useUiInfo = () => useQuery(uiInfoQuery)
 
 /** The user's free-form extra profile info (`/user/self/details`). */
 export const useUserDetails = () => useQuery(userDetailsQuery)
 
-/** Saves UI preferences and updates the cache directly, so no refetch is needed. */
-export const useSaveUiInfo = () => {
+let uiInfoQueue: Promise<unknown> = Promise.resolve()
+
+/**
+ * Saves a change to the UI preferences. The API replaces the whole object, so each change is merged
+ * into the latest cached copy when its turn comes; changes go out one at a time, so two quick ones
+ * can't overwrite each other. Does nothing until the saved preferences have loaded (writing before
+ * that would wipe them).
+ */
+export const updateUiInfo = (queryClient: QueryClient, patch: Partial<UiInfo>): Promise<void> => {
+  const run = async () => {
+    const current = queryClient.getQueryData<JsonObject>(UI_INFO_KEY)
+    if (!current) return
+    const { info, preserved } = parseUiInfo(current)
+    const next = serializeUiInfo({ ...info, ...patch }, preserved)
+    await saveUiInfo(next)
+    queryClient.setQueryData(UI_INFO_KEY, next)
+  }
+  const done = uiInfoQueue.then(run, run)
+  uiInfoQueue = done.catch(() => {})
+  return done
+}
+
+/** `updateUiInfo` bound to this app's query client. */
+export const useUpdateUiInfo = () => {
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (uiInfo: JsonObject) => saveUiInfo(uiInfo),
-    onSuccess: (_, uiInfo) => queryClient.setQueryData(UI_INFO_KEY, uiInfo),
-  })
+  return useCallback((patch: Partial<UiInfo>) => updateUiInfo(queryClient, patch), [queryClient])
 }
 
 /** Saves the free-form profile details (replacing the whole object) and updates the cache directly. */

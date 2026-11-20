@@ -89,7 +89,7 @@ describe.skipIf(!API_URL)('live Main API: startup screen requests', () => {
       organizationName: 'RolesTest Org',
       primaryEmail: 'scoped@example.test',
       isEmailVerified: true,
-      permissions: ['tag:create', 'user:role:view', 'user:role:create', 'user:role:update', 'user:role:delete'],
+      permissions: ['tag:create', 'user:role:view', 'user:role:create', 'user:role:edit', 'user:role:delete'],
       tags: [1],
       allowedLinuxUsers: ['deploy'],
       canApproveApprovals: false,

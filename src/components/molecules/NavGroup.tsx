@@ -60,6 +60,8 @@ export const NavGroup = ({ label, icon: Icon, items, collapsed = false, onExpand
     }
   }
 
+  const showList = !collapsed && open
+
   return (
     <div>
       <button
@@ -70,34 +72,45 @@ export const NavGroup = ({ label, icon: Icon, items, collapsed = false, onExpand
         aria-expanded={collapsed ? undefined : open}
         aria-controls={collapsed ? undefined : listId}
         className={cn(
-          'flex w-full items-center gap-3 rounded-md py-2 text-sm transition-colors duration-150',
-          collapsed ? 'justify-center px-0' : 'px-3',
+          'flex w-full items-center gap-3 rounded-md py-2 pr-3 pl-[15px] text-sm whitespace-nowrap transition-colors duration-150',
           containsActive ? 'text-text' : 'text-text-muted hover:text-text',
           collapsed && containsActive ? 'bg-signal/15 text-signal' : 'hover:bg-surface-raised',
         )}
       >
         <Icon size={17} className="shrink-0" />
-        {!collapsed && (
-          <>
-            <span className={cn('flex-1 truncate text-left', containsActive && 'font-medium')}>{label}</span>
-            <ChevronRight
-              size={15}
-              aria-hidden="true"
-              className={cn('shrink-0 transition-transform duration-150', open && 'rotate-90')}
-            />
-          </>
-        )}
+        <span
+          aria-hidden={collapsed || undefined}
+          className={cn(
+            'flex flex-1 items-center gap-3 overflow-hidden transition-opacity duration-200',
+            collapsed && 'opacity-0',
+          )}
+        >
+          <span className={cn('flex-1 truncate text-left', containsActive && 'font-medium')}>{label}</span>
+          <ChevronRight
+            size={15}
+            aria-hidden="true"
+            className={cn('shrink-0 transition-transform duration-150', open && 'rotate-90')}
+          />
+        </span>
       </button>
 
-      {!collapsed && open && (
-        <ul id={listId} className="mt-0.5 ml-5 flex flex-col gap-0.5 border-l border-border pl-2">
+      {/* folds open and closed (grid rows 0fr ↔ 1fr) rather than popping, also when the rail collapses */}
+      <div
+        className={cn(
+          'grid transition-[grid-template-rows,opacity] duration-200',
+          showList ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+        )}
+        aria-hidden={!showList || undefined}
+        inert={!showList}
+      >
+        <ul id={listId} className="mt-0.5 ml-5 flex min-h-0 flex-col gap-0.5 overflow-hidden border-l border-border pl-2">
           {items.map((item) => (
             <li key={item.path}>
               <NavItem to={item.path} label={item.title} />
             </li>
           ))}
         </ul>
-      )}
+      </div>
     </div>
   )
 }

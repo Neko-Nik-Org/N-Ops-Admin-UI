@@ -22,9 +22,9 @@ import { ROUTES } from '@/constants/routes'
 
 /** "Page doesn't exist" message with a link back to the dashboard. */
 export const NotFoundPage = () => (
-  <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-ink text-center">
-    <h1 className="font-mono text-sm text-text-muted">404</h1>
-    <p className="text-text">This page doesn't exist.</p>
+  <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-ink px-4 text-center">
+    <h1 className="font-mono text-7xl leading-none font-bold tracking-tight text-text sm:text-8xl">404</h1>
+    <p className="mt-2 text-lg text-text">This page doesn't exist.</p>
     <Link to={ROUTES.overview} className="text-sm text-signal hover:text-signal-strong">
       Back to N-Ops
     </Link>

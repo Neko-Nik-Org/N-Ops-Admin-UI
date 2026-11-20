@@ -110,7 +110,7 @@ describe('hidden secrets (is_hidden)', () => {
 
   it('is per version: an older visible version can still be revealed, and the history says which are hidden', async () => {
     const { secretId } = stripeProd()
-    expect(await revealSecret(secretId, 1)).toBe('sk_live_51Hc2f…old1')
+    expect(await revealSecret(secretId, 1)).toBe('example_stripe_key_51Hc2f…old1')
     expect((await listSecretVersions(secretId)).map((v) => [v.version, v.isHidden])).toEqual([
       [3, true],
       [2, true],
@@ -122,7 +122,7 @@ describe('hidden secrets (is_hidden)', () => {
     const { secretId } = stripeProd()
     await rollbackSecret(secretId, 1)
     expect(stripeProd().isHidden).toBe(false)
-    await addSecretVersion(secretId, 'sk_live_new', 'Rotate', true)
+    await addSecretVersion(secretId, 'example_stripe_key_new', 'Rotate', true)
     expect(stripeProd()).toMatchObject({ currentVersion: 4, isHidden: true })
   })
 
@@ -138,7 +138,7 @@ describe('hidden secrets (is_hidden)', () => {
   })
 
   it('keeps a hidden key hidden when a .env import changes it', async () => {
-    await importDotenv(1, 1, 'STRIPE_SECRET_KEY=sk_live_imported', '')
+    await importDotenv(1, 1, 'STRIPE_SECRET_KEY=example_stripe_key_imported', '')
     expect(stripeProd()).toMatchObject({ currentVersion: 4, isHidden: true })
   })
 })

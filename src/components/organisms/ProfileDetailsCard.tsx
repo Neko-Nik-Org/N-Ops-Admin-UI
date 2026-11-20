@@ -15,21 +15,24 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Profile details card on the Account page: the user's free-form extra info (`/user/self/details`). */
+/** Profile details card on the Account page (`/user/self/details`), grouped as in features/account/profileDetails.ts. */
 
 import { Pencil } from 'lucide-react'
 import { useState } from 'react'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { SkeletonText } from '@/components/molecules/Skeleton'
 import { ProfileDetailsDialog } from '@/components/organisms/ProfileDetailsDialog'
-import { formatDetailValue } from '@/features/account/details'
+import { ProfileDetailsView } from '@/components/organisms/ProfileDetailsView'
 import { useUserDetails } from '@/features/account/hooks/useAccount'
+import { isProfileDetailsEmpty, parseProfileDetails } from '@/features/account/profileDetails'
 
-/** Lists the saved details and opens the editor. Shown even after a reload, since it loads its own data. */
+/** Shows the saved details and opens the editor. Shown even after a reload, since it loads its own data. */
 export const ProfileDetailsCard = () => {
   const { data: details, isPending, error } = useUserDetails()
   const [editing, setEditing] = useState(false)
-  const entries = Object.entries(details ?? {})
+  const empty =
+    !details ||
+    (isProfileDetailsEmpty(parseProfileDetails(details).details) && !Object.keys(parseProfileDetails(details).preserved).length)
 
   return (
     <section className="rounded-xl border border-border bg-surface-raised p-5">
@@ -46,19 +49,12 @@ export const ProfileDetailsCard = () => {
         <SkeletonText lines={2} />
       ) : error ? (
         <p className="text-sm text-danger">Couldn't load your profile details: {error.message}</p>
-      ) : entries.length === 0 ? (
-        <p className="text-sm text-text-muted">No extra details yet. Add things like your job title or team.</p>
+      ) : empty ? (
+        <p className="text-sm text-text-muted">
+          No details yet. Add your job title, how and when to reach you, or your SSH keys.
+        </p>
       ) : (
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-          {entries.map(([label, value]) => (
-            <div key={label} className="min-w-0">
-              <dt className="text-text-muted">{label}</dt>
-              <dd className={typeof value === 'string' ? 'break-words text-text' : 'break-all font-mono text-xs text-text'}>
-                {typeof value === 'string' ? value || '—' : formatDetailValue(value)}
-              </dd>
-            </div>
-          ))}
-        </dl>
+        <ProfileDetailsView raw={details} />
       )}
 
       {details && <ProfileDetailsDialog open={editing} details={details} onClose={() => setEditing(false)} />}

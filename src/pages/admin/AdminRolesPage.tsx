@@ -48,18 +48,15 @@ type DialogState =
 /** Shown on edit / delete buttons for a role wider than the signed-in user's own access. */
 const OUT_OF_SCOPE = 'This role has permissions or tags your own role lacks, so you can’t change it.'
 
-/**
- * Shown on a disabled Edit button. The API checks `user:role:update`, although its docs and seed
- * data call it `user:role:edit`, so name the one that actually works.
- */
-const NO_UPDATE = 'Editing roles needs the “Edit roles” permission (user:role:update), which your role doesn’t have.'
+/** Shown on a disabled Edit button. */
+const NO_UPDATE = 'Editing roles needs the “Edit roles” permission (user:role:edit), which your role doesn’t have.'
 
 /** Roles table: what each grants and where. Actions follow the `user:role:*` permissions. */
 export const AdminRolesPage = () => {
   const user = useAtomValue(currentUserAtom)
   const canView = useHasPermissions('user:role:view')
   const canCreate = useHasPermissions('user:role:view', 'user:role:create')
-  const canUpdate = useHasPermissions('user:role:view', 'user:role:update')
+  const canUpdate = useHasPermissions('user:role:view', 'user:role:edit')
   const canDelete = useHasPermissions('user:role:view', 'user:role:delete')
   const { data: roles, isLoading, error } = useRoles({ enabled: canView })
   const { data: tags } = useTags()

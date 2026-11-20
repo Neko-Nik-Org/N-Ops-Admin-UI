@@ -388,65 +388,94 @@ describe('AccountPage — security', () => {
 })
 
 describe('AccountPage — profile details', () => {
-  it('lists saved details, including non-text values', async () => {
-    mockGets(200, { Team: 'SRE', 'On call': '', shifts: [1, 2] })
+  const KEY = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl priya@laptop'
+  const openEditor = async () => {
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    return within(screen.getByRole('dialog'))
+  }
+
+  it('shows saved details grouped, reading older free-form text too', async () => {
+    mockGets(200, {
+      version: 1,
+      work: { job_title: 'SRE lead' },
+      availability: {
+        timezone: 'UTC',
+        working_hours: { start: '09:00', end: '17:00' },
+        working_days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+      },
+      engineering: { expertise: ['PostgreSQL', 'nginx'], ssh_public_keys: [KEY] },
+      Team: 'SRE', // free-form, from before the structure
+      Pronouns: 'they/them',
+      shifts: [1, 2],
+    })
     renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
-    expect(await screen.findByText('SRE')).toBeInTheDocument()
-    expect(screen.getByText('On call')).toBeInTheDocument()
+    expect(await screen.findByText('SRE lead')).toBeInTheDocument()
+    expect(screen.getByText('Department').nextSibling).toHaveTextContent('SRE')
+    expect(screen.getByText(/^UTC \(.* there now\)$/)).toBeInTheDocument()
+    expect(screen.getByText('09:00–17:00')).toBeInTheDocument()
+    expect(screen.getByText('Mon–Fri')).toBeInTheDocument()
+    expect(screen.getByText('nginx')).toBeInTheDocument()
+    expect(screen.getByTitle(KEY)).toHaveTextContent('ssh-ed25519 AAAAC3Nz…h2l9GKJl priya@laptop')
+    expect(screen.getByText('they/them')).toBeInTheDocument()
     expect(screen.getByText('[1,2]')).toBeInTheDocument()
   })
 
   it('shows an empty state', async () => {
     mockGets()
     renderWithProviders(<AccountPage />, { route: '/account' })
-    expect(await screen.findByText('No extra details yet. Add things like your job title or team.')).toBeInTheDocument()
+    expect(await screen.findByText(/^No details yet\./)).toBeInTheDocument()
   })
 
-  it('edits, adds and removes fields, keeping non-text values', async () => {
-    mockGets(200, { Team: 'SRE', Location: 'Pune', shifts: [1, 2] })
+  it('saves the structured details, keeping values it does not know', async () => {
+    mockGets(200, { Team: 'SRE', shifts: [1, 2] })
     api.post.mockResolvedValue({ data: '' })
     renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
-    const dialog = screen.getByRole('dialog')
-    expect(within(dialog).getByText('1 non-text value is kept as they are.')).toBeInTheDocument()
-    fireEvent.change(within(dialog).getByLabelText('Value 1'), { target: { value: ' Platform ' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Remove field 2' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Add field' }))
-    fireEvent.change(within(dialog).getByLabelText('Label 2'), { target: { value: 'Pronouns' } })
-    fireEvent.change(within(dialog).getByLabelText('Value 2'), { target: { value: 'they/them' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Save details' }))
+    const form = await openEditor()
+    expect(form.getByLabelText('Department or team')).toHaveValue('SRE') // moved from the free-form "Team"
+    fireEvent.change(form.getByLabelText('Job title'), { target: { value: ' SRE lead ' } })
+    fireEvent.change(form.getAllByLabelText('Phone')[0]!, { target: { value: '+91 98765 43210' } })
+    fireEvent.change(form.getByLabelText('Time zone'), { target: { value: 'UTC' } })
+    fireEvent.change(form.getByLabelText('Working hours from'), { target: { value: '09:30' } })
+    fireEvent.change(form.getByLabelText('to'), { target: { value: '18:00' } })
+    fireEvent.click(form.getByLabelText('Wed'))
+    fireEvent.click(form.getByLabelText('Mon'))
+    fireEvent.change(form.getByLabelText('Expertise'), { target: { value: 'PostgreSQL, , nginx' } })
+    fireEvent.change(form.getByLabelText('SSH public keys'), { target: { value: `${KEY}\n` } })
+    fireEvent.click(form.getByRole('button', { name: 'Add field' }))
+    fireEvent.change(form.getByLabelText('Label 1'), { target: { value: 'Pronouns' } })
+    fireEvent.change(form.getByLabelText('Value 1'), { target: { value: 'they/them' } })
+    fireEvent.click(form.getByRole('button', { name: 'Save details' }))
 
     await waitFor(() =>
-      expect(api.post).toHaveBeenCalledWith('/user/self/details', { shifts: [1, 2], Team: 'Platform', Pronouns: 'they/them' }),
+      expect(api.post).toHaveBeenCalledWith('/user/self/details', {
+        shifts: [1, 2],
+        version: 1,
+        work: { job_title: 'SRE lead', department: 'SRE' },
+        contact: { phone: '+91 98765 43210' },
+        availability: { timezone: 'UTC', working_hours: { start: '09:30', end: '18:00' }, working_days: ['mon', 'wed'] },
+        engineering: { expertise: ['PostgreSQL', 'nginx'], ssh_public_keys: [KEY] },
+        custom: { Pronouns: 'they/them' },
+      }),
     )
-    expect(await screen.findByText('they/them')).toBeInTheDocument()
   })
 
-  it('rejects duplicate and empty labels', async () => {
-    mockGets(200, { Team: 'SRE' })
+  it('checks phones, hours, SSH keys and labels before saving', async () => {
+    mockGets(200, { custom: { Team: 'SRE' } })
     renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    const form = await openEditor()
+    fireEvent.change(form.getAllByLabelText('Phone')[0]!, { target: { value: 'call me' } })
+    fireEvent.change(form.getByLabelText('Working hours from'), { target: { value: '18:00' } })
+    fireEvent.change(form.getByLabelText('to'), { target: { value: '09:00' } })
+    fireEvent.change(form.getByLabelText('SSH public keys'), { target: { value: '-----BEGIN OPENSSH PRIVATE KEY-----' } })
+    fireEvent.click(form.getByRole('button', { name: 'Add field' }))
+    fireEvent.change(form.getByLabelText('Label 2'), { target: { value: 'team' } })
+    fireEvent.click(form.getByRole('button', { name: 'Save details' }))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
-    const dialog = screen.getByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Add field' }))
-    fireEvent.change(within(dialog).getByLabelText('Label 2'), { target: { value: 'team' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Save details' }))
-    expect(await within(dialog).findByText('This label is already used.')).toBeInTheDocument()
-
-    fireEvent.change(within(dialog).getByLabelText('Label 2'), { target: { value: '' } })
-    fireEvent.change(within(dialog).getByLabelText('Value 2'), { target: { value: 'orphan' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Save details' }))
-    expect(await within(dialog).findByText('Enter a label.')).toBeInTheDocument()
+    expect(await form.findByText(/Use digits, spaces and/)).toBeInTheDocument()
+    expect(form.getByText('End after the start time.')).toBeInTheDocument()
+    expect(form.getByText(/Each line must be one OpenSSH public key/)).toBeInTheDocument()
+    expect(form.getByText('This label is already used.')).toBeInTheDocument()
     expect(api.post).not.toHaveBeenCalled()
-  })
-
-  it('offers starter fields when there are no details', async () => {
-    mockGets()
-    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
-    expect(screen.getByLabelText('Label 1')).toHaveValue('Job title')
-    expect(screen.getByLabelText('Label 2')).toHaveValue('Team')
   })
 })
 

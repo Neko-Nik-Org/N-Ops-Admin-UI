@@ -17,6 +17,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Opt-in live contract test against a running Main API (`test/integration`).
 - Community files: contributing guide, security policy, code of conduct, issue and pull request
   templates.
+- Super Admin pages at `/super-admin`: every organization with its plan limits and usage, and one
+  organization's details. Unlocked with the API's admin key, which is kept encrypted and removed as
+  soon as you're on any other page.
+- Admin › Users: add users, change a username, reset a password, mark an email verified, deactivate
+  and delete users. Users and their details come from the live API.
+- Admin › Roles: permissions as a View / Create / Edit / Delete matrix, and a read-only role view.
+- Vault: inside a project, Env, Conf and Notes are tabs.
+- Workflows: list and detail pages with the flow diagram and run history (sample data until the API
+  has workflow endpoints).
+- Profile details have a structure: work, contact, availability, engineering (including SSH public
+  keys) and your own fields. Older free-form details are carried over.
+- Your last page is remembered and you return to it after signing in again. Sidebar, selected tag
+  and Vault view follow you across devices.
+- Everything the app saves in the browser is encrypted (AES-GCM with a non-extractable key).
+- Low-power mode for older machines: no decorative animation or blur.
 
 ### Changed
 
@@ -26,7 +41,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   the atoms, molecules, organisms, and templates folders.
 - The in-memory demo data for Admin and Vault moved from inside each feature to `src/mocks/`, so
   the Vault feature no longer depends on the Admin feature.
+- API errors show their error code, e.g. "(E221)".
+- Faster loading on slow connections: smaller first download, startup requests in parallel, page
+  code loaded on demand, and fonts bundled instead of loaded from Google Fonts.
+- One CI/CD workflow that builds the Docker image once, then pushes and deploys that image.
+- Editing roles needs `user:role:edit`, matching the API.
+- Toasts show above open dialogs, without a countdown bar.
+- Collapsing and expanding the sidebar animates smoothly.
 
 ### Fixed
 
 - One-time code inputs accept letters when the API's code alphabet includes them.
+- Data cached for one account is cleared on sign-out, so the next account on the same browser
+  never sees it.
+- A dialog opened on top of another one is announced with its own title.

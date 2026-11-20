@@ -17,7 +17,7 @@
 /**
  * Admin › Organization (/admin/organization): the organization's profile and plan usage, from
  * `GET /user/self/org-info`. Read-only: the API has no endpoint for changing the organization yet
- * (its `/super-admin/organization` routes are still commented out).
+ * (the super-admin API can list and read organizations, but not update them).
  */
 
 import type { ReactNode } from 'react'

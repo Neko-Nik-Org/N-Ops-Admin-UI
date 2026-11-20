@@ -24,7 +24,7 @@
  */
 
 import type { ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SkeletonText } from '@/components/molecules/Skeleton'
 import { useVaultProjects } from '@/features/vault/hooks/useVault'
@@ -78,10 +78,16 @@ export const VaultPage = () => {
         </div>
       </div>
     )
-  else if (project && section === 'env') content = <EnvView key={key} project={project} />
-  else if (project && section === 'conf') content = <ConfView key={key} project={project} />
-  else if (project && section === 'notes') content = <NotesView key={key} project={project} />
-  else if (project) content = <ProjectView key={key} project={project} />
+  // a project opens on its first tab
+  else if (project && !section) content = <Navigate to={vaultPath(project.projectId, 'env')} replace />
+  else if (project && section)
+    content = (
+      <ProjectView key={project.projectId} project={project} section={section}>
+        {section === 'env' && <EnvView key={key} project={project} />}
+        {section === 'conf' && <ConfView key={key} project={project} />}
+        {section === 'notes' && <NotesView key={key} project={project} />}
+      </ProjectView>
+    )
   else content = <RootView key={key} projects={projects ?? []} />
 
   return <div className="min-w-0">{content}</div>

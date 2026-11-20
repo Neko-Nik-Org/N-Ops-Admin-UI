@@ -14,16 +14,17 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Folder views: the Vault root (project folders) and a project (its Env / Conf / Notes folders). */
+/** Folder views: the Vault root (project folders) and a project (its Env / Conf / Notes tabs). */
 
 import { Folder, FolderOpen, FolderPlus, Pencil, Trash2 } from 'lucide-react'
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, type ReactNode } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { DeleteProjectDialog, ProjectFormDialog } from '@/components/organisms/ProjectDialogs'
 import { useOrgInfo } from '@/features/account/hooks/useAccount'
 import { useHasPermissions } from '@/features/auth/permissions'
 import type { VaultProject } from '@/features/vault/types'
+import { cn } from '@/utils/cn'
 import { formatDateTime, formatRelative } from '@/utils/format'
 import { FolderContents, FolderHeader, FolderLayout, FolderPage, ListCard, PreviewCard } from './ExplorerParts'
 import { FolderGlyph } from './ExplorerIcons'
@@ -214,111 +215,59 @@ export const RootView = ({ projects }: { projects: readonly VaultProject[] }) =>
 
 // ── A project ────────────────────────────────────────────
 
-/** Rows for the three folders; ids are just their position. */
-const FOLDER_ROWS = SECTION_ORDER.map((section, i) => ({ id: i + 1, section }))
-
-/** Inside a project: its Env, Conf and Notes folders. */
-export const ProjectView = ({ project }: { project: VaultProject }) => {
-  const navigate = useNavigate()
-  const [selectedId, select] = useSelectedItem()
-  const [search, setSearch] = useState('')
+/**
+ * Inside a project: its path (Vault › project) and one tab per folder (Env, Conf, Notes),
+ * with the open folder below. Each tab has its own URL (`/vault/<id>/env` …), so links, back and
+ * forward keep working.
+ */
+export const ProjectView = ({
+  project,
+  section,
+  children,
+}: {
+  project: VaultProject
+  section: VaultSection
+  /** The open folder's view. */
+  children: ReactNode
+}) => {
   const counts = useSectionCounts(project.projectId)
-  const actions = useProjectActions()
-  const visible = FOLDER_ROWS.filter((r) => matches(search, SECTIONS[r.section].label, SECTIONS[r.section].purpose))
-  const selected = visible.find((r) => r.id === selectedId) ?? null
-  const open = (section: VaultSection) => navigate(vaultPath(project.projectId, section))
-  const countText = (s: VaultSection) => (counts[s] === undefined ? '…' : plural(counts[s]!, SECTIONS[s].noun))
 
+  // just the path above the tabs; renaming and deleting a project happen in the Vault's project list
   return (
-    <FolderPage
-      header={
-        <FolderHeader
-          path={[ROOT_CRUMB]}
-          title={project.projectName}
-          description={project.description || 'Project folder.'}
-          actions={
-            <>
-              {actions.canRename && (
-                <LoadingButton variant="secondary" icon={<Pencil size={14} />} onClick={() => actions.setRenaming(project)}>
-                  Rename
-                </LoadingButton>
+    <FolderPage header={<FolderHeader path={[ROOT_CRUMB]} title={project.projectName} pathOnly />}>
+      {/*
+        Scrolls sideways on narrow screens. The grey baseline is an inset shadow, not a border, so the
+        active tab's underline can sit on it without sticking out (which would add a scrollbar).
+      */}
+      <nav
+        aria-label={`${project.projectName} folders`}
+        className="-mt-2 flex gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-border)]"
+      >
+        {SECTION_ORDER.map((s) => {
+          const { label, icon: Icon, purpose } = SECTIONS[s]
+          const active = s === section
+          return (
+            <Link
+              key={s}
+              to={vaultPath(project.projectId, s)}
+              aria-current={active ? 'page' : undefined}
+              aria-label={counts[s] === undefined ? label : `${label}, ${plural(counts[s]!, SECTIONS[s].noun)}`}
+              title={purpose}
+              className={cn(
+                'flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+                active
+                  ? 'border-signal text-text'
+                  : 'border-transparent text-text-muted hover:border-border-strong hover:text-text',
               )}
-              {actions.canDelete && (
-                <LoadingButton variant="ghost" icon={<Trash2 size={14} />} onClick={() => actions.setDeleting(project)}>
-                  Delete project
-                </LoadingButton>
-              )}
-            </>
-          }
-        />
-      }
-    >
-      <FolderLayout
-        list={
-          <ListCard title="Folders" count={visible.length} search={search} onSearch={setSearch}>
-            <FolderContents
-              label={`Contents of ${project.projectName}`}
-              rows={visible}
-              rowId={(r) => r.id}
-              name={(r) => SECTIONS[r.section].label}
-              text={(r) => SECTIONS[r.section].label}
-              subtitle={(r) => countText(r.section)}
-              bigIcon={(r) => <FolderGlyph badge={SECTIONS[r.section].icon} filled={!!counts[r.section]} />}
-              icon={(r) => {
-                const Icon = SECTIONS[r.section].icon
-                return <Icon size={16} className="text-signal" />
-              }}
-              columns={[
-                { key: 'items', label: 'Items', render: (r) => countText(r.section) },
-                { key: 'purpose', label: 'Holds', render: (r) => SECTIONS[r.section].purpose, className: 'max-w-80 truncate' },
-              ]}
-              selectedId={selectedId}
-              onSelect={select}
-              onOpen={(r) => open(r.section)}
-              onUp={() => navigate(vaultPath())}
-              empty="No folders match your search."
-            />
-          </ListCard>
-        }
-        preview={
-          selected && (
-            <PreviewCard onClose={() => select(null)}>
-              {selected
-                ? (() => {
-                    const { label, purpose, icon: Icon } = SECTIONS[selected.section]
-                    return (
-                      <div className="flex flex-col gap-4">
-                        <div className="flex items-center gap-3">
-                          <Icon size={30} className="shrink-0 text-signal" aria-hidden="true" />
-                          <div>
-                            <h2 className="font-semibold text-text">{label}</h2>
-                            <p className="text-xs text-text-muted">Folder · {countText(selected.section)}</p>
-                          </div>
-                        </div>
-                        <p className="text-sm text-text">{purpose}</p>
-                        <div className="border-t border-border pt-4">
-                          <LoadingButton size="sm" icon={<FolderOpen size={14} />} onClick={() => open(selected.section)}>
-                            Open
-                          </LoadingButton>
-                        </div>
-                      </div>
-                    )
-                  })()
-                : null}
-            </PreviewCard>
+            >
+              <Icon size={15} className={active ? 'text-signal' : undefined} aria-hidden="true" />
+              {label}
+              <span className="rounded-full bg-ink px-1.5 py-0.5 text-[0.6875rem] text-text-muted">{counts[s] ?? '…'}</span>
+            </Link>
           )
-        }
-      />
-      <ProjectFormDialog
-        open={!!actions.renaming}
-        project={actions.renaming ?? undefined}
-        onClose={() => actions.setRenaming(null)}
-      />
-      <DeleteProjectDialog
-        project={actions.deleting}
-        onClose={() => actions.setDeleting(null)}
-        onDeleted={() => navigate(vaultPath(), { replace: true })}
-      />
+        })}
+      </nav>
+      {children}
     </FolderPage>
   )
 }

@@ -57,13 +57,30 @@ const messageOf = (error: AxiosError<ApiErrorBody | string>): { message: string;
  * Normalizes errors to an ApiError carrying the API's message and HTTP status, and drops
  * the stored session on 401 so the route guards send the user back to login.
  */
+/** The API's error, worded for people, as an ApiError carrying the HTTP status and Exxx code. */
+const toApiError = (error: AxiosError<ApiErrorBody | string>) => {
+  const { message, code } = messageOf(error)
+  return new ApiError(message, error.response?.status, code)
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiErrorBody | string>) => {
     if (error.response?.status === 401) {
       clearSessionToken()
     }
-    const { message, code } = messageOf(error)
-    return Promise.reject(new ApiError(message, error.response?.status, code))
+    return Promise.reject(toApiError(error))
   },
+)
+
+/**
+ * Client for the super-admin API (`/super-admin/*`), which is authorized by the server's admin key
+ * (`x-nops-admin-key`, passed per request) rather than a user session. It never sends the session
+ * token, and a 401 here means a wrong key, so it leaves the signed-in session alone.
+ */
+export const superAdminClient = axios.create({ baseURL: env.apiBaseUrl })
+
+superAdminClient.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError<ApiErrorBody | string>) => Promise.reject(toApiError(error)),
 )

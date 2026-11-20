@@ -62,7 +62,17 @@ export const ROUTES = {
   twoFactor: '/login/verify-2fa',
   forgotPassword: '/login/forgot-password',
   invite: '/invite/:token',
+  /**
+   * Super admin (all organizations), behind the API's admin key rather than a user's sign-in.
+   * Deliberately not linked from anywhere in the app.
+   */
+  superAdmin: '/super-admin',
+  superAdminOrganization: '/super-admin/organizations/:organizationId',
 } as const
+
+/** URL of one organization in the super-admin pages. */
+export const superAdminOrganizationPath = (organizationId: string) =>
+  ROUTES.superAdminOrganization.replace(':organizationId', encodeURIComponent(organizationId))
 
 /** A routed page reached from the sidebar. */
 export interface AppPage {

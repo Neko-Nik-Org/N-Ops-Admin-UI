@@ -237,36 +237,42 @@ describe('Vault explorer: the root and project folders', () => {
     expect(await screen.findByText(/You need the “View vault projects” permission/)).toBeInTheDocument()
   })
 
-  it('shows a project’s Env, Conf and Notes folders with their item counts', async () => {
+  it('opens a project on its Env tab', async () => {
     openAt('/vault/1')
-    const grid = await list('Contents of payments-api')
-    expect(await within(grid).findByText('11 keys')).toBeInTheDocument() // under each folder's name
-    expect(within(grid).getByText('4 files')).toBeInTheDocument()
-    expect(within(grid).getByText('2 notes')).toBeInTheDocument()
-    fireEvent.click(row('Conf'))
-    expect(within(preview()).getByText(/Deployable configuration files/)).toBeInTheDocument()
-    fireEvent.doubleClick(row('Conf'))
-    expect(screen.getByTestId('location')).toHaveTextContent('/vault/1/conf')
+    expect(await screen.findByTestId('location')).toHaveTextContent('/vault/1/env')
   })
 
-  it('shows the folder path above the title, without a folder tree', async () => {
+  it('shows Env, Conf and Notes as tabs with their item counts, under the folder path', async () => {
     openAt('/vault/1/env')
     await list('Contents of Env')
-    expect(screen.getByRole('heading', { level: 1, name: 'Env' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'payments-api' })).toBeInTheDocument()
     const path = screen.getByRole('navigation', { name: 'Folder path' })
     expect(within(path).getByRole('link', { name: 'Vault' })).toHaveAttribute('href', '/vault')
-    expect(within(path).getByRole('link', { name: 'payments-api' })).toHaveAttribute('href', '/vault/1')
+    // no title row: renaming and deleting a project happen in the project list
+    expect(screen.queryByRole('button', { name: 'Rename' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete project' })).not.toBeInTheDocument()
 
-    // no folder tree beside the open folder
+    const tabs = screen.getByRole('navigation', { name: 'payments-api folders' })
+    const env = await within(tabs).findByRole('link', { name: 'Env, 11 keys' })
+    expect(env).toHaveAttribute('aria-current', 'page')
+    expect(await within(tabs).findByRole('link', { name: 'Conf, 4 files' })).toHaveAttribute('href', '/vault/1/conf')
+    expect(within(tabs).getByRole('link', { name: 'Notes, 2 notes' })).not.toHaveAttribute('aria-current')
+    // the tab's own buttons stay
+    expect(screen.getByRole('button', { name: 'New key' })).toBeInTheDocument()
     expect(screen.queryByRole('tree')).not.toBeInTheDocument()
+
+    fireEvent.click(within(tabs).getByRole('link', { name: /Conf/ }))
+    expect(await list('Contents of Conf')).toBeInTheDocument()
+    expect(within(tabs).getByRole('link', { name: /Conf/ })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'New file' })).toBeInTheDocument()
   })
 
-  it('goes up a level with Backspace', async () => {
+  it('goes back to the Vault with Backspace', async () => {
     openAt('/vault/1/env')
     await list('Contents of Env')
     fireEvent.click(row('CONCURRENCY'))
     fireEvent.keyDown(row('CONCURRENCY'), { key: 'Backspace' })
-    expect(screen.getByTestId('location')).toHaveTextContent('/vault/1')
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/vault$/)
   })
 
   it('says when a folder does not exist', async () => {
@@ -300,7 +306,7 @@ describe('Vault explorer: Env', () => {
     await within(dialog()).findByText('v1')
     expect(within(dialog()).getAllByText('Hidden')).toHaveLength(2) // v3 and v2
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Reveal v1' }))
-    expect(await within(dialog()).findByText('sk_live_51Hc2f…old1')).toBeInTheDocument()
+    expect(await within(dialog()).findByText('example_stripe_key_51Hc2f…old1')).toBeInTheDocument()
   })
 
   it('opens a key’s history on double-click', async () => {
@@ -372,6 +378,41 @@ describe('Vault explorer: Conf', () => {
     fireEvent.click(await within(preview()).findByRole('button', { name: 'History' }))
     fireEvent.click(await screen.findByRole('button', { name: /^v2/ }))
     expect(await screen.findByText('v2 → v3 (in use)')).toBeInTheDocument()
+  })
+
+  it('creates a file from the New file dialog and opens it', async () => {
+    openAt('/vault/1/conf')
+    await list('Contents of Conf')
+    fireEvent.click(screen.getByRole('button', { name: 'New file' }))
+    const form = within(await screen.findByRole('dialog'))
+    fireEvent.change(form.getByLabelText('File name'), { target: { value: 'redis.conf' } })
+    fireEvent.change(await form.findByLabelText('Tag'), { target: { value: '1' } })
+    fireEvent.change(form.getByLabelText('Contents'), { target: { value: 'maxmemory 2gb' } })
+    fireEvent.click(form.getByRole('button', { name: 'Create file' }))
+    expect(await screen.findByText('Created redis.conf.')).toBeInTheDocument()
+    expect(await screen.findByLabelText('Contents of redis.conf')).toHaveValue('maxmemory 2gb')
+  })
+
+  it('rolls a file back to an older version from its history', async () => {
+    openAt('/vault/1/conf')
+    await list('Contents of Conf')
+    fireEvent.click(row('app.yaml', 'production'))
+    fireEvent.click(await within(preview()).findByRole('button', { name: 'History' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^v1/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Use v1' }))
+    expect(await screen.findByText('app.yaml now uses v1.')).toBeInTheDocument()
+  })
+
+  it('deletes a file after confirming', async () => {
+    openAt('/vault/1/conf')
+    await list('Contents of Conf')
+    fireEvent.click(row('worker.toml'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete worker.toml' }))
+    fireEvent.click(
+      within(await screen.findByRole('dialog', { name: 'Delete config file' })).getByRole('button', { name: 'Delete file' }),
+    )
+    expect(await screen.findByText('Deleted worker.toml.')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('worker.toml', { selector: 'span' })).not.toBeInTheDocument())
   })
 })
 

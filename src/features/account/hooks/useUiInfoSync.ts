@@ -14,63 +14,143 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Syncs the theme choice with the account's saved UI preferences. */
+/**
+ * Keeps the app in step with the account's UI preferences (`ui_info`, see features/account/uiInfo.ts),
+ * so they follow the user across devices and sign-ins: theme, sidebar, selected tag, Vault view and
+ * the last page they were on.
+ */
 
-import { useAtom } from 'jotai'
+import type { QueryClient } from '@tanstack/react-query'
+import { atom, useAtom, type PrimitiveAtom, type WritableAtom } from 'jotai'
 import { useEffect, useRef } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { sidebarCollapsedAtom } from '@/app/sidebar'
 import { themeAtom, themeUnsyncedAtom, type Theme } from '@/app/theme'
-import { useSaveUiInfo, useUiInfo } from './useAccount'
+import { ROUTES } from '@/constants/routes'
+import { selectedTagIdAtom } from '@/features/tags/store/selectedTag'
+import { explorerViewAtom } from '@/pages/vault/explorer/explorerView'
+import { isRestorablePath, parseUiInfo, type UiInfo } from '../uiInfo'
+import { updateUiInfo, useUiInfo, useUpdateUiInfo } from './useAccount'
 
-/** Valid theme values, used to ignore anything unexpected stored in ui_info. */
-const THEMES: readonly Theme[] = ['light', 'dark', 'system']
-const isTheme = (value: unknown): value is Theme => THEMES.includes(value as Theme)
+/** Set by a fresh sign-in: once the preferences load, go back to the page the user was last on. */
+export const returnToLastPageAtom = atom(false)
+
+/** How long someone stays on a page before it's saved as their last page (keeps requests down). */
+export const LAST_PAGE_SAVE_MS = 3000
+
+/** The page not yet saved as the last one, so signing out can save it straight away. */
+let unsavedPath: string | null = null
+
+/** Saves the current page as the last one now (on sign-out), giving up after a moment. */
+export const flushLastPage = async (queryClient: QueryClient): Promise<void> => {
+  if (!unsavedPath) return
+  const path = unsavedPath
+  unsavedPath = null
+  await Promise.race([
+    updateUiInfo(queryClient, { lastLocation: { path, at: new Date().toISOString() } }).catch(() => {}),
+    new Promise((resolve) => setTimeout(resolve, 1500)),
+  ])
+}
 
 /**
- * Keeps the theme in step with the account's `ui_info` so it follows the user across devices.
- *
- * The newest choice wins:
- * - on load, a theme picked on this device that never reached the account (e.g. on the sign-in
- *   page) is saved to the account; otherwise the account's saved theme is applied;
- * - later changes are written back, merged into the rest of `ui_info`.
+ * One preference: on the first load the account's saved value wins (if it has one); after that,
+ * changes made here are written back.
  */
-export const useUiInfoSync = (): void => {
-  const [theme, setTheme] = useAtom(themeAtom)
-  const [unsynced, setUnsynced] = useAtom(themeUnsyncedAtom)
-  const { data: uiInfo } = useUiInfo()
-  const { mutate: save } = useSaveUiInfo()
-  // The theme both sides agree on; null until ui_info has loaded.
-  const synced = useRef<Theme | null>(null)
-  // Latest theme, so a slow save doesn't clear the flag for a newer, unsaved pick.
-  const latest = useRef(theme)
-  useEffect(() => {
-    latest.current = theme
-  }, [theme])
+const useSyncedPreference = <T>(
+  stateAtom: PrimitiveAtom<T> | WritableAtom<T, [T], void>,
+  saved: T | undefined,
+  loaded: boolean,
+  toPatch: (value: T) => Partial<UiInfo>,
+) => {
+  const [value, setValue] = useAtom(stateAtom)
+  const update = useUpdateUiInfo()
+  const synced = useRef<{ value: T } | null>(null)
 
   useEffect(() => {
-    if (!uiInfo) return
-
-    /** Saves `value` to the account, then clears the "not saved yet" flag if nothing newer was picked. */
-    const push = (value: Theme) =>
-      save({ ...uiInfo, theme: value }, { onSuccess: () => latest.current === value && setUnsynced(false) })
-
-    /** First load: decide which side is newer. */
+    if (!loaded) return
     if (synced.current === null) {
-      synced.current = theme
-      if (unsynced) {
-        // Picked on this device since the last save: the account catches up.
-        if (uiInfo.theme === theme) setUnsynced(false)
-        else push(theme)
-      } else if (isTheme(uiInfo.theme)) {
-        synced.current = uiInfo.theme
-        if (uiInfo.theme !== theme) setTheme(uiInfo.theme)
-      }
-      // Nothing saved and nothing picked: don't write until the user actually picks a theme.
+      synced.current = { value: saved === undefined ? value : saved }
+      if (saved !== undefined && saved !== value) setValue(saved)
       return
     }
+    if (value === synced.current.value) return
+    synced.current = { value }
+    update(toPatch(value)).catch(() => {}) // a preference that didn't save is retried with the next change
+  }, [loaded, saved, value, setValue, update, toPatch])
+}
 
-    /** Afterwards: write back only when the theme actually changed. */
-    if (theme === synced.current) return
-    synced.current = theme
-    push(theme)
-  }, [uiInfo, theme, unsynced, setTheme, setUnsynced, save])
+const sidebarPatch = (v: boolean): Partial<UiInfo> => ({ sidebarCollapsed: v })
+const tagPatch = (v: number | null): Partial<UiInfo> => ({ selectedTagId: v })
+const vaultViewPatch = (v: 'icons' | 'details'): Partial<UiInfo> => ({ vaultView: v })
+
+export const useUiInfoSync = (): void => {
+  const { data: raw } = useUiInfo()
+  const info = raw ? parseUiInfo(raw).info : undefined
+  const loaded = !!raw
+  const update = useUpdateUiInfo()
+
+  // ── theme: the newest choice wins (it can be picked on the sign-in page, before the account loads)
+  const [theme, setTheme] = useAtom(themeAtom)
+  const [unsynced, setUnsynced] = useAtom(themeUnsyncedAtom)
+  const syncedTheme = useRef<Theme | null>(null)
+  const latestTheme = useRef(theme)
+  useEffect(() => {
+    latestTheme.current = theme
+  }, [theme])
+  useEffect(() => {
+    if (!info) return
+    const push = (value: Theme) =>
+      update({ theme: value })
+        .then(() => latestTheme.current === value && setUnsynced(false))
+        .catch(() => {})
+    if (syncedTheme.current === null) {
+      syncedTheme.current = theme
+      if (unsynced) {
+        // picked on this device since the last save: the account catches up
+        if (info.theme === theme) setUnsynced(false)
+        else void push(theme)
+      } else if (info.theme) {
+        syncedTheme.current = info.theme
+        if (info.theme !== theme) setTheme(info.theme)
+      }
+      return // nothing saved and nothing picked: don't write until the user picks a theme
+    }
+    if (theme === syncedTheme.current) return
+    syncedTheme.current = theme
+    void push(theme)
+    // `loaded` matters on its own: with no saved theme, info?.theme is undefined before and after the load
+  }, [loaded, info?.theme, theme, unsynced, setTheme, setUnsynced, update]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── other preferences
+  useSyncedPreference(sidebarCollapsedAtom, info?.sidebarCollapsed, loaded, sidebarPatch)
+  useSyncedPreference(selectedTagIdAtom, info?.selectedTagId, loaded, tagPatch)
+  useSyncedPreference(explorerViewAtom, info?.vaultView, loaded, vaultViewPatch)
+
+  // ── last page: go back to it after signing in, and remember where the user is now
+  const { pathname, search } = useLocation()
+  const navigate = useNavigate()
+  const [returnToLastPage, setReturnToLastPage] = useAtom(returnToLastPageAtom)
+  const here = pathname + search
+  const lastPath = info?.lastLocation?.path
+
+  useEffect(() => {
+    if (!loaded || !returnToLastPage) return
+    setReturnToLastPage(false)
+    // only from the default landing page: a link the user followed to sign in takes priority
+    if (pathname === ROUTES.overview && isRestorablePath(lastPath) && lastPath !== here) navigate(lastPath, { replace: true })
+  }, [loaded, returnToLastPage, setReturnToLastPage, pathname, here, lastPath, navigate])
+
+  useEffect(() => {
+    // wait for the preferences (and any return to the last page) before recording where we are
+    if (!loaded || returnToLastPage || !isRestorablePath(here) || here === lastPath) {
+      if (here === lastPath) unsavedPath = null
+      return
+    }
+    unsavedPath = here
+    const timer = setTimeout(() => {
+      unsavedPath = null
+      update({ lastLocation: { path: here, at: new Date().toISOString() } }).catch(() => {})
+    }, LAST_PAGE_SAVE_MS)
+    return () => clearTimeout(timer)
+  }, [loaded, returnToLastPage, here, lastPath, update])
 }

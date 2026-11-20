@@ -28,6 +28,7 @@ import { RequireAuth, RequireGuest } from './guards'
 import { AppShell } from '@/components/templates/AppShell'
 import { ScreenLoader } from '@/components/organisms/ScreenLoader'
 import { APP_PAGES, APP_SECTIONS, ROUTES, VAULT_REDIRECTS } from '@/constants/routes'
+import { useForgetSuperAdminKeyElsewhere } from '@/features/superAdmin/store/adminKey'
 import {
   AccountPage,
   AdminApiKeysPage,
@@ -41,7 +42,10 @@ import {
   LoginPage,
   NotFoundPage,
   preloadLinksOnIntent,
+  OrganizationDetailPage,
+  OrganizationsPage,
   OverviewPage,
+  SuperAdminShell,
   TagsPage,
   TwoFactorPage,
   VaultPage,
@@ -61,13 +65,24 @@ const BUILT_PAGES: Partial<Record<string, ReactNode>> = {
   [ROUTES.workflows]: <WorkflowsPage />,
 }
 
+/** Router-level effects that need the current location. */
+const RouteEffects = () => {
+  // the super-admin key never outlives the super-admin pages
+  useForgetSuperAdminKeyElsewhere()
+  return null
+}
+
 /** All application routes. Sections that are not built yet render ComingSoonPage. */
 export const AppRouter = () => {
   // Hovering or focusing any in-app link starts loading that page's code
   useEffect(preloadLinksOnIntent, [])
 
+  // No transitions: by default React Router switches pages inside React.startTransition, which keeps
+  // the old page on screen (and hides the loading screen) until the new page's code has downloaded,
+  // so a click looked like it did nothing. Switching at once shows the loading screen straight away.
   return (
-    <BrowserRouter>
+    <BrowserRouter useTransitions={false}>
+      <RouteEffects />
       {/* Full-screen loading screen while a page's code downloads (sign-in pages, not-found); AppShell has its own boundary so the sidebar stays put */}
       <Suspense fallback={<ScreenLoader messages={['Loading page']} />}>
         <Routes>
@@ -128,6 +143,11 @@ export const AppRouter = () => {
               <Route key={path} path={path} element={<Navigate to={children![0].path} replace />} />
             ))}
             <Route path={ROUTES.account} element={<AccountPage />} />
+          </Route>
+          {/* Super admin: its own layout and key prompt, open whether or not anyone is signed in */}
+          <Route path={ROUTES.superAdmin} element={<SuperAdminShell />}>
+            <Route index element={<OrganizationsPage />} />
+            <Route path={ROUTES.superAdminOrganization} element={<OrganizationDetailPage />} />
           </Route>
           {/* Anything unmatched */}
           <Route path="*" element={<NotFoundPage />} />

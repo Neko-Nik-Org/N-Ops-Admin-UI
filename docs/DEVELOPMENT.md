@@ -123,7 +123,9 @@ Light, dark, and system modes come from `src/app/theme.ts` (a Jotai atom persist
 override defined together. Use these tokens instead of hard-coded colors. The loader styles map
 their colors onto them at the top of `styles/n-loading.css`, so they follow the theme too.
 
-Fonts are IBM Plex Sans and IBM Plex Mono (SIL Open Font License), loaded from Google Fonts.
+Fonts are IBM Plex Sans and IBM Plex Mono (SIL Open Font License), bundled with the app from the
+`@fontsource` packages (Latin subset, only the weights in use), so the app makes no requests to an
+outside font service.
 
 ## Runtime configuration
 

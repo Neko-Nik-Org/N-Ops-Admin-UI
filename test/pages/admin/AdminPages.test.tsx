@@ -253,7 +253,7 @@ describe('AdminUsersPage', () => {
 })
 
 describe('AdminRolesPage', () => {
-  const ROLE_PERMS = ['user:role:view', 'user:role:create', 'user:role:update', 'user:role:delete']
+  const ROLE_PERMS = ['user:role:view', 'user:role:create', 'user:role:edit', 'user:role:delete']
   const admin = (overrides: Parameters<typeof makeUser>[0] = {}) =>
     makeUser({ permissions: ['tag:create', 'tag:edit', 'tag:delete', ...ROLE_PERMS], ...overrides })
 
@@ -327,7 +327,7 @@ describe('AdminRolesPage', () => {
     // Edit stays visible but disabled, naming the permission the API checks
     const edit = screen.getAllByRole('button', { name: /^Edit / })[0]!
     expect(edit).toBeDisabled()
-    expect(edit).toHaveAttribute('title', expect.stringContaining('user:role:update'))
+    expect(edit).toHaveAttribute('title', expect.stringContaining('user:role:edit'))
     expect(screen.queryByRole('button', { name: /^Delete / })).not.toBeInTheDocument()
   })
 
