@@ -22,6 +22,8 @@ export interface Organization {
   organizationName: string
   /** Free-form profile (website, contact, address…), as the organization saved it. */
   organizationInfo: Record<string, unknown>
+  /** Free-form billing details (GST, plan, SLA…), only super admins see it. */
+  billingInfo: Record<string, unknown>
   isActive: boolean
   aiCredit: { used: number; allocated: number }
   storageBytes: { used: number; allocated: number }
@@ -32,4 +34,24 @@ export interface Organization {
   vaultKeysPerProjectLimit: number
   vaultNotesLimit: number
   createdAt: string
+}
+
+/** The plan limits an organization runs under (`UpdateOrgQuotaDto`). */
+export interface OrganizationLimits {
+  aiCredit: number
+  storageBytes: number
+  userLimit: number
+  serverLimit: number
+  workflowLimit: number
+  vaultProjectLimit: number
+  vaultKeysPerProjectLimit: number
+  vaultNotesLimit: number
+}
+
+/** Everything needed to create an organization (`CreateOrgDto`). */
+export interface NewOrganization extends OrganizationLimits {
+  organizationName: string
+  organizationInfo: Record<string, unknown>
+  billingInfo: Record<string, unknown>
+  isActive: boolean
 }

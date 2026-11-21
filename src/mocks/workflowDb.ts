@@ -66,9 +66,6 @@ export const VERIFIED_RECIPIENTS: readonly string[] = [
   'priya@acme.dev',
 ]
 
-/** Models the AI step offers. */
-export const AI_MODELS: readonly string[] = ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-opus-5-5']
-
 // ── Node builders ────────────────────────────────────────
 
 type NodeOf<T extends WorkflowNode['type']> = Extract<WorkflowNode, { type: T }>

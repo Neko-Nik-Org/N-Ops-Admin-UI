@@ -16,10 +16,21 @@
  */
 /** Super-admin data hooks. Everything is keyed by the admin key, so a new key never sees old results. */
 
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { useAtomValue } from 'jotai'
-import { getOrganization, listOrganizations } from '../api/organizations'
+import {
+  createOrganization,
+  deleteOrganization,
+  getOrganization,
+  isOrganizationNameAvailable,
+  listOrganizations,
+  renameOrganization,
+  setOrganizationActive,
+  updateOrganizationDetails,
+  updateOrganizationLimits,
+} from '../api/organizations'
+import type { NewOrganization, OrganizationLimits } from '../types'
 import { superAdminKeyAtom } from '../store/adminKey'
 
 /** Under ['system', …] so signing a normal user out doesn't drop it (see AppProviders). */
@@ -63,4 +74,55 @@ export const useOrganization = (organizationId: string) => {
     retry: false,
     staleTime: FRESH_MS,
   })
+}
+
+/**
+ * A super-admin change, sent with the current key. Afterwards the list and any open organization
+ * reload, even when the change failed half-way.
+ */
+const useOrgMutation = <V>(run: (adminKey: string, vars: V) => Promise<void>) => {
+  const adminKey = useAtomValue(superAdminKeyAtom)
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: V) => (adminKey ? run(adminKey, vars) : Promise.reject(new Error('Enter the admin key first.'))),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: KEY }),
+  })
+}
+
+export const useCreateOrganization = () => useOrgMutation((key, org: NewOrganization) => createOrganization(key, org))
+
+export const useRenameOrganization = () =>
+  useOrgMutation((key, { organizationId, name }: { organizationId: string; name: string }) =>
+    renameOrganization(key, organizationId, name),
+  )
+
+export const useSetOrganizationActive = () =>
+  useOrgMutation((key, { organizationId, isActive }: { organizationId: string; isActive: boolean }) =>
+    setOrganizationActive(key, organizationId, isActive),
+  )
+
+export const useUpdateOrganizationLimits = () =>
+  useOrgMutation((key, { organizationId, limits }: { organizationId: string; limits: OrganizationLimits }) =>
+    updateOrganizationLimits(key, organizationId, limits),
+  )
+
+export const useUpdateOrganizationDetails = () =>
+  useOrgMutation(
+    (
+      key,
+      {
+        organizationId,
+        which,
+        details,
+      }: { organizationId: string; which: 'profile' | 'billing'; details: Record<string, unknown> },
+    ) => updateOrganizationDetails(key, organizationId, which, details),
+  )
+
+export const useDeleteOrganization = () =>
+  useOrgMutation((key, organizationId: string) => deleteOrganization(key, organizationId))
+
+/** Name availability with the current key (true = free). */
+export const useCheckOrganizationName = () => {
+  const adminKey = useAtomValue(superAdminKeyAtom)
+  return useCallback((name: string) => isOrganizationNameAvailable(adminKey ?? '', name), [adminKey])
 }

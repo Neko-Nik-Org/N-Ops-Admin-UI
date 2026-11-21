@@ -15,10 +15,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Full-screen and per-panel loaders built on NLoader. */
+/** Full-screen and content-area loading screens built on NLoader. */
 
-import { useEffect, useState, type ReactNode } from 'react'
-import { NLoader, type NLoaderVariant } from '@/components/molecules/NLoader'
+import { useEffect, useState } from 'react'
+import { NLoader } from '@/components/molecules/NLoader'
 import { cn } from '@/utils/cn'
 
 /** Props for ScreenLoader. */
@@ -105,27 +105,6 @@ export function ScreenLoader({
           {pct == null ? <span className="is-indeterminate" /> : <span style={{ transform: `scaleX(${pct})` }} />}
         </div>
       </div>
-    </div>
-  )
-}
-
-/** Props for PanelLoader. */
-export interface PanelLoaderProps {
-  /** Short text under the mark, e.g. "Refreshing servers". */
-  label?: ReactNode
-  variant?: NLoaderVariant
-  size?: number
-}
-
-/**
- * Covers one card, table or chart while it refreshes, keeping the old content faintly visible.
- * The parent needs `position: relative`.
- */
-export function PanelLoader({ label = 'Loading', variant = 'trace', size = 40 }: PanelLoaderProps) {
-  return (
-    <div className="n-panel-loader" role="status" aria-live="polite">
-      <NLoader size={size} variant={variant} decorative />
-      <span>{label}</span>
     </div>
   )
 }

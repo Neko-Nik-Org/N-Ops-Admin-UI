@@ -21,6 +21,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import type { AxiosRequestConfig } from 'axios'
 import { createStore, Provider } from 'jotai'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
+import { ToastContainer } from 'react-toastify'
 import { describe, expect, it, vi } from 'vitest'
 import { ROUTES } from '@/constants/routes'
 import { isSuperAdminPath, SUPER_ADMIN_KEY_STORAGE, useForgetSuperAdminKeyElsewhere } from '@/features/superAdmin/store/adminKey'
@@ -42,6 +43,8 @@ const serve = () =>
     if ((config?.headers as Record<string, string> | undefined)?.['x-nops-admin-key'] !== 'good')
       throw new ApiError('Unauthorized: Missing or Invalid Admin Key', 401)
     if (url === '/super-admin/organization/list') return { data: ORGS }
+    if (url.startsWith('/super-admin/organization/check-name/'))
+      return { data: { is_available: !ORGS.some((o) => o.organization_name === decodeURIComponent(url.split('/').pop()!)) } }
     return { data: ORGS.find((o) => url.endsWith(`/${o.organization_id}`)) ?? null }
   })
 
@@ -66,6 +69,7 @@ const renderAt = (route: string) =>
             </Route>
           </Routes>
         </MemoryRouter>
+        <ToastContainer />
       </Provider>
     </QueryClientProvider>,
   )
@@ -158,5 +162,147 @@ describe('Super admin', () => {
     expect(isSuperAdminPath('/super-admin/organizations/a-1')).toBe(true)
     expect(isSuperAdminPath('/super-administrators')).toBe(false)
     expect(isSuperAdminPath('/admin/users')).toBe(false)
+  })
+})
+
+describe('Super admin: managing organizations', () => {
+  const key = { 'x-nops-admin-key': 'good' }
+  /** Opens a page with the key already saved, as after a reload. */
+  const openWithKey = (route: string) => {
+    secureStorage.setItem(SUPER_ADMIN_KEY_STORAGE, '"good"')
+    serve()
+    return renderAt(route)
+  }
+  const dialog = (name: string | RegExp) => within(screen.getByRole('dialog', { name }))
+
+  it('creates an organization after checking its name, with its limits, profile and billing', async () => {
+    client.post.mockResolvedValue({ data: '' })
+    openWithKey('/super-admin')
+    fireEvent.click(await screen.findByRole('button', { name: 'New organization' }))
+    const form = dialog('New organization')
+    fireEvent.change(form.getByLabelText('Name'), { target: { value: 'Acme' } })
+    fireEvent.click(form.getByRole('button', { name: 'Create organization' }))
+    expect(await form.findByText('That name is already taken.')).toBeInTheDocument()
+    expect(client.post).not.toHaveBeenCalled()
+
+    fireEvent.change(form.getByLabelText('Name'), { target: { value: 'Initech' } })
+    fireEvent.change(form.getByLabelText('Users'), { target: { value: '0' } })
+    fireEvent.click(form.getByRole('button', { name: 'Create organization' }))
+    expect(await form.findByText('At least 1.')).toBeInTheDocument()
+
+    fireEvent.change(form.getByLabelText('Users'), { target: { value: '40' } })
+    fireEvent.change(form.getByLabelText('Storage (GB)'), { target: { value: '2.5' } })
+    fireEvent.change(form.getByLabelText('profile value 1'), { target: { value: 'https://initech.example' } })
+    fireEvent.click(within(form.getByRole('group', { name: 'Billing' })).getByRole('button', { name: 'Add field' }))
+    fireEvent.change(form.getByLabelText('billing label 1'), { target: { value: 'gst' } })
+    fireEvent.change(form.getByLabelText('billing value 1'), { target: { value: '29ABCDE1234F1Z5' } })
+    fireEvent.click(form.getByRole('button', { name: 'Create organization' }))
+
+    expect(await screen.findByText('Created Initech.')).toBeInTheDocument()
+    expect(client.post).toHaveBeenCalledWith(
+      '/super-admin/organization/create',
+      {
+        organization_name: 'Initech',
+        organization_info: { website: 'https://initech.example' }, // the empty contact_email row is left out
+        billing_info: { gst: '29ABCDE1234F1Z5' },
+        is_active: true,
+        allocated_ai_credit: 1000,
+        allocated_storage_bytes: Math.round(2.5 * 1024 ** 3),
+        user_limit: 40,
+        server_limit: 50,
+        workflow_limit: 20,
+        ss_project_limit: 10,
+        ss_keys_limit: 200,
+        ss_notes_limit: 100,
+      },
+      { headers: key },
+    )
+  })
+
+  it('renames an organization, refusing a name another one has', async () => {
+    client.put.mockResolvedValue({ data: '' })
+    openWithKey('/super-admin/organizations/a-1')
+    fireEvent.click(await screen.findByRole('button', { name: 'Rename' }))
+    const form = dialog('Rename Acme')
+    fireEvent.change(form.getByLabelText('New name'), { target: { value: 'Globex' } })
+    fireEvent.click(form.getByRole('button', { name: 'Rename' }))
+    expect(await form.findByText('That name is already taken.')).toBeInTheDocument()
+    fireEvent.change(form.getByLabelText('New name'), { target: { value: 'Acme Corp' } })
+    fireEvent.click(form.getByRole('button', { name: 'Rename' }))
+    expect(await screen.findByText('Renamed to Acme Corp.')).toBeInTheDocument()
+    expect(client.put).toHaveBeenCalledWith('/super-admin/organization/update/name/a-1', '"Acme Corp"', {
+      headers: { ...key, 'Content-Type': 'application/json' },
+    })
+  })
+
+  it('disables an active organization after confirming', async () => {
+    client.put.mockResolvedValue({ data: '' })
+    openWithKey('/super-admin/organizations/a-1')
+    fireEvent.click(await screen.findByRole('button', { name: 'Disable' }))
+    fireEvent.click(dialog('Disable organization').getByRole('button', { name: 'Disable' }))
+    expect(await screen.findByText('Disabled Acme.')).toBeInTheDocument()
+    expect(client.put).toHaveBeenCalledWith('/super-admin/organization/state/a-1/false', null, { headers: key })
+  })
+
+  it("won't lower AI credit or storage below what's used, and saves valid limits", async () => {
+    client.put.mockResolvedValue({ data: '' })
+    openWithKey('/super-admin/organizations/a-1') // 250 AI credit and 1 GB used
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit plan limits' }))
+    const form = dialog('Plan limits for Acme')
+    expect(form.getByLabelText('Storage (GB)')).toHaveValue(10)
+    fireEvent.change(form.getByLabelText('AI credit'), { target: { value: '100' } })
+    fireEvent.change(form.getByLabelText('Storage (GB)'), { target: { value: '0.5' } })
+    fireEvent.click(form.getByRole('button', { name: 'Save limits' }))
+    expect(await form.findByText(/At least 250: that much is already used/)).toBeInTheDocument()
+    expect(form.getByText(/At least 1.0 GB: that much is already used/)).toBeInTheDocument()
+    expect(client.put).not.toHaveBeenCalled()
+
+    fireEvent.change(form.getByLabelText('AI credit'), { target: { value: '5000' } })
+    fireEvent.change(form.getByLabelText('Storage (GB)'), { target: { value: '20' } })
+    fireEvent.click(form.getByRole('button', { name: 'Save limits' }))
+    expect(await screen.findByText('Updated the limits for Acme.')).toBeInTheDocument()
+    expect(client.put).toHaveBeenCalledWith(
+      '/super-admin/organization/update/quota/a-1',
+      expect.objectContaining({ allocated_ai_credit: 5000, allocated_storage_bytes: 20 * 1024 ** 3, user_limit: 25 }),
+      { headers: key },
+    )
+  })
+
+  it('edits billing details, keeping non-text values', async () => {
+    client.put.mockResolvedValue({ data: '' })
+    ORGS[0] = rawOrg('a-1', 'Acme', { billing_info: { plan: 'pro', seats: 25 } })
+    try {
+      openWithKey('/super-admin/organizations/a-1')
+      expect(await screen.findByText('pro')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Edit billing' }))
+      const form = dialog('Billing details for Acme')
+      expect(form.getByText('1 other saved value is kept as they are.')).toBeInTheDocument()
+      fireEvent.change(form.getByLabelText('rows value 1'), { target: { value: 'enterprise' } })
+      fireEvent.click(form.getByRole('button', { name: 'Save details' }))
+      expect(await screen.findByText('Saved the billing details for Acme.')).toBeInTheDocument()
+      expect(client.put).toHaveBeenCalledWith(
+        '/super-admin/organization/update/billing/a-1',
+        { seats: 25, plan: 'enterprise' },
+        { headers: key },
+      )
+    } finally {
+      ORGS[0] = rawOrg('a-1', 'Acme')
+    }
+  })
+
+  it('deletes only after the name is typed, then goes back to the list', async () => {
+    client.delete.mockResolvedValue({ data: '' })
+    openWithKey('/super-admin/organizations/a-1')
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    const form = dialog('Delete organization')
+    const confirm = form.getByRole('button', { name: 'Delete organization' })
+    expect(confirm).toBeDisabled()
+    fireEvent.change(form.getByLabelText('Type Acme to confirm'), { target: { value: 'acme' } })
+    expect(confirm).toBeDisabled() // exact name only
+    fireEvent.change(form.getByLabelText('Type Acme to confirm'), { target: { value: 'Acme' } })
+    fireEvent.click(confirm)
+    expect(await screen.findByText('Deleted Acme.')).toBeInTheDocument()
+    expect(client.delete).toHaveBeenCalledWith('/super-admin/organization/delete/a-1', { headers: key })
+    expect(await screen.findByRole('heading', { name: 'Organizations' })).toBeInTheDocument()
   })
 })

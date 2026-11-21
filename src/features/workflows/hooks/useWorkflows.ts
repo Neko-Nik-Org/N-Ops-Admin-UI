@@ -21,7 +21,6 @@ import {
   decideRunApproval,
   deleteWorkflow,
   getWorkflow,
-  listVerifiedRecipients,
   listWorkflowRuns,
   listWorkflows,
   listWorkflowServers,
@@ -35,7 +34,6 @@ const KEYS = {
   detail: (id: number) => ['workflows', 'detail', id] as const,
   runs: (id: number) => ['workflows', 'runs', id] as const,
   servers: ['workflows', 'servers'] as const,
-  recipients: ['workflows', 'recipients'] as const,
 }
 
 const useWorkflowMutation = <V, R>(fn: (vars: V) => Promise<R>) => {
@@ -59,9 +57,6 @@ export const useWorkflowRuns = (workflowId: number | null) =>
   useQuery({ queryKey: KEYS.runs(workflowId ?? 0), queryFn: () => listWorkflowRuns(workflowId!), enabled: workflowId !== null })
 
 export const useWorkflowServers = () => useQuery({ queryKey: KEYS.servers, queryFn: listWorkflowServers, staleTime: Infinity })
-
-export const useVerifiedRecipients = () =>
-  useQuery({ queryKey: KEYS.recipients, queryFn: listVerifiedRecipients, staleTime: Infinity })
 
 export const useSetWorkflowEnabled = () =>
   useWorkflowMutation(({ workflowId, enabled }: { workflowId: number; enabled: boolean }) =>

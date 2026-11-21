@@ -16,16 +16,19 @@
  */
 /** Super admin › Organizations (/super-admin): every organization with its plan and usage. */
 
+import { Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/atoms/Badge'
 import { Select } from '@/components/atoms/Select'
+import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'
 import { TableSkeleton } from '@/components/molecules/Skeleton'
 import { superAdminOrganizationPath } from '@/constants/routes'
 import { useOrganizations } from '@/features/superAdmin/hooks/useOrganizations'
 import { formatBytes, formatDate, formatNumber } from '@/utils/format'
+import { NewOrganizationDialog } from './OrganizationDialogs'
 
 /** "used / total" with a thin bar; warning color past 85 %. */
 const Usage = ({ used, total, format = formatNumber }: { used: number; total: number; format?: (n: number) => string }) => {
@@ -50,6 +53,7 @@ export const OrganizationsPage = () => {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
+  const [creating, setCreating] = useState(false)
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -65,7 +69,14 @@ export const OrganizationsPage = () => {
       <PageHeader
         title="Organizations"
         badge={orgs && <span className="text-sm text-text-muted">{formatNumber(orgs.length)}</span>}
+        actions={
+          <LoadingButton icon={<Plus size={15} />} onClick={() => setCreating(true)}>
+            New organization
+          </LoadingButton>
+        }
       />
+      {/* a new organization is found by name in the refreshed list, then opened */}
+      <NewOrganizationDialog open={creating} onClose={() => setCreating(false)} onCreated={setSearch} />
       {isLoading ? (
         <TableSkeleton rows={6} columns={6} />
       ) : error ? (

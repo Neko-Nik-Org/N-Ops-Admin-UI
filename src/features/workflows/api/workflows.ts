@@ -333,9 +333,3 @@ export const listWorkflowServers = async (): Promise<WorkflowServer[]> => {
   await mockDelay()
   return clone([...WORKFLOW_SERVERS])
 }
-
-/** Email addresses alerts may send to. Future: the organization's verified addresses. */
-export const listVerifiedRecipients = async (): Promise<string[]> => {
-  await mockDelay()
-  return [...VERIFIED_RECIPIENTS]
-}

@@ -487,30 +487,6 @@
   }
 }
 
-/* ───────────── PanelLoader: over one card or table while it refreshes ───────────── */
-.n-panel-loader {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  border-radius: inherit;
-  background: color-mix(in srgb, var(--n-panel) 78%, transparent);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-  color: var(--n-text-2);
-  font: 500 0.8438rem var(--n-font);
-  animation: n-fade-in 0.2s ease both;
-}
-@keyframes n-fade-in {
-  from {
-    opacity: 0;
-  }
-}
-
 /* ───────────── Skeletons ───────────── */
 .n-sk {
   display: block;
@@ -634,46 +610,6 @@
   }
 }
 
-/* ───────────── TopProgress: thin bar for page changes ───────────── */
-.n-top {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 0.1875rem;
-  z-index: 2000;
-  pointer-events: none;
-  overflow: hidden;
-  transition: opacity 0.3s ease 0.25s;
-}
-.n-top > span {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 35%;
-  background: linear-gradient(90deg, transparent, var(--n-mint) 40%, var(--n-violet));
-  box-shadow: 0 0 0.625rem color-mix(in srgb, var(--n-mint) 70%, transparent);
-  animation: n-top 1.1s cubic-bezier(0.65, 0, 0.35, 1) infinite;
-}
-.n-top.is-done {
-  opacity: 0;
-}
-.n-top.is-done > span {
-  animation: none;
-  width: 100%;
-  transform: none;
-  transition: width 0.25s ease;
-}
-@keyframes n-top {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(300%);
-  }
-}
-
 /* ───────────── Reduced motion: no movement, a calm fade so people still see it's working ───────────── */
 @media (prefers-reduced-motion: reduce) {
   .n-loader__line,
@@ -683,7 +619,6 @@
   .n-btn::after,
   .n-sk,
   .n-screen__bar > span,
-  .n-top > span,
   .n-screen__msg {
     animation: none !important;
   }
@@ -698,18 +633,13 @@
   }
   .n-loader svg,
   .n-spinner,
-  .n-screen__bar > .is-indeterminate,
-  .n-top > span {
+  .n-screen__bar > .is-indeterminate {
     animation: n-calm 2.4s ease-in-out infinite !important;
   }
   .n-spinner__head {
     stroke-dasharray: none;
   }
   .n-screen__bar > .is-indeterminate {
-    width: 100%;
-    transform: none;
-  }
-  .n-top > span {
     width: 100%;
     transform: none;
   }

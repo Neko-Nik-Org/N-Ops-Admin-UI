@@ -21,7 +21,7 @@ src/
   config/       typed env access (runtime env.js first, then VITE_* build values)
   constants/    route paths + sidebar sections (routes.ts), shared UI values (config.ts)
   features/     one folder per domain: account, admin, auth, dashboard, invite, tags, vault
-  hooks/        shared, feature-agnostic React hooks (useAsyncAction, useDelayedLoading)
+  hooks/        shared, feature-agnostic React hooks (useAsyncAction)
   lib/          axios instance, react-query client
   mocks/        in-memory fake backend for features whose API isn't built yet (admin, vault)
   pages/        route-level screens, composed from templates + features

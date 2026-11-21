@@ -34,7 +34,7 @@ window.__NOPS_ENV__ = { API_BASE_URL: 'https://api.test', TURNSTILE_SITE_KEY: 't
 // Every test talks to this fake instead of the network. lib/axios.ts itself is tested with vi.importActual.
 vi.mock('@/lib/axios', () => ({
   apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() },
-  superAdminClient: { get: vi.fn() },
+  superAdminClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }))
 
 // jsdom has no modal dialogs: emulate the open/close state the Dialog component relies on
