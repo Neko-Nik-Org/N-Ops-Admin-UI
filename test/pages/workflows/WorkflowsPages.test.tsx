@@ -17,10 +17,10 @@
 
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { resetAdminMock } from '@/mocks/adminDb'
-import { resetWorkflowMock, workflowDb } from '@/mocks/workflowDb'
-import { WorkflowDetailPage } from '@/pages/workflows/WorkflowDetailPage'
-import { WorkflowsPage } from '@/pages/workflows/WorkflowsPage'
+import { resetAdminMock } from '@/data/mockAdmin'
+import { resetWorkflowMock, workflowDb } from '@/data/mockWorkflows'
+import { WorkflowDetailPage } from '@/pages/workflows/details'
+import { WorkflowsPage } from '@/pages/workflows/list'
 import { renderWithProviders, serveLiveReads } from '../../testUtils'
 
 beforeEach(() => {

@@ -16,7 +16,7 @@
  */
 /** Organizations as /super-admin/organization/* returns them. */
 
-import type { RawOrganization } from '@/features/superAdmin/api/organizations'
+import type { RawOrganization } from '@/api/organizations'
 
 export const rawOrg = (id: string, name: string, extra: Partial<RawOrganization> = {}): RawOrganization => ({
   organization_id: id,

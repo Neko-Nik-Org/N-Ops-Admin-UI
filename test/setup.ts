@@ -18,7 +18,7 @@
  * Global test setup (runs before every test file, see vite.config.ts).
  *
  * - jest-dom matchers (toBeInTheDocument, ...)
- * - runtime config, so src/config/env.ts can load
+ * - runtime config, so src/utils/env.ts can load
  * - small stand-ins for browser APIs jsdom lacks (matchMedia, ResizeObserver, canvas)
  * - a mocked API client: every test controls responses via `api.get/post/put/delete` (see testUtils.tsx)
  * - a clean slate after each test: DOM, cookies, localStorage and mocks
@@ -27,12 +27,12 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
-import { initSecureStorage, resetSecureStorageForTests } from '@/lib/secureStorage'
+import { initSecureStorage, resetSecureStorageForTests } from '@/utils/secureStorage'
 
 window.__NOPS_ENV__ = { API_BASE_URL: 'https://api.test', TURNSTILE_SITE_KEY: 'test-site-key' }
 
-// Every test talks to this fake instead of the network. lib/axios.ts itself is tested with vi.importActual.
-vi.mock('@/lib/axios', () => ({
+// Every test talks to this fake instead of the network. api/client.ts itself is tested with vi.importActual.
+vi.mock('@/api/client', () => ({
   apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() },
   superAdminClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }))

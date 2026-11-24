@@ -14,12 +14,12 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tests for src/components/molecules/MultiSelect.tsx. */
+/** Tests for src/components/MultiSelect.tsx. */
 
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
-import { MultiSelect } from '@/components/molecules/MultiSelect'
+import { MultiSelect } from '@/components/MultiSelect'
 import { COUNTRY_OPTIONS } from '@/constants/countries'
 
 const OPTIONS = [

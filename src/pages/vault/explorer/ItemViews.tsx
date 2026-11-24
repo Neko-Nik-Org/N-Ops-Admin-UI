@@ -34,22 +34,22 @@ import {
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
-import { Badge } from '@/components/atoms/Badge'
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog'
-import { CopyButton } from '@/components/molecules/CopyButton'
-import { LoadingButton } from '@/components/molecules/LoadingButton'
-import { SkeletonText } from '@/components/molecules/Skeleton'
-import { ConfigFilePanel, NewConfigDialog } from '@/components/organisms/ConfigFilePanels'
-import { NoteForm, NotePanel, NoteShareDialog } from '@/components/organisms/NotePanels'
+import { Badge } from '@/components/Badge'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { CopyButton } from '@/components/CopyButton'
+import { LoadingButton } from '@/components/LoadingButton'
+import { SkeletonText } from '@/components/Skeleton'
+import { ConfigFilePanel, NewConfigDialog } from '@/pages/vault/ConfigFilePanels'
+import { NoteForm, NotePanel, NoteShareDialog } from '@/pages/vault/NotePanels'
 import {
   ExportDotenvDialog,
   ImportDotenvDialog,
   SecretDialog,
   SecretHistoryDialog,
   type SecretDialogState,
-} from '@/components/organisms/SecretDialogs'
-import { useTagOptions } from '@/features/admin/hooks/useTagOptions'
-import { useSelectedTag } from '@/features/tags/hooks/useTags'
+} from '@/pages/vault/SecretDialogs'
+import { useTagOptions } from '@/hooks/useTagOptions'
+import { useSelectedTag } from '@/hooks/useTags'
 import {
   useConfigs,
   useDeleteConfig,
@@ -58,8 +58,8 @@ import {
   useNotes,
   useRevealSecret,
   useSecrets,
-} from '@/features/vault/hooks/useVault'
-import type { ConfigFile, SecretKey, SecureNote, VaultProject } from '@/features/vault/types'
+} from '@/hooks/useVault'
+import type { ConfigFile, SecretKey, SecureNote, VaultProject } from '@/types/vault'
 import { formatBytes, formatDateTime, formatRelative } from '@/utils/format'
 import { FolderContents, FolderLayout, FolderPage, ListCard, LocalOnlyBadge, PreviewCard, SectionToolbar } from './ExplorerParts'
 import { FileGlyph } from './ExplorerIcons'

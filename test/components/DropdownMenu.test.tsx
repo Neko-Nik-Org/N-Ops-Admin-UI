@@ -14,11 +14,11 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tests for src/components/molecules/DropdownMenu.tsx: the menu opens where it fits. */
+/** Tests for src/components/DropdownMenu.tsx: the menu opens where it fits. */
 
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DropdownMenu } from '@/components/molecules/DropdownMenu'
+import { DropdownMenu } from '@/components/DropdownMenu'
 
 /** Puts the trigger at `top`–`top + 30` px in an 800 px tall window, with a 150 px tall menu. */
 const layout = (top: number) => {

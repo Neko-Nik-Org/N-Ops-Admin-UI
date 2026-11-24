@@ -14,12 +14,12 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tests for src/components/molecules/OtpInput.tsx: typing, deleting, moving and pasting a code. */
+/** Tests for src/components/OtpInput.tsx: typing, deleting, moving and pasting a code. */
 
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { OtpInput } from '@/components/molecules/OtpInput'
+import { OtpInput } from '@/components/OtpInput'
 
 /** Holds the value like a real form does. */
 const Harness = ({ onComplete, charset }: { onComplete?: (v: string) => void; charset?: 'numeric' | 'alphanumeric' }) => {

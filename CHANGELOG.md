@@ -49,6 +49,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- The code follows the team's Frontend Structure & Development Guidelines: a flat `src/` with
+  `api/`, `components/` (shared UI only), `constants/`, `data/`, `hooks/`, `pages/` (one folder per
+  page with an `index.tsx` and its own components and validation), `types/`, `utils/`, plus `routes/`
+  and `store/`. The atomic `components/{atoms,molecules,organisms,templates}` and `features/` folders
+  are gone. The UI looks and behaves the same.
 - The top bar stays fixed at the top while the page scrolls.
 - Admin › Access policies: allowed IPs are added from one input (+ or Enter) and listed below it,
   each with the range it covers. IPv4 and IPv6 addresses and CIDR ranges are checked with ipaddr.js

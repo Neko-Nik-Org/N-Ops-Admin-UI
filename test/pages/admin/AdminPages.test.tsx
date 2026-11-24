@@ -21,12 +21,12 @@
 
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { resetAdminMock } from '@/mocks/adminDb'
-import { AdminApiKeysPage } from '@/pages/admin/AdminApiKeysPage'
-import { AdminAuditLogsPage } from '@/pages/admin/AdminAuditLogsPage'
-import { AdminOrganizationPage } from '@/pages/admin/AdminOrganizationPage'
-import { AdminRolesPage } from '@/pages/admin/AdminRolesPage'
-import { AdminUsersPage } from '@/pages/admin/AdminUsersPage'
+import { resetAdminMock } from '@/data/mockAdmin'
+import { AdminApiKeysPage } from '@/pages/admin/apiKeys'
+import { AdminAuditLogsPage } from '@/pages/admin/auditLogs'
+import { AdminOrganizationPage } from '@/pages/admin/organization'
+import { AdminRolesPage } from '@/pages/admin/roles'
+import { AdminUsersPage } from '@/pages/admin/users'
 import { api, makeUser, RAW_ORG_INFO, RAW_USERS, rawRole, renderWithProviders, serveLiveReads } from '../../testUtils'
 
 const render = (ui: React.ReactElement, route: string) =>

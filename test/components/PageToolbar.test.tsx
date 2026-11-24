@@ -14,11 +14,11 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tests for src/components/molecules/PageToolbar.tsx: path on the left, buttons and Back together on the right. */
+/** Tests for src/components/PageToolbar.tsx: path on the left, buttons and Back together on the right. */
 
 import { screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { PageToolbar } from '@/components/molecules/PageToolbar'
+import { PageToolbar } from '@/components/PageToolbar'
 import { renderWithProviders } from '../testUtils'
 
 describe('PageToolbar', () => {

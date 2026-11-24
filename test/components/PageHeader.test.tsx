@@ -14,11 +14,11 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tests for src/components/molecules/PageHeader.tsx: the title is for screen readers unless asked for. */
+/** Tests for src/components/PageHeader.tsx: the title is for screen readers unless asked for. */
 
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { PageHeader } from '@/components/molecules/PageHeader'
+import { PageHeader } from '@/components/PageHeader'
 
 describe('PageHeader', () => {
   it('keeps the title only for screen readers, and takes no space with nothing else to show', () => {
