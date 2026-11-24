@@ -32,12 +32,11 @@ describe('ProfileMenu', () => {
     const menu = screen.getByRole('menu', { name: 'Profile' })
     expect(menu).toHaveTextContent('@priya · Acme')
 
-    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual([
-      'Profile',
-      'Security',
-      'Organization',
-      'Sign out',
-    ])
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((i) => i.textContent),
+    ).toEqual(['Profile', 'Security', 'Organization', 'Sign out'])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Security' }))
     expect(screen.getByTestId('location')).toHaveTextContent('/account/security')
   })
