@@ -24,10 +24,10 @@ import { useAtom } from 'jotai'
 import { ChevronRight, CloudOff, LayoutGrid, List, X } from 'lucide-react'
 import { useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { PageHeader } from '@/components/molecules/PageHeader'
-import { SearchInput } from '@/components/molecules/SearchInput'
+import { PageHeader } from '@/components/PageHeader'
+import { SearchInput } from '@/components/SearchInput'
 import { cn } from '@/utils/cn'
-import { explorerViewAtom } from './explorerView'
+import { explorerViewAtom } from '@/store/vaultExplorerView'
 
 /** One step of the folder path above the title. */
 export interface Crumb {

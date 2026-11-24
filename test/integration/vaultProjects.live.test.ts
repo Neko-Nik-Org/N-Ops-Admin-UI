@@ -29,17 +29,17 @@
 
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 
-vi.unmock('@/lib/axios') // test/setup.ts mocks the client for unit tests; this file needs the real one
+vi.unmock('@/api/client') // test/setup.ts mocks the client for unit tests; this file needs the real one
 
 const processEnv = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {}
 const API_URL = processEnv.NOPS_LIVE_API_URL
 
-const { apiClient } = await import('@/lib/axios')
-const { login } = await import('@/features/auth/api/login')
-const { getOrgInfo } = await import('@/features/account/api/account')
-const vp = await import('@/features/vault/api/vaultProjects')
+const { apiClient } = await import('@/api/client')
+const { login } = await import('@/api/login')
+const { getOrgInfo } = await import('@/api/account')
+const vp = await import('@/api/vaultProjects')
 const { createVaultProject, updateVaultProject } = vp
-const { setSessionToken } = await import('@/features/auth/store/sessionToken')
+const { setSessionToken } = await import('@/store/sessionToken')
 const { errorStatus } = await import('@/types/api')
 
 const failure = async (promise: Promise<unknown>) => {

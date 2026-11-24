@@ -27,19 +27,19 @@
 
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 
-vi.unmock('@/lib/axios') // test/setup.ts mocks the client for unit tests; this file needs the real one
+vi.unmock('@/api/client') // test/setup.ts mocks the client for unit tests; this file needs the real one
 
 const processEnv = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {}
 const API_URL = processEnv.NOPS_LIVE_API_URL
 
-const { apiClient } = await import('@/lib/axios')
-const { login } = await import('@/features/auth/api/login')
-const { verifySession } = await import('@/features/auth/api/session')
-const account = await import('@/features/account/api/account')
-const { listTags } = await import('@/features/tags/api/tags')
-const { getServiceHealth } = await import('@/features/system/api/health')
-const { setSessionToken, clearSessionToken } = await import('@/features/auth/store/sessionToken')
-const roles = await import('@/features/admin/api/roles')
+const { apiClient } = await import('@/api/client')
+const { login } = await import('@/api/login')
+const { verifySession } = await import('@/api/session')
+const account = await import('@/api/account')
+const { listTags } = await import('@/api/tags')
+const { getServiceHealth } = await import('@/api/health')
+const { setSessionToken, clearSessionToken } = await import('@/store/sessionToken')
+const roles = await import('@/api/roles')
 
 /** Signs in through the UI's login() and stores the session the way the app does. */
 const signIn = async (userName: string) => {

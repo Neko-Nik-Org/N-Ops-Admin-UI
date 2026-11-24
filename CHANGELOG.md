@@ -31,7 +31,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   show these fields with readable labels.
 - Admin › Users: edit someone's name, email and profile details, and change their role and access
   policy. Users show their access policy (its 2FA and sign-in limits) instead of per-user IP and
-  country fields, and Add user picks an access policy.
+  country fields, and Add user picks an access policy. Add user can also fill in the new user's
+  profile details (work, contact, availability, engineering), in a section that starts collapsed.
 - Admin › Invitations: invite someone by email with a role, an optional access policy, an expiry
   (1 hour to 21 days) and a note, see pending and expired invitations, and revoke them. Roles can
   grant the new View / Send / Revoke invitations permissions.
@@ -48,7 +49,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- The code follows the team's Frontend Structure & Development Guidelines: a flat `src/` with
+  `api/`, `components/` (shared UI only), `constants/`, `data/`, `hooks/`, `pages/` (one folder per
+  page with an `index.tsx` and its own components and validation), `types/`, `utils/`, plus `routes/`
+  and `store/`. The atomic `components/{atoms,molecules,organisms,templates}` and `features/` folders
+  are gone. The UI looks and behaves the same.
 - The top bar stays fixed at the top while the page scrolls.
+- Admin › Access policies: allowed IPs are added from one input (+ or Enter) and listed below it,
+  each with the range it covers. IPv4 and IPv6 addresses and CIDR ranges are checked with ipaddr.js
+  the way the API checks them; a range like 203.0.113.5/24 is refused with a one-click fix
+  (203.0.113.0/24), and pasting a list adds every valid entry.
+- Access policies: the country picker lists all 250 countries; it used to stop after the first 100
+  (around Honduras) unless you typed.
+- Admin › Access policies: viewing, creating, duplicating and editing a policy each open their own
+  page (`/admin/access-policies/<id>`, `/new`, `/new?from=<id>`, `/<id>/edit`) instead of a popup,
+  so they can be linked and bookmarked. Deleting still asks in a dialog.
+- Pages no longer show their name as a large title (the sidebar shows which page is open). Screen readers
+  still hear it. Pages about one item (an organization, a workflow) still show its name.
 - API errors keep their HTTP status, and short plain-text error bodies are shown as the message.
 - Shared components now all follow the atomic layout. The auth and loading components moved into
   the atoms, molecules, organisms, and templates folders.

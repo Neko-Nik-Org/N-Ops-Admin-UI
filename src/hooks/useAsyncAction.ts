@@ -18,7 +18,7 @@
 /** Async action state for LoadingButton: idle → loading → success. */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ButtonState } from '@/components/molecules/LoadingButton'
+import type { ButtonState } from '@/components/LoadingButton'
 
 /**
  * Drives a LoadingButton from an async function: idle → loading → success (for `successMs`) → idle.

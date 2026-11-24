@@ -14,12 +14,12 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tests for src/components/molecules/Dialog.tsx: a modal that stays out of the browser's top layer. */
+/** Tests for src/components/Dialog.tsx: a modal that stays out of the browser's top layer. */
 
 import { fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Dialog } from '@/components/molecules/Dialog'
+import { Dialog } from '@/components/Dialog'
 
 let root: HTMLDivElement
 

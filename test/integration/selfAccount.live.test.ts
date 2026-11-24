@@ -30,7 +30,7 @@
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.unmock('@/lib/axios') // test/setup.ts mocks the client for unit tests; this file needs the real one
+vi.unmock('@/api/client') // test/setup.ts mocks the client for unit tests; this file needs the real one
 
 /** Environment variables of the Vitest process (test files are type-checked without Node's types). */
 const processEnv = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {}
@@ -38,12 +38,12 @@ const API_URL = processEnv.NOPS_LIVE_API_URL
 const MAILPIT_URL = processEnv.NOPS_LIVE_MAILPIT_URL ?? 'http://127.0.0.1:18025'
 const PASSWORD = 'Start#Pass1'
 
-const { apiClient } = await import('@/lib/axios')
-const account = await import('@/features/account/api/account')
-const session = await import('@/features/auth/api/session')
-const { login } = await import('@/features/auth/api/login')
-const tags = await import('@/features/tags/api/tags')
-const { clearSessionToken, getSessionToken, setSessionToken } = await import('@/features/auth/store/sessionToken')
+const { apiClient } = await import('@/api/client')
+const account = await import('@/api/account')
+const session = await import('@/api/session')
+const { login } = await import('@/api/login')
+const tags = await import('@/api/tags')
+const { clearSessionToken, getSessionToken, setSessionToken } = await import('@/store/sessionToken')
 const { errorStatus } = await import('@/types/api')
 
 /** HTTP status a promise rejects with (fails the test if it resolves). */

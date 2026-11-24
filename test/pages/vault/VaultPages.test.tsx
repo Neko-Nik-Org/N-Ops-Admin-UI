@@ -14,14 +14,14 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tests for the Vault explorer (src/pages/vault/VaultPage.tsx and explorer/*) on the mock backend. */
+/** Tests for the Vault explorer (src/pages/vault/index.tsx and explorer/*) on the mock backend. */
 
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { CurrentUser } from '@/features/auth/types'
-import { resetAdminMock } from '@/mocks/adminDb'
-import { resetVaultMock } from '@/mocks/vaultDb'
-import { VaultPage } from '@/pages/vault/VaultPage'
+import type { CurrentUser } from '@/types/auth'
+import { resetAdminMock } from '@/data/mockAdmin'
+import { resetVaultMock } from '@/data/mockVault'
+import { VaultPage } from '@/pages/vault'
 import { ApiError } from '@/types/api'
 import { api, makeUser, RAW_ORG_INFO, RAW_PROJECTS, rawProject, renderWithProviders, serveLiveReads } from '../../testUtils'
 

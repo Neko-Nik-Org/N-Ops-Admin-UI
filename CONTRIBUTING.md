@@ -28,8 +28,9 @@ npm run dev             # http://localhost:5173
 
 1. Fork the repository and branch from `main`, e.g. `fix/otp-paste` or `feat/user-invites`.
 2. Follow the layout and conventions in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md):
-   - shared UI goes in `src/components/` (atoms → molecules → organisms → templates);
-   - feature logic goes in `src/features/<name>/` (`api/`, `hooks/`, `schema/`, `store/`, `types.ts`);
+   - code that one page uses lives in that page's folder (`src/pages/<page>/`, with an `index.tsx`);
+   - only genuinely shared code goes in `src/components/`, `src/hooks/`, `src/utils/` or `src/types/`;
+   - API calls go in `src/api/<resource>.ts`, client state (Jotai) in `src/store/`;
    - tests go in `test/`, mirroring `src/`;
    - every source file starts with the GPL-3.0 license header used in the existing files.
 3. Add or update tests for what you changed.

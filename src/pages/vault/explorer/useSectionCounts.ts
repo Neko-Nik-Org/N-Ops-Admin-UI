@@ -15,8 +15,8 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-import { useSelectedTag } from '@/features/tags/hooks/useTags'
-import { useConfigs, useNotes, useSecrets } from '@/features/vault/hooks/useVault'
+import { useSelectedTag } from '@/hooks/useTags'
+import { useConfigs, useNotes, useSecrets } from '@/hooks/useVault'
 import type { VaultSection } from './sections'
 
 /** Item counts for a project's folders; Env and Conf follow the top bar's tag, Notes have none. */

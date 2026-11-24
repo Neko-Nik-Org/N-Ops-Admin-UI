@@ -20,9 +20,9 @@
  * inside the app-wide providers.
  */
 
-import { AppProviders } from '@/app/providers'
-import { AppRouter } from '@/app/router'
-import { useSessionBootstrap } from '@/features/auth/hooks/useSessionBootstrap'
+import { AppProviders } from '@/AppProviders'
+import { AppRouter } from '@/routes/router'
+import { useSessionBootstrap } from '@/hooks/useSessionBootstrap'
 
 /**
  * Starts the session check on first render (see useSessionBootstrap), so the

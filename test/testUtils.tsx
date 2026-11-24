@@ -23,9 +23,9 @@ import type { ReactElement, ReactNode } from 'react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import { vi } from 'vitest'
-import { currentUserAtom, sessionStatusAtom } from '@/features/auth/store/session'
-import type { CurrentUser } from '@/features/auth/types'
-import { apiClient } from '@/lib/axios'
+import { currentUserAtom, sessionStatusAtom } from '@/store/session'
+import type { CurrentUser } from '@/types/auth'
+import { apiClient } from '@/api/client'
 
 /** The mocked API client from test/setup.ts, typed for `mockResolvedValue` & co. */
 export const api = vi.mocked(apiClient)
@@ -70,19 +70,24 @@ interface RenderOptions {
   path?: string
   /** Signed-in user; omit for a signed-out session. */
   user?: CurrentUser | null
+  /** Pages visited before `route` in this session (oldest first), so "back" has somewhere to go. */
+  history?: string[]
 }
 
 /**
  * Renders `ui` inside the app's providers (React Query, jotai, router, toasts).
  * Any other URL renders a LocationProbe, so `screen.getByTestId('location')` reveals where the app navigated.
  */
-export const renderWithProviders = (ui: ReactElement, { route = '/', state, path, user }: RenderOptions = {}) => {
+export const renderWithProviders = (ui: ReactElement, { route = '/', state, path, user, history = [] }: RenderOptions = {}) => {
   const { queryClient, store } = createTestState(user)
   const [pathname, search = ''] = route.split('?')
   const result = render(
     <QueryClientProvider client={queryClient}>
       <Provider store={store}>
-        <MemoryRouter initialEntries={[{ pathname, search: search && `?${search}`, state }]}>
+        <MemoryRouter
+          initialEntries={[...history, { pathname, search: search && `?${search}`, state }]}
+          initialIndex={history.length}
+        >
           <Routes>
             <Route path={path ?? pathname} element={ui} />
             <Route path="*" element={<LocationProbe />} />

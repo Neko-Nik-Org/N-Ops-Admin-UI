@@ -15,11 +15,11 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Tests for src/components/molecules/ThemeMenu.tsx. */
+/** Tests for src/components/ThemeMenu.tsx. */
 
 import { fireEvent, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { ThemeMenu } from '@/components/molecules/ThemeMenu'
+import { ThemeMenu } from '@/components/ThemeMenu'
 import { renderWithProviders } from '../testUtils'
 
 describe('ThemeMenu', () => {

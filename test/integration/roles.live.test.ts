@@ -31,21 +31,21 @@
 
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 
-vi.unmock('@/lib/axios') // test/setup.ts mocks the client for unit tests; this file needs the real one
+vi.unmock('@/api/client') // test/setup.ts mocks the client for unit tests; this file needs the real one
 
 const processEnv = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {}
 const API_URL = processEnv.NOPS_LIVE_API_URL
 const PASSWORD = 'Start#Pass1'
 
-const { apiClient } = await import('@/lib/axios')
-const roles = await import('@/features/admin/api/roles')
-const { listTags } = await import('@/features/tags/api/tags')
-const { login } = await import('@/features/auth/api/login')
-const { toCurrentUser } = await import('@/features/auth/types')
-const { isRoleWithinScope } = await import('@/features/auth/permissions')
-const { setSessionToken } = await import('@/features/auth/store/sessionToken')
+const { apiClient } = await import('@/api/client')
+const roles = await import('@/api/roles')
+const { listTags } = await import('@/api/tags')
+const { login } = await import('@/api/login')
+const { toCurrentUser } = await import('@/types/auth')
+const { isRoleWithinScope } = await import('@/hooks/usePermissions')
+const { setSessionToken } = await import('@/store/sessionToken')
 const { errorStatus } = await import('@/types/api')
-type RoleInput = import('@/features/admin/types').RoleInput
+type RoleInput = import('@/types/role').RoleInput
 
 /** HTTP status and message a promise rejects with (fails the test if it resolves). */
 const failure = async (promise: Promise<unknown>): Promise<{ status?: number; message: string }> => {

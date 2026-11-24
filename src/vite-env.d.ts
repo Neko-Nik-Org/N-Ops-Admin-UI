@@ -19,7 +19,7 @@
 
 /**
  * Build-time variables Vite reads from `.env` for local development.
- * In Docker these are overridden at run time by `window.__NOPS_ENV__` (see config/env.ts).
+ * In Docker these are overridden at run time by `window.__NOPS_ENV__` (see utils/env.ts).
  */
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string

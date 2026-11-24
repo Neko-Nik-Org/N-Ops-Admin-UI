@@ -31,16 +31,16 @@ import '@fontsource/ibm-plex-mono/latin-400.css'
 import '@fontsource/ibm-plex-mono/latin-500.css'
 import 'react-toastify/dist/ReactToastify.css'
 import './index.css'
-import './styles/n-loading.css'
-import './styles/n-auth.css'
+import '@/assets/styles/n-loading.css'
+import '@/assets/styles/n-auth.css'
 import App from './App.tsx'
-import { preloadRoute } from './app/lazyPages'
+import { preloadRoute } from '@/routes/lazyPages'
 import { ROUTES } from './constants/routes'
-import { getSessionToken } from './features/auth/store/sessionToken'
-import { applyLowPowerMode } from './lib/lowPower'
-import { initSecureStorage, secureStorage } from './lib/secureStorage'
+import { getSessionToken } from '@/store/sessionToken'
+import { applyLowPowerMode } from '@/utils/lowPower'
+import { initSecureStorage, secureStorage } from '@/utils/secureStorage'
 
-// Older or weaker machines skip decorative motion and blur (see lib/lowPower)
+// Older or weaker machines skip decorative motion and blur (see utils/lowPower)
 applyLowPowerMode()
 
 // Start downloading this URL's page now, alongside the startup requests, rather than after them.
