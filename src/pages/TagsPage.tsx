@@ -80,16 +80,15 @@ export const TagsPage = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text">Tags</h1>
-        </div>
-        {canCreate && (
+      {/* the sidebar shows which page is open; the heading is for screen readers */}
+      <h1 className="sr-only">Tags</h1>
+      {canCreate && (
+        <div className="flex justify-end">
           <LoadingButton icon={<Plus size={15} />} onClick={() => setDialog({ kind: 'create' })}>
             New tag
           </LoadingButton>
-        )}
-      </div>
+        </div>
+      )}
 
       {isLoading ? (
         <TableSkeleton rows={5} columns={3} />

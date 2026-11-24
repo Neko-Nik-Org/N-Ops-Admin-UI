@@ -238,6 +238,7 @@ export const WorkflowDetailPage = () => {
         {crumbs}
         <PageHeader
           title={workflow.name}
+          showTitle
           description={workflow.description}
           mock
           actions={

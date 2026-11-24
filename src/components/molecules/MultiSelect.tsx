@@ -45,9 +45,6 @@ interface MultiSelectProps {
   onBlur?: () => void
 }
 
-/** Most options rendered at once; typing narrows the rest. */
-const MAX_SHOWN = 100
-
 export const MultiSelect = ({
   id,
   options,
@@ -70,8 +67,8 @@ export const MultiSelect = ({
   const byValue = useMemo(() => new Map(options.map((o) => [o.value, o])), [options])
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const found = q ? options.filter((o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase() === q) : options
-    return found.slice(0, MAX_SHOWN)
+    // every option is listed (the country list is ~250); typing narrows it
+    return q ? options.filter((o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase() === q) : options
   }, [options, query])
 
   // close when focus or a click lands outside

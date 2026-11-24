@@ -163,6 +163,39 @@ describe('AdminUsersPage', () => {
     )
   })
 
+  it('adds a user with profile details, and sends none when they are left empty', async () => {
+    serveWithUsernames()
+    api.post.mockResolvedValue({ data: 'User created successfully and a welcome email sent' })
+    renderUsers(EDITOR)
+    fireEvent.click(await screen.findByRole('button', { name: 'Add user' }))
+    const form = within(await screen.findByRole('dialog', { name: 'Add user' }))
+    fireEvent.change(form.getByLabelText('Name'), { target: { value: 'Zoe Park' } })
+    fireEvent.change(form.getByLabelText('Username'), { target: { value: 'zoe_park' } })
+    fireEvent.change(form.getByLabelText('Email'), { target: { value: 'zoe@acme.dev' } })
+    await waitFor(() => expect(form.getAllByRole('option').length).toBeGreaterThan(1))
+    fireEvent.change(form.getByLabelText('Role'), { target: { value: '4' } })
+    fireEvent.change(form.getByLabelText('Password'), { target: { value: 'Start#Pass1' } })
+    fireEvent.change(form.getByLabelText('Confirm password'), { target: { value: 'Start#Pass1' } })
+
+    const toggle = form.getByRole('button', { name: /Profile details/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(toggle)
+    fireEvent.change(form.getByLabelText('Job title'), { target: { value: 'SRE' } })
+    fireEvent.change(form.getByLabelText('GitHub username'), { target: { value: 'not valid!' } })
+    fireEvent.click(toggle) // collapse it: a problem inside opens it again
+    fireEvent.click(form.getByRole('button', { name: 'Add user' }))
+    await waitFor(() => expect(form.getByText('GitHub usernames use letters, digits and single hyphens.')).toBeVisible())
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(api.post).not.toHaveBeenCalled()
+
+    fireEvent.change(form.getByLabelText('GitHub username'), { target: { value: 'zoepark' } })
+    fireEvent.click(form.getByRole('button', { name: 'Add user' }))
+    expect(await screen.findByText("Added Zoe Park. They've been sent a welcome email.")).toBeInTheDocument()
+    const body = api.post.mock.calls[0][1] as { user_details: Record<string, Record<string, unknown>> }
+    expect(body.user_details.work).toEqual({ job_title: 'SRE' })
+    expect(body.user_details.engineering).toMatchObject({ github_username: 'zoepark' })
+  })
+
   it("won't add a user whose email someone already has", async () => {
     serveWithUsernames()
     renderUsers(EDITOR)
@@ -286,6 +319,45 @@ describe('AdminUsersPage', () => {
     const details = await openUser('Neko Nik')
     expect(await details.findByRole('button', { name: 'Change role or policy' })).toBeDisabled()
     expect(details.getByRole('button', { name: 'Edit name and email' })).toBeDisabled()
+  })
+
+  it("edits and deletes from a user's row without opening their details", async () => {
+    api.put.mockResolvedValue({ data: undefined })
+    api.delete.mockResolvedValue({ data: undefined })
+    renderUsers([...EDITOR, 'policy:ar:view'])
+    const row = (await screen.findByText('Marcus Chen')).closest('tr') as HTMLElement
+
+    fireEvent.click(within(row).getByRole('button', { name: 'Edit Marcus Chen' }))
+    expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual([
+      'Edit name and email',
+      'Edit profile details',
+      'Change role or policy',
+      'Change username',
+      'Reset password',
+    ])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit name and email' }))
+    const form = within(await screen.findByRole('dialog', { name: 'Edit Marcus Chen' }))
+    fireEvent.change(form.getByLabelText('Name'), { target: { value: 'Marcus C' } })
+    fireEvent.click(form.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText('Saved Marcus C.')).toBeInTheDocument()
+    expect(api.put).toHaveBeenCalledWith('/user/admin/update/3', expect.objectContaining({ display_name: 'Marcus C' }))
+    expect(screen.queryByRole('dialog', { name: 'User details' })).not.toBeInTheDocument()
+
+    fireEvent.click(within(row).getByRole('button', { name: 'Delete Marcus Chen' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Delete user' })).getByRole('button', { name: 'Delete user' }))
+    expect(await screen.findByText('Deleted Marcus Chen.')).toBeInTheDocument()
+    expect(api.delete).toHaveBeenCalledWith('/user/admin/delete/3')
+  })
+
+  it('disables the row actions on your own row, and hides them without user:edit', async () => {
+    const { unmount } = renderUsers(EDITOR)
+    const me = (await screen.findByText('Neko Nik')).closest('tr') as HTMLElement
+    expect(within(me).getByRole('button', { name: 'Edit Neko Nik' })).toBeDisabled()
+    expect(within(me).getByRole('button', { name: 'Delete Neko Nik' })).toBeDisabled()
+    unmount()
+    renderUsers()
+    await screen.findByText('Marcus Chen')
+    expect(screen.queryByRole('button', { name: 'Edit Marcus Chen' })).not.toBeInTheDocument()
   })
 
   it('shows no actions without user:edit', async () => {

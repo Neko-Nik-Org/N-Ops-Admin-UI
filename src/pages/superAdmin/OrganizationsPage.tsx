@@ -178,7 +178,9 @@ export const OrganizationsPage = () => {
                               label={`Edit ${o.organizationName}`}
                               menuLabel="Edit"
                               trigger={<Pencil size={14} aria-hidden="true" />}
-                              triggerClassName="border-transparent bg-transparent"
+                              // looks like the ghost icon buttons beside it (Delete)
+                              triggerClassName="h-[2.125rem] rounded-lg border-transparent bg-transparent px-2 text-signal hover:border-transparent hover:bg-surface-raised hover:text-signal"
+                              chevron={false}
                               floating
                             >
                               {EDIT_ITEMS.map(([kind, label]) => (

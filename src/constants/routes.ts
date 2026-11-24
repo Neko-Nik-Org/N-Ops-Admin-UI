@@ -57,6 +57,10 @@ export const ROUTES = {
   adminApiKeys: '/admin/api-keys',
   adminRoles: '/admin/roles',
   adminAccessPolicies: '/admin/access-policies',
+  /** New policy; `?from=<id>` starts from a copy of that one (Duplicate). */
+  adminAccessPolicyNew: '/admin/access-policies/new',
+  adminAccessPolicy: '/admin/access-policies/:policyId',
+  adminAccessPolicyEdit: '/admin/access-policies/:policyId/edit',
   tags: '/admin/tags',
   adminAuditLogs: '/admin/audit-logs',
   account: '/account',
@@ -74,6 +78,16 @@ export const ROUTES = {
   superAdmin: '/super-admin',
   superAdminOrganization: '/super-admin/organizations/:organizationId',
 } as const
+
+/** URL of one access policy's page. */
+export const accessPolicyPath = (policyId: number) => ROUTES.adminAccessPolicy.replace(':policyId', String(policyId))
+
+/** URL of the page that edits one access policy. */
+export const accessPolicyEditPath = (policyId: number) => ROUTES.adminAccessPolicyEdit.replace(':policyId', String(policyId))
+
+/** URL of the new-policy page, optionally starting from a copy of another policy. */
+export const newAccessPolicyPath = (fromPolicyId?: number) =>
+  fromPolicyId === undefined ? ROUTES.adminAccessPolicyNew : `${ROUTES.adminAccessPolicyNew}?from=${fromPolicyId}`
 
 /** URL of one organization in the super-admin pages. */
 export const superAdminOrganizationPath = (organizationId: string) =>

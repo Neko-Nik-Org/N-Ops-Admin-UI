@@ -20,6 +20,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import { MultiSelect } from '@/components/molecules/MultiSelect'
+import { COUNTRY_OPTIONS } from '@/constants/countries'
 
 const OPTIONS = [
   { value: 'DE', label: 'Germany' },
@@ -42,6 +43,19 @@ const box = () => screen.getByRole('combobox', { name: 'Countries' })
 const value = () => screen.getByTestId('value').textContent
 
 describe('MultiSelect', () => {
+  it('lists every country without typing, Z included', () => {
+    render(
+      <>
+        <label htmlFor="all">All countries</label>
+        <MultiSelect id="all" options={COUNTRY_OPTIONS} value={[]} onChange={() => {}} />
+      </>,
+    )
+    fireEvent.focus(screen.getByRole('combobox', { name: 'All countries' }))
+    expect(screen.getAllByRole('option')).toHaveLength(COUNTRY_OPTIONS.length)
+    expect(COUNTRY_OPTIONS.length).toBeGreaterThan(240)
+    expect(screen.getByRole('option', { name: /^Zimbabwe/ })).toBeInTheDocument()
+  })
+
   it('filters by name or exact code and toggles options', () => {
     render(<Harness />)
     fireEvent.change(box(), { target: { value: 'in' } })

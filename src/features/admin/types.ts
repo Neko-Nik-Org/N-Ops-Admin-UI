@@ -79,6 +79,8 @@ export interface AdminUserInput {
   password: string
   isActive: boolean
   accessPolicyId: number | null
+  /** Profile details (work, contact, availability…) in the structure of features/account/profileDetails. */
+  userDetails?: Record<string, unknown>
 }
 
 /** What an admin can change on someone's profile (`PUT /user/admin/update/{id}`). */

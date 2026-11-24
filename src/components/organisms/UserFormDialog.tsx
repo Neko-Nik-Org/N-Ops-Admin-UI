@@ -20,6 +20,8 @@
  */
 
 import { yupResolver } from '@hookform/resolvers/yup'
+import { ChevronDown } from 'lucide-react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'react-toastify'
 import { Input } from '@/components/atoms/Input'
@@ -28,7 +30,10 @@ import { Switch } from '@/components/atoms/Switch'
 import { Dialog } from '@/components/molecules/Dialog'
 import { FormField } from '@/components/molecules/FormField'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
+import { ProfileDetailsFields } from '@/components/organisms/ProfileDetailsFields'
 import { isUsernameAvailable } from '@/features/account/api/account'
+import { isProfileDetailsEmpty, serializeProfileDetails } from '@/features/account/profileDetails'
+import { emptyDetailsForm, fromDetailsForm } from '@/features/account/profileDetailsForm'
 import { useAccessPolicies, useAdminUsers, useCreateUser, useRoleOptions } from '@/features/admin/hooks/useAdmin'
 import { userSchema, type UserFormValues } from '@/features/admin/schema/adminSchemas'
 import { useHasPermissions } from '@/features/auth/permissions'
@@ -45,6 +50,7 @@ const UserForm = ({ onClose }: { onClose: () => void }) => {
   const {
     register,
     handleSubmit,
+    control,
     setError,
     formState: { errors },
   } = useForm<UserFormValues>({
@@ -58,10 +64,13 @@ const UserForm = ({ onClose }: { onClose: () => void }) => {
       confirmPassword: '',
       isActive: true,
       accessPolicyId: 0,
+      details: emptyDetailsForm(),
     },
   })
+  const [showDetails, setShowDetails] = useState(false)
 
   const onSubmit = async (v: UserFormValues) => {
+    const details = fromDetailsForm(v.details)
     // the API reports a taken username or email only as a bare database error, so check first
     const email = v.primaryEmail.toLowerCase()
     if (users.some((u) => u.primaryEmail.toLowerCase() === email)) {
@@ -85,6 +94,7 @@ const UserForm = ({ onClose }: { onClose: () => void }) => {
         password: v.password,
         isActive: v.isActive,
         accessPolicyId: Number(v.accessPolicyId) || null,
+        userDetails: !isProfileDetailsEmpty(details) ? serializeProfileDetails(details) : {},
       })
       if (welcomeEmailSent) toast.success(`Added ${v.displayName}. They've been sent a welcome email.`)
       else toast.warning(`Added ${v.displayName}, but the welcome email couldn't be sent. Share their sign-in details yourself.`)
@@ -95,7 +105,14 @@ const UserForm = ({ onClose }: { onClose: () => void }) => {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
+    <form
+      onSubmit={handleSubmit(onSubmit, (invalid) => {
+        // a problem in the collapsed section would be invisible, so open it
+        if (invalid.details) setShowDetails(true)
+      })}
+      className="flex flex-col gap-4"
+      noValidate
+    >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField id="displayName" label="Name" error={errors.displayName?.message}>
           <Input
@@ -191,6 +208,36 @@ const UserForm = ({ onClose }: { onClose: () => void }) => {
       <div className="rounded-lg border border-border p-4">
         <Switch label="Active" description="Inactive users can't sign in." {...register('isActive')} />
       </div>
+
+      <section className="rounded-lg border border-border">
+        <button
+          type="button"
+          aria-expanded={showDetails}
+          aria-controls="newUserDetails"
+          onClick={() => setShowDetails((s) => !s)}
+          className="flex w-full items-center justify-between gap-3 p-4 text-left"
+        >
+          <span className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium text-text">Profile details</span>
+            <span className="text-xs text-text-muted">
+              Optional: job title, contact, working hours, GitHub and SSH keys. They can fill these in later too.
+            </span>
+          </span>
+          <ChevronDown
+            size={16}
+            aria-hidden="true"
+            className={`shrink-0 text-text-muted transition-transform ${showDetails ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {/* kept mounted while collapsed, so typed values survive closing it */}
+        <div
+          id="newUserDetails"
+          hidden={!showDetails}
+          className={showDetails ? 'flex flex-col gap-5 border-t border-border p-4' : 'hidden'}
+        >
+          <ProfileDetailsFields register={register} control={control} errors={errors.details} prefix="details." />
+        </div>
+      </section>
 
       <div className="flex justify-end gap-2 pt-1">
         <LoadingButton variant="ghost" onClick={onClose}>

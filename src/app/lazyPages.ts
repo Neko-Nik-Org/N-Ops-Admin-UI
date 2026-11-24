@@ -28,6 +28,8 @@ import { APP_PAGES, ROUTES } from '@/constants/routes'
 /** One import per page module; each page is a named export with the module's own name. */
 const loaders = {
   AccountPage: () => import('@/pages/AccountPage'),
+  AccessPolicyDetailPage: () => import('@/pages/admin/AccessPolicyDetailPage'),
+  AccessPolicyFormPage: () => import('@/pages/admin/AccessPolicyFormPage'),
   AdminAccessPoliciesPage: () => import('@/pages/admin/AdminAccessPoliciesPage'),
   AdminApiKeysPage: () => import('@/pages/admin/AdminApiKeysPage'),
   AdminAuditLogsPage: () => import('@/pages/admin/AdminAuditLogsPage'),
@@ -57,6 +59,8 @@ const page = <K extends string, P extends object>(load: () => Promise<Record<K, 
   lazy(() => load().then((m) => ({ default: m[name] })))
 
 export const AccountPage = page(loaders.AccountPage, 'AccountPage')
+export const AccessPolicyDetailPage = page(loaders.AccessPolicyDetailPage, 'AccessPolicyDetailPage')
+export const AccessPolicyFormPage = page(loaders.AccessPolicyFormPage, 'AccessPolicyFormPage')
 export const AdminAccessPoliciesPage = page(loaders.AdminAccessPoliciesPage, 'AdminAccessPoliciesPage')
 export const AdminApiKeysPage = page(loaders.AdminApiKeysPage, 'AdminApiKeysPage')
 export const AdminAuditLogsPage = page(loaders.AdminAuditLogsPage, 'AdminAuditLogsPage')
@@ -94,6 +98,9 @@ const ROUTE_LOADERS: Array<[pattern: string, load: () => Promise<unknown>]> = [
   [ROUTES.adminApiKeys, loaders.AdminApiKeysPage],
   [ROUTES.adminRoles, loaders.AdminRolesPage],
   [ROUTES.adminAccessPolicies, loaders.AdminAccessPoliciesPage],
+  [ROUTES.adminAccessPolicyNew, loaders.AccessPolicyFormPage],
+  [ROUTES.adminAccessPolicyEdit, loaders.AccessPolicyFormPage],
+  [ROUTES.adminAccessPolicy, loaders.AccessPolicyDetailPage],
   [ROUTES.adminAuditLogs, loaders.AdminAuditLogsPage],
   [ROUTES.workflowDetail, loaders.WorkflowDetailPage],
   [ROUTES.workflows, loaders.WorkflowsPage],

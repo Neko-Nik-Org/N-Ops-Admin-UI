@@ -31,6 +31,8 @@ import { APP_PAGES, APP_SECTIONS, ROUTES, VAULT_REDIRECTS } from '@/constants/ro
 import { useForgetSuperAdminKeyElsewhere } from '@/features/superAdmin/store/adminKey'
 import {
   AccountPage,
+  AccessPolicyDetailPage,
+  AccessPolicyFormPage,
   AdminAccessPoliciesPage,
   AdminApiKeysPage,
   AdminAuditLogsPage,
@@ -151,6 +153,10 @@ export const AppRouter = () => {
             <Route path={ROUTES.vaultProject} element={<VaultPage />} />
             <Route path={ROUTES.vaultSection} element={<VaultPage />} />
             <Route path={ROUTES.workflowDetail} element={<WorkflowDetailPage />} />
+            {/* Access policies: view, create and edit each have their own page */}
+            <Route path={ROUTES.adminAccessPolicyNew} element={<AccessPolicyFormPage />} />
+            <Route path={ROUTES.adminAccessPolicy} element={<AccessPolicyDetailPage />} />
+            <Route path={ROUTES.adminAccessPolicyEdit} element={<AccessPolicyFormPage />} />
             {VAULT_REDIRECTS.map((from) => (
               <Route key={from} path={from} element={<Navigate to={ROUTES.vault} replace />} />
             ))}

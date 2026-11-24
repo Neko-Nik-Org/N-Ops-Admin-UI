@@ -48,9 +48,8 @@ export const OverviewPage = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold text-text">Overview</h1>
-      </div>
+      {/* the sidebar shows which page is open; the heading is for screen readers */}
+      <h1 className="sr-only">Overview</h1>
 
       {isError || !overview ? (
         <NotConnected />

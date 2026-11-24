@@ -18,8 +18,8 @@
  * Admin › Users (/admin/users): people in the organization, from `/user/admin/list`. Click someone to
  * see their details (from `/user/admin/fetch/{id}`) and act on them: edit their name, email and
  * profile details, change their role and access policy, change their username, set a new password,
- * mark their email verified, deactivate or delete them (all need `user:edit`). Adding needs
- * `user:create` + `user:role:view`.
+ * mark their email verified, deactivate or delete them (all need `user:edit`). The edits and delete
+ * are also in each row's Edit menu and Delete button. Adding needs `user:create` + `user:role:view`.
  */
 
 import {
@@ -43,6 +43,7 @@ import { useAtomValue } from 'jotai'
 import { toast } from 'react-toastify'
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog'
 import { Dialog } from '@/components/molecules/Dialog'
+import { DropdownMenu, menuItemClass } from '@/components/molecules/DropdownMenu'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { ProfileDetailsView } from '@/components/organisms/ProfileDetailsView'
 import { useOrgInfo } from '@/features/account/hooks/useAccount'
@@ -50,7 +51,7 @@ import { currentUserAtom } from '@/features/auth/store/session'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'
 import { SkeletonText, TableSkeleton } from '@/components/molecules/Skeleton'
-import { TwoFactorBadges } from '@/components/organisms/AccessPolicyViewDialog'
+import { TwoFactorBadges } from '@/components/organisms/AccessPolicyDetails'
 import { countryName } from '@/constants/countries'
 import {
   useAccessPolicies,
@@ -295,6 +296,67 @@ export const AdminUsersPage = () => {
     />
   )
 
+  /** The Edit menu and Delete button at the end of a user's row (only with `user:edit`). */
+  const rowActions = (user: AdminUser) => {
+    const name = user.displayName
+    if (user.userId === me?.userId)
+      return (
+        <div className="flex items-center justify-end gap-1">
+          <LoadingButton
+            variant="ghost"
+            size="sm"
+            icon={<Pencil size={14} />}
+            aria-label={`Edit ${name}`}
+            title="Use the Account page to change your own account."
+            disabled
+          />
+          <LoadingButton
+            variant="ghost"
+            size="sm"
+            icon={<Trash2 size={14} />}
+            aria-label={`Delete ${name}`}
+            title="You can't delete yourself."
+            disabled
+          />
+        </div>
+      )
+    const items: Array<[NonNullable<typeof action>['kind'], string]> = [
+      ['profile', 'Edit name and email'],
+      ['details', 'Edit profile details'],
+      ['rename', 'Change username'],
+      ['password', 'Reset password'],
+    ]
+    if (canChangeRole || canChangePolicy) items.splice(2, 0, ['access', 'Change role or policy'])
+    return (
+      <div className="flex items-center justify-end gap-1">
+        <DropdownMenu
+          label={`Edit ${name}`}
+          menuLabel="Edit"
+          trigger={<Pencil size={14} aria-hidden="true" />}
+          // looks like the ghost icon buttons beside it (Delete)
+          triggerClassName="h-[2.125rem] rounded-lg border-transparent bg-transparent px-2 text-signal hover:border-transparent hover:bg-surface-raised hover:text-signal"
+          chevron={false}
+          widthClassName="w-52"
+          floating
+        >
+          {items.map(([kind, label]) => (
+            <button key={kind} type="button" role="menuitem" className={menuItemClass} onClick={() => setAction({ kind, user })}>
+              {label}
+            </button>
+          ))}
+        </DropdownMenu>
+        <LoadingButton
+          variant="ghost"
+          size="sm"
+          icon={<Trash2 size={14} />}
+          aria-label={`Delete ${name}`}
+          title="Delete"
+          onClick={() => setAction({ kind: 'delete', user })}
+        />
+      </div>
+    )
+  }
+
   /** What the signed-in admin can do to `user`, shown under their details. */
   const userActions = (user: AdminUser) => {
     if (!canEdit) return null
@@ -452,6 +514,11 @@ export const AdminUsersPage = () => {
                       <th className="pb-2 font-medium">2FA</th>
                       <th className="pb-2 font-medium">Status</th>
                       <th className="pb-2 font-medium">Last sign-in</th>
+                      {canEdit && (
+                        <th className="pb-2 font-medium">
+                          <span className="sr-only">Actions</span>
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -496,6 +563,12 @@ export const AdminUsersPage = () => {
                             </div>
                           </td>
                           <td className="py-3 text-sm text-text-muted">{lastSignIn(user)}</td>
+                          {canEdit && (
+                            // the buttons act on their own; a click or Enter there doesn't open the details
+                            <td className="py-3 pr-2" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                              {rowActions(user)}
+                            </td>
+                          )}
                         </tr>
                       )
                     })}

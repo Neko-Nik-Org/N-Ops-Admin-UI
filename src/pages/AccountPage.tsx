@@ -27,9 +27,8 @@ import { ThemeToggle } from '@/components/molecules/ThemeToggle'
 /** Two-column layout: profile, security and preferences on the left; access and organization info on the right. */
 export const AccountPage = () => (
   <div className="flex flex-col gap-6">
-    <div>
-      <h1 className="text-2xl font-bold text-text">Account</h1>
-    </div>
+    {/* the sidebar shows which page is open; the heading is for screen readers */}
+    <h1 className="sr-only">Account</h1>
 
     <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
       <div className="flex flex-col gap-4">

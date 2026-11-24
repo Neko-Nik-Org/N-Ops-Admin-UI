@@ -17,11 +17,9 @@
 /** Validation rules for the Admin forms. Limits mirror the column sizes in the API schema. */
 
 import * as yup from 'yup'
-import { passwordField, usernameField } from '@/features/account/schema/accountSchemas'
+import { passwordField, profileDetailsSchema, usernameField } from '@/features/account/schema/accountSchemas'
 import { isCountryCode } from '@/constants/countries'
-
-/** IPv4 address, optionally with a CIDR suffix (e.g. 203.0.113.0/24). */
-const IPV4_CIDR = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}(\/(3[0-2]|[12]?\d))?$/
+import { checkCidr, isValidCidr, normalizeCidr } from '@/utils/cidr'
 
 /** Splits a comma- or newline-separated list into trimmed, non-empty items. */
 export const splitList = (value: string | undefined): string[] =>
@@ -30,41 +28,51 @@ export const splitList = (value: string | undefined): string[] =>
     .map((s) => s.trim())
     .filter(Boolean)
 
-/** Two-letter country code, as the API's IP location lookup reports it. */
-const COUNTRY_CODE = /^[A-Za-z]{2}$/
+/** Most IP entries one policy can hold. */
+export const MAX_POLICY_IPS = 100
+
+/** One IP row of the policy form: an address or CIDR range (rows are objects for useFieldArray). */
+const ipRow = yup.object({
+  value: yup
+    .string()
+    .default('')
+    .test('cidr', 'Enter an IP address or range.', function cidr(v) {
+      if (!v?.trim()) return true // empty rows are dropped on save
+      const check = checkCidr(v)
+      return check.ok || this.createError({ message: check.error })
+    }),
+})
 
 /**
- * IP and country sign-in limits for the access-policy form. A list is only checked
- * while its switch is on; an empty list would let everyone in, so an enabled limit needs one entry.
+ * The policy's IP limit, checked only while its switch is on: at least one entry (an empty list would
+ * let everyone in), every entry a valid address or CIDR range, and no entry twice (compared after
+ * normalizing, so 2001:db8:0::1 and 2001:db8::1 are the same).
  */
-const signInRestrictionFields = {
-  hasIpRestriction: yup.boolean().default(false),
-  allowedIps: yup
-    .string()
-    .default('')
-    .when('hasIpRestriction', {
-      is: true,
-      then: (s) =>
-        s
-          .test('has-ips', 'Add at least one IP address.', (v) => splitList(v).length > 0)
-          .test('valid-ips', 'Use IPv4 addresses or ranges, like 203.0.113.0/24.', (v) =>
-            splitList(v).every((ip) => IPV4_CIDR.test(ip)),
-          ),
-    }),
-  hasGeoRestriction: yup.boolean().default(false),
-  allowedGeoLocations: yup
-    .string()
-    .default('')
-    .when('hasGeoRestriction', {
-      is: true,
-      then: (s) =>
-        s
-          .test('has-countries', 'Add at least one country.', (v) => splitList(v).length > 0)
-          .test('valid-countries', 'Use two-letter country codes, like IN or US.', (v) =>
-            splitList(v).every((c) => COUNTRY_CODE.test(c)),
-          ),
-    }),
-}
+const allowedIpsField = yup
+  .array(yup.object({ value: yup.string().default('') }))
+  .default([])
+  .when('hasIpRestriction', {
+    is: true,
+    then: (s) =>
+      s
+        .of(ipRow)
+        .test('has-ips', 'Add at least one IP address or range.', (rows) => (rows ?? []).some((r) => r.value?.trim()))
+        .test(
+          'max-ips',
+          `Add at most ${MAX_POLICY_IPS} entries.`,
+          (rows) => (rows ?? []).filter((r) => r.value?.trim()).length <= MAX_POLICY_IPS,
+        )
+        .test('unique-ips', 'This one is already in the list.', function unique(rows) {
+          const seen = new Set<string>()
+          for (const [i, r] of (rows ?? []).entries()) {
+            if (!r.value?.trim() || !isValidCidr(r.value)) continue
+            const key = normalizeCidr(r.value)
+            if (seen.has(key)) return this.createError({ path: `${this.path}[${i}].value` })
+            seen.add(key)
+          }
+          return true
+        }),
+  })
 
 /** Add-user form. Username and password follow the API's rules. */
 export const userSchema = yup.object({
@@ -85,6 +93,8 @@ export const userSchema = yup.object({
   isActive: yup.boolean().default(true),
   /** 0 = no access policy. */
   accessPolicyId: yup.number().default(0),
+  /** Optional profile details, as the profile details form holds them. */
+  details: profileDetailsSchema,
 })
 export type UserFormValues = yup.InferType<typeof userSchema>
 
@@ -164,7 +174,9 @@ export const accessPolicySchema = yup.object({
   policyDescription: yup.string().trim().default(''),
   enforceTotp2fa: yup.boolean().default(false),
   enforceEmail2fa: yup.boolean().default(false),
-  ...signInRestrictionFields,
+  hasIpRestriction: yup.boolean().default(false),
+  allowedIps: allowedIpsField,
+  hasGeoRestriction: yup.boolean().default(false),
   // picked from the country list, so an array of codes rather than typed text
   allowedGeoLocations: yup
     .array(yup.string().required())

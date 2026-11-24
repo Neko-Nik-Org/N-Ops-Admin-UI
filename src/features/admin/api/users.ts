@@ -106,7 +106,7 @@ export const createUser = async (input: AdminUserInput): Promise<{ welcomeEmailS
       user_name: input.userName,
       display_name: input.displayName,
       primary_email: input.primaryEmail,
-      user_details: {},
+      user_details: input.userDetails ?? {},
       is_active: input.isActive,
       role_id: input.roleId,
       password: toBase64(input.password),

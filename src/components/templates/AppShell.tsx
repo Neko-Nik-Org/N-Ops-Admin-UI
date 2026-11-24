@@ -50,7 +50,8 @@ export const AppShell = () => {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onMenuClick={() => setMobileNavOpen(true)} />
-        <main className="relative flex-1 overflow-x-hidden p-4 sm:p-6">
+        {/* overflow-x-clip, not hidden: hidden would make this a scroll container and break sticky bars inside pages */}
+        <main className="relative flex-1 overflow-x-clip p-4 sm:p-6">
           {/* The current route's page */}
           {/* While a page's code downloads: the loading screen over the content area; sidebar and top bar stay */}
           <Suspense fallback={<ScreenLoader contained messages={['Loading page']} />}>

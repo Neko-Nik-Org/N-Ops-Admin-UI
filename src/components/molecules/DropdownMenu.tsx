@@ -15,10 +15,11 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Small popover menu anchored to a trigger button: shared by the Topbar theme and profile menus. */
+/** Small popover menu anchored to a trigger button: the Topbar theme and profile menus and the table row Edit menus. */
 
 import { ChevronDown } from 'lucide-react'
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '@/utils/cn'
 
 interface DropdownMenuProps {
@@ -26,8 +27,10 @@ interface DropdownMenuProps {
   label: string
   /** Accessible name of the opened menu. */
   menuLabel: string
-  /** Visible content of the trigger (icons, text); a chevron is appended. */
+  /** Visible content of the trigger (icons, text); a chevron is appended unless `chevron` is false. */
   trigger: ReactNode
+  /** Show the chevron after the trigger content. Default true. */
+  chevron?: boolean
   /** Extra classes for the trigger button. */
   triggerClassName?: string
   /** Menu width class, default w-40. */
@@ -51,8 +54,13 @@ export const menuItemClass =
 /** Selector for the focusable items inside the menu. */
 const ITEMS = '[role^="menuitem"]:not([aria-disabled="true"])'
 
+/** Gap between the trigger and the menu, and the least room kept from the window edge, in px. */
+const GAP = 6
+const EDGE = 8
+
 /**
- * Opens below the trigger, right-aligned. Closes on outside click, Escape, Tab or an item click;
+ * Opens below the trigger, right-aligned; above it instead when there isn't room below but there is
+ * more above, so a menu near the bottom of the window isn't cut off. Closes on outside click, Escape, Tab or an item click;
  * arrow keys move between items. On open, focus goes to the checked item (if any) or the first one.
  */
 export const DropdownMenu = ({
@@ -62,10 +70,10 @@ export const DropdownMenu = ({
   triggerClassName,
   widthClassName = 'w-40',
   floating = false,
+  chevron = true,
   children,
 }: DropdownMenuProps) => {
   const [open, setOpen] = useState(false)
-  const [position, setPosition] = useState<CSSProperties>()
   const rootRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -76,11 +84,15 @@ export const DropdownMenu = ({
     const initial = menu?.querySelector<HTMLElement>('[aria-checked="true"]') ?? menu?.querySelector<HTMLElement>(ITEMS)
     initial?.focus()
     const onPointerDown = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      // a floating menu lives in <body>, outside rootRef
+      if (!rootRef.current?.contains(target) && !menuRef.current?.contains(target)) setOpen(false)
     }
     document.addEventListener('pointerdown', onPointerDown)
     // a floating menu would drift away from its trigger, so it closes instead
-    const onMove = () => setOpen(false)
+    const onMove = (e: Event) => {
+      if (!(e.target instanceof Node && menu?.contains(e.target))) setOpen(false) // scrolling the menu itself is fine
+    }
     if (floating) {
       window.addEventListener('scroll', onMove, true)
       window.addEventListener('resize', onMove)
@@ -92,13 +104,38 @@ export const DropdownMenu = ({
     }
   }, [open, floating])
 
-  const toggle = () => {
-    if (!open && floating && buttonRef.current) {
-      const r = buttonRef.current.getBoundingClientRect()
-      setPosition({ position: 'fixed', top: r.bottom + 6, right: window.innerWidth - r.right })
+  // place the menu before it's painted: below or above the trigger, whichever has room
+  useLayoutEffect(() => {
+    const menu = menuRef.current
+    const button = buttonRef.current
+    if (!open || !menu || !button) return
+    const r = button.getBoundingClientRect()
+    const height = menu.offsetHeight
+    const below = window.innerHeight - r.bottom
+    const up = height + GAP + EDGE > below && r.top > below
+    const style = menu.style
+    if (floating) {
+      style.position = 'fixed'
+      style.right = `${Math.max(EDGE, window.innerWidth - r.right)}px`
+      style.top = up ? '' : `${r.bottom + GAP}px`
+      style.bottom = up ? `${window.innerHeight - r.top + GAP}px` : ''
+      // a very tall menu still fits: it scrolls inside the room it has
+      style.maxHeight = `${Math.max(120, (up ? r.top : below) - GAP - EDGE)}px`
+    } else {
+      style.top = up ? '' : '100%'
+      style.bottom = up ? '100%' : ''
+      style.marginTop = up ? '' : `${GAP}px`
+      style.marginBottom = up ? `${GAP}px` : ''
     }
-    setOpen((o) => !o)
-  }
+  }, [open, floating])
+
+  const toggle = () => setOpen((o) => !o)
+
+  /**
+   * A floating menu is drawn in <body>: inside the page, an ancestor with a transform or filter (e.g. a
+   * page's enter animation) would make "fixed" relative to that ancestor instead of the window.
+   */
+  const floatIn = (menu: ReactNode) => (floating ? createPortal(menu, document.body) : menu)
 
   const close = () => {
     setOpen(false)
@@ -141,30 +178,32 @@ export const DropdownMenu = ({
         )}
       >
         {trigger}
-        <ChevronDown
-          size={13}
-          aria-hidden="true"
-          className={cn('shrink-0 transition-transform duration-150', open && 'rotate-180')}
-        />
+        {chevron && (
+          <ChevronDown
+            size={13}
+            aria-hidden="true"
+            className={cn('shrink-0 transition-transform duration-150', open && 'rotate-180')}
+          />
+        )}
       </button>
 
-      {open && (
-        <div
-          ref={menuRef}
-          role="menu"
-          aria-label={menuLabel}
-          onClick={onMenuClick}
-          onKeyDown={onMenuKeyDown}
-          style={floating ? position : undefined}
-          className={cn(
-            'z-50 rounded-md border border-border bg-surface p-1 shadow-lg',
-            !floating && 'absolute right-0 mt-1.5',
-            widthClassName,
-          )}
-        >
-          {children}
-        </div>
-      )}
+      {open &&
+        floatIn(
+          <div
+            ref={menuRef}
+            role="menu"
+            aria-label={menuLabel}
+            onClick={onMenuClick}
+            onKeyDown={onMenuKeyDown}
+            className={cn(
+              'z-50 overflow-y-auto rounded-md border border-border bg-surface p-1 shadow-lg',
+              !floating && 'absolute right-0',
+              widthClassName,
+            )}
+          >
+            {children}
+          </div>,
+        )}
     </div>
   )
 }

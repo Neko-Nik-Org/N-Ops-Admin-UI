@@ -119,6 +119,7 @@ export const OrganizationDetailPage = () => {
       {back}
       <PageHeader
         title={org.organizationName}
+        showTitle
         badge={<Badge tone={org.isActive ? 'signal' : 'neutral'}>{org.isActive ? 'Active' : 'Disabled'}</Badge>}
         actions={
           <>
