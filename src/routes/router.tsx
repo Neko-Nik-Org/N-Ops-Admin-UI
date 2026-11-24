@@ -26,11 +26,13 @@ import { Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth, RequireGuest, RequireSecuritySetup } from './guards'
 import { AppShell } from '@/components/AppShell'
-import { ScreenLoader } from '@/components/ScreenLoader'
+import { AuthPageSkeleton } from '@/components/Skeleton'
 import { APP_PAGES, APP_SECTIONS, ROUTES, VAULT_REDIRECTS } from '@/constants/routes'
 import { useForgetSuperAdminKeyElsewhere } from '@/store/adminKey'
 import {
-  AccountPage,
+  AccountProfilePage,
+  AccountSecurityPage,
+  AccountOrganizationPage,
   AccessPolicyDetailPage,
   AccessPolicyFormPage,
   AdminAccessPoliciesPage,
@@ -39,6 +41,14 @@ import {
   AdminInvitationsPage,
   AdminOrganizationPage,
   AdminRolesPage,
+  RoleDetailPage,
+  UserDetailPage,
+  UserFormPage,
+  InvitationDetailPage,
+  InvitationFormPage,
+  ApiKeyDetailPage,
+  ApiKeyFormPage,
+  RoleFormPage,
   AdminUsersPage,
   ComingSoonPage,
   ForgotPasswordPage,
@@ -85,13 +95,13 @@ export const AppRouter = () => {
   useEffect(preloadLinksOnIntent, [])
 
   // No transitions: by default React Router switches pages inside React.startTransition, which keeps
-  // the old page on screen (and hides the loading screen) until the new page's code has downloaded,
-  // so a click looked like it did nothing. Switching at once shows the loading screen straight away.
+  // the old page on screen (and hides the skeleton) until the new page's code has downloaded,
+  // so a click looked like it did nothing. Switching at once shows the skeleton straight away.
   return (
     <BrowserRouter useTransitions={false}>
       <RouteEffects />
-      {/* Full-screen loading screen while a page's code downloads (sign-in pages, not-found); AppShell has its own boundary so the sidebar stays put */}
-      <Suspense fallback={<ScreenLoader messages={['Loading page']} />}>
+      {/* Skeleton while a page's code downloads (sign-in pages, not-found); AppShell has its own boundary so the sidebar stays put */}
+      <Suspense fallback={<AuthPageSkeleton />}>
         <Routes>
           {/* Public, signed-out only */}
           <Route
@@ -153,6 +163,19 @@ export const AppRouter = () => {
             <Route path={ROUTES.vaultProject} element={<VaultPage />} />
             <Route path={ROUTES.vaultSection} element={<VaultPage />} />
             <Route path={ROUTES.workflowDetail} element={<WorkflowDetailPage />} />
+            {/* Users, invitations and API keys: view, create and edit each have their own page */}
+            <Route path={ROUTES.adminUserNew} element={<UserFormPage />} />
+            <Route path={ROUTES.adminUser} element={<UserDetailPage />} />
+            <Route path={ROUTES.adminUserEdit} element={<UserFormPage />} />
+            <Route path={ROUTES.adminInvitationNew} element={<InvitationFormPage />} />
+            <Route path={ROUTES.adminInvitation} element={<InvitationDetailPage />} />
+            <Route path={ROUTES.adminApiKeyNew} element={<ApiKeyFormPage />} />
+            <Route path={ROUTES.adminApiKey} element={<ApiKeyDetailPage />} />
+            <Route path={ROUTES.adminApiKeyEdit} element={<ApiKeyFormPage />} />
+            {/* Roles: view, create and edit each have their own page */}
+            <Route path={ROUTES.adminRoleNew} element={<RoleFormPage />} />
+            <Route path={ROUTES.adminRole} element={<RoleDetailPage />} />
+            <Route path={ROUTES.adminRoleEdit} element={<RoleFormPage />} />
             {/* Access policies: view, create and edit each have their own page */}
             <Route path={ROUTES.adminAccessPolicyNew} element={<AccessPolicyFormPage />} />
             <Route path={ROUTES.adminAccessPolicy} element={<AccessPolicyDetailPage />} />
@@ -164,7 +187,11 @@ export const AppRouter = () => {
             {APP_SECTIONS.filter((s) => s.children?.length).map(({ path, children }) => (
               <Route key={path} path={path} element={<Navigate to={children![0].path} replace />} />
             ))}
-            <Route path={ROUTES.account} element={<AccountPage />} />
+            {/* Account: profile, security and organization, each its own page (from the profile menu) */}
+            <Route path={ROUTES.account} element={<Navigate to={ROUTES.accountProfile} replace />} />
+            <Route path={ROUTES.accountProfile} element={<AccountProfilePage />} />
+            <Route path={ROUTES.accountSecurity} element={<AccountSecurityPage />} />
+            <Route path={ROUTES.accountOrganization} element={<AccountOrganizationPage />} />
           </Route>
           {/* Super admin: its own layout and key prompt, open whether or not anyone is signed in */}
           <Route path={ROUTES.superAdmin} element={<SuperAdminShell />}>

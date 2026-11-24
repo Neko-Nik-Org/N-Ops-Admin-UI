@@ -14,48 +14,38 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Admin › API keys (/admin/api-keys): keys for scripts and pipelines, each acting with an existing role. */
+/**
+ * Admin › API keys (/admin/api-keys): keys for scripts and pipelines, each acting with an existing role.
+ * Viewing, creating and editing a key each open their own page; deleting asks in a dialog.
+ */
 
-import { KeyRound, Pencil, Plus, Trash2 } from 'lucide-react'
-import moment from 'moment'
+import { Eye, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/Badge'
 import { LoadingButton } from '@/components/LoadingButton'
 import { TableSkeleton } from '@/components/Skeleton'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { PageHeader } from '@/components/PageHeader'
 import { SearchInput } from '@/components/SearchInput'
-import { ApiKeyFormDialog } from '@/pages/admin/apiKeys/ApiKeyFormDialog'
+import { ApiKeyDeleteImpact, KeyStatus, useProjectName } from '@/pages/admin/apiKeys/ApiKeyDetails'
+import { apiKeyEditPath, apiKeyPath, ROUTES } from '@/constants/routes'
 import { useApiKeys, useDeleteApiKey } from '@/hooks/useApiKeys'
 import { useRoleOptions } from '@/hooks/useRoles'
 import { useTagOptions } from '@/hooks/useTagOptions'
-import { useVaultProjects } from '@/hooks/useVault'
 import { type ApiKey } from '@/types/apiKey'
 import { formatDate, formatRelative } from '@/utils/format'
-
-/** Which dialog is open, and for which key. */
-type DialogState = { kind: 'closed' } | { kind: 'create' } | { kind: 'edit'; apiKey: ApiKey } | { kind: 'delete'; apiKey: ApiKey }
-
-/** Active, disabled, expired, or expiring within 14 days. */
-const KeyStatus = ({ apiKey }: { apiKey: ApiKey }) => {
-  if (!apiKey.isActive) return <Badge>Disabled</Badge>
-  if (apiKey.expiresAt && moment(apiKey.expiresAt).isBefore()) return <Badge tone="danger">Expired</Badge>
-  if (apiKey.expiresAt && moment(apiKey.expiresAt).diff(moment(), 'days') < 14)
-    return <Badge tone="warning">Expires {formatRelative(apiKey.expiresAt)}</Badge>
-  return <Badge tone="signal">Active</Badge>
-}
 
 /** API keys table. */
 export const AdminApiKeysPage = () => {
   const { data: keys, isLoading, error } = useApiKeys()
   const { roleName } = useRoleOptions()
   const { tagName } = useTagOptions()
-  const { data: projects } = useVaultProjects()
-  const projectName = (id: number) => projects?.find((p) => p.projectId === id)?.projectName ?? `#${id}`
+  const projectName = useProjectName()
   const { mutateAsync: remove } = useDeleteApiKey()
-  const [dialog, setDialog] = useState<DialogState>({ kind: 'closed' })
+  const [deleting, setDeleting] = useState<ApiKey | null>(null)
   const [search, setSearch] = useState('')
-  const close = () => setDialog({ kind: 'closed' })
+  const navigate = useNavigate()
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -68,7 +58,7 @@ export const AdminApiKeysPage = () => {
         title="API keys"
         mock
         actions={
-          <LoadingButton icon={<Plus size={15} />} onClick={() => setDialog({ kind: 'create' })}>
+          <LoadingButton icon={<Plus size={15} />} onClick={() => navigate(ROUTES.adminApiKeyNew)}>
             New API key
           </LoadingButton>
         }
@@ -106,7 +96,12 @@ export const AdminApiKeysPage = () => {
                   {visible.map((key) => (
                     <tr key={key.apiKeyId} className="border-t border-border align-top">
                       <td className="max-w-xs py-3">
-                        <p className="text-sm font-medium text-text">{key.keyName}</p>
+                        <Link
+                          to={apiKeyPath(key.apiKeyId)}
+                          className="text-left text-sm font-medium text-text hover:text-signal hover:underline"
+                        >
+                          {key.keyName}
+                        </Link>
                         <p className="font-mono text-xs text-text-muted">{key.keyPrefix}…</p>
                         <p className="mt-0.5 text-xs text-text-muted">{key.keyDescription}</p>
                       </td>
@@ -137,16 +132,26 @@ export const AdminApiKeysPage = () => {
                           <LoadingButton
                             variant="ghost"
                             size="sm"
+                            icon={<Eye size={14} />}
+                            aria-label={`View ${key.keyName}`}
+                            title="View"
+                            onClick={() => navigate(apiKeyPath(key.apiKeyId))}
+                          />
+                          <LoadingButton
+                            variant="ghost"
+                            size="sm"
                             icon={<Pencil size={14} />}
                             aria-label={`Edit ${key.keyName}`}
-                            onClick={() => setDialog({ kind: 'edit', apiKey: key })}
+                            title="Edit"
+                            onClick={() => navigate(apiKeyEditPath(key.apiKeyId))}
                           />
                           <LoadingButton
                             variant="ghost"
                             size="sm"
                             icon={<Trash2 size={14} />}
                             aria-label={`Delete ${key.keyName}`}
-                            onClick={() => setDialog({ kind: 'delete', apiKey: key })}
+                            title="Delete"
+                            onClick={() => setDeleting(key)}
                           />
                         </div>
                       </td>
@@ -159,25 +164,15 @@ export const AdminApiKeysPage = () => {
         </section>
       )}
 
-      <ApiKeyFormDialog
-        open={dialog.kind === 'create' || dialog.kind === 'edit'}
-        apiKey={dialog.kind === 'edit' ? dialog.apiKey : undefined}
-        onClose={close}
-      />
       <ConfirmDialog
-        open={dialog.kind === 'delete'}
+        open={deleting !== null}
         title="Delete API key"
         confirmLabel="Delete key"
-        successMessage={dialog.kind === 'delete' ? `Deleted ${dialog.apiKey.keyName}.` : ''}
-        onConfirm={() => (dialog.kind === 'delete' ? remove(dialog.apiKey.apiKeyId) : Promise.resolve())}
-        onClose={close}
+        successMessage={deleting ? `Deleted ${deleting.keyName}.` : ''}
+        onConfirm={() => (deleting ? remove(deleting.apiKeyId) : Promise.resolve())}
+        onClose={() => setDeleting(null)}
       >
-        {dialog.kind === 'delete' && (
-          <p>
-            Delete <span className="font-medium text-text">{dialog.apiKey.keyName}</span>? Anything using it stops working
-            immediately. To pause it instead, edit the key and turn off Active.
-          </p>
-        )}
+        {deleting && <ApiKeyDeleteImpact apiKey={deleting} />}
       </ConfirmDialog>
     </div>
   )

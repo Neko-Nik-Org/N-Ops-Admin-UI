@@ -16,30 +16,26 @@
  */
 /**
  * Admin › Invitations (/admin/invitations): pending invitations to join the organization, backed by
- * `/invite/*`. Invitations can be sent and revoked; the API has no edit or re-send.
+ * `/invite/*`. Invitations can be sent and revoked; the API has no edit or re-send. Viewing and sending
+ * one open their own page; revoking asks in a dialog.
  */
 
-import { Send, Trash2 } from 'lucide-react'
-import { Suspense, useMemo, useState } from 'react'
+import { Eye, Send, Trash2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/Badge'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { LoadingButton } from '@/components/LoadingButton'
 import { PageHeader } from '@/components/PageHeader'
 import { SearchInput } from '@/components/SearchInput'
 import { TableSkeleton } from '@/components/Skeleton'
-import { useAccessPolicies } from '@/hooks/useAccessPolicies'
+import { InvitationRevokeImpact, isExpired, usePolicyName } from '@/pages/admin/invitations/InvitationDetails'
+import { invitationPath, ROUTES } from '@/constants/routes'
 import { useDeleteInvitation, useInvitations } from '@/hooks/useInvitations'
 import { useRoleOptions } from '@/hooks/useRoles'
 import { type Invitation } from '@/types/invitation'
 import { useHasPermissions } from '@/hooks/usePermissions'
-import { formatDateTime, formatRelative, parseIso } from '@/utils/format'
-import { lazyNamed, usePreloadWhenIdle } from '@/utils/lazyNamed'
-
-// the form brings react-hook-form and yup, which the table doesn't need: it loads after it
-const InvitationFormDialog = lazyNamed(() => import('@/pages/admin/invitations/InvitationFormDialog'), 'InvitationFormDialog')
-
-/** Expired invitations linger until the API's cleanup job removes them. */
-const isExpired = (invitation: Invitation, now: number) => (parseIso(invitation.expiresAt)?.getTime() ?? 0) <= now
+import { formatDateTime, formatRelative } from '@/utils/format'
 
 /** Pending invitations table. Actions follow the `user:invite:*` permissions. */
 export const AdminInvitationsPage = () => {
@@ -47,20 +43,15 @@ export const AdminInvitationsPage = () => {
   // the API checks user:create too, since accepting creates a user
   const canSend = useHasPermissions('user:invite:create', 'user:create')
   const canRevoke = useHasPermissions('user:invite:view', 'user:invite:delete')
-  const canViewPolicies = useHasPermissions('policy:ar:view')
   const { data: invitations, isLoading, error } = useInvitations({ enabled: canView })
   const { roleName } = useRoleOptions()
-  const { data: policies = [] } = useAccessPolicies({ enabled: canView && canViewPolicies })
+  const policyName = usePolicyName({ enabled: canView })
   const { mutateAsync: revoke } = useDeleteInvitation()
-  const [sending, setSending] = useState(false)
   const [revoking, setRevoking] = useState<Invitation | null>(null)
   const [search, setSearch] = useState('')
   // when the page opened; good enough for marking expired rows, which the API soon removes
   const [now] = useState(Date.now)
-  usePreloadWhenIdle(canSend, InvitationFormDialog.preload)
-
-  const policyName = (policyId: number | null) =>
-    policyId === null ? null : (policies.find((p) => p.policyId === policyId)?.policyName ?? `Policy #${policyId}`)
+  const navigate = useNavigate()
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -73,7 +64,7 @@ export const AdminInvitationsPage = () => {
         title="Invitations"
         actions={
           canSend && (
-            <LoadingButton icon={<Send size={15} />} onClick={() => setSending(true)}>
+            <LoadingButton icon={<Send size={15} />} onClick={() => navigate(ROUTES.adminInvitationNew)}>
               Invite someone
             </LoadingButton>
           )
@@ -116,7 +107,12 @@ export const AdminInvitationsPage = () => {
                     return (
                       <tr key={invitation.invitationId} className="border-t border-border align-top">
                         <td className="max-w-xs py-3">
-                          <p className="font-mono text-sm text-text">{invitation.email}</p>
+                          <Link
+                            to={invitationPath(invitation.invitationId)}
+                            className="font-mono text-sm text-text hover:text-signal hover:underline"
+                          >
+                            {invitation.email}
+                          </Link>
                           {invitation.invitationNotes && (
                             <p className="truncate text-xs text-text-muted" title={invitation.invitationNotes}>
                               {invitation.invitationNotes}
@@ -136,8 +132,16 @@ export const AdminInvitationsPage = () => {
                           )}
                         </td>
                         <td className="py-3">
-                          {canRevoke && (
-                            <div className="flex justify-end">
+                          <div className="flex justify-end gap-1">
+                            <LoadingButton
+                              variant="ghost"
+                              size="sm"
+                              icon={<Eye size={14} />}
+                              aria-label={`View invitation for ${invitation.email}`}
+                              title="View"
+                              onClick={() => navigate(invitationPath(invitation.invitationId))}
+                            />
+                            {canRevoke && (
                               <LoadingButton
                                 variant="ghost"
                                 size="sm"
@@ -146,8 +150,8 @@ export const AdminInvitationsPage = () => {
                                 title="Revoke"
                                 onClick={() => setRevoking(invitation)}
                               />
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )
@@ -159,7 +163,6 @@ export const AdminInvitationsPage = () => {
         </section>
       )}
 
-      <Suspense fallback={null}>{sending && <InvitationFormDialog open onClose={() => setSending(false)} />}</Suspense>
       <ConfirmDialog
         open={revoking !== null}
         title="Revoke invitation"
@@ -168,12 +171,7 @@ export const AdminInvitationsPage = () => {
         onConfirm={() => (revoking ? revoke(revoking.invitationId) : Promise.resolve())}
         onClose={() => setRevoking(null)}
       >
-        {revoking && (
-          <p>
-            Revoke the invitation for <span className="font-mono text-text">{revoking.email}</span>? The link in their email stops
-            working. You can send them a new one afterwards.
-          </p>
-        )}
+        {revoking && <InvitationRevokeImpact invitation={revoking} />}
       </ConfirmDialog>
     </div>
   )

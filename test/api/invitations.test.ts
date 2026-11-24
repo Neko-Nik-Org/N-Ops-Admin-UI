@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { deleteInvitation, INVITATION_PAGE_SIZE, listInvitations, listInvitationsPage, sendInvitation } from '@/api/invitations'
-import { invitationExpiry } from '@/pages/admin/invitations/invitationValidation'
+import { invitationExpiry } from '@/pages/admin/invitations/form/invitationValidation'
 import { api } from '../testUtils'
 
 const rawInvitation = (id: number, invitedAt = '2026-11-20T08:00:00Z', extra: Record<string, unknown> = {}) => ({

@@ -15,7 +15,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 /**
- * The role editor's permissions as a matrix: one table per section, a row per module and a column
+ * Permissions as a matrix (role editor, role details, Account › Security): one table per section, a row per module and a column
  * per action (View / Create / Edit / Delete, plus "More" for the odd ones). "—" means the module has
  * no such permission. Only modules the signed-in user can grant something in are shown.
  */
@@ -50,6 +50,7 @@ export const PermissionMatrix = ({
   onChange,
   canGrant = () => true,
   readOnly = false,
+  emptyText,
 }: {
   selected: readonly string[]
   onChange?: (next: string[]) => void
@@ -57,6 +58,8 @@ export const PermissionMatrix = ({
   canGrant?: (key: string) => boolean
   /** Shows what `selected` grants: ticks can't change, and only modules with a tick are listed. */
   readOnly?: boolean
+  /** Text shown when there is nothing to list. */
+  emptyText?: string
 }) => {
   const set = (keys: string[], on: boolean) => {
     const rest = selected.filter((k) => !keys.includes(k))
@@ -99,7 +102,8 @@ export const PermissionMatrix = ({
   if (!sections.length)
     return (
       <p className="text-sm text-text-muted">
-        {readOnly ? 'This role has no permissions.' : 'Your role has no permissions you could give to another role.'}
+        {emptyText ??
+          (readOnly ? 'This role has no permissions.' : 'Your role has no permissions you could give to another role.')}
       </p>
     )
 

@@ -109,12 +109,22 @@ change, `useSyncSelfSession` (in `hooks/`) updates the in-app profile. For remem
 sessions it then calls `/auth/refresh`. Other sessions are not refreshed, so their server copy
 updates at the next sign-in. If the refresh fails with `401`, the user is asked to sign in again.
 
+**Saved startup data.** The startup requests for the signed-in user (profile, UI preferences, details,
+org info, tags; `SAVED_STARTUP_QUERIES` in `hooks/useAppBootstrap.ts`) are saved in the encrypted
+storage by `utils/queryPersistence.ts`. On a reload with the same user's session, they are put back
+into the React Query cache before the first render, marked stale. The app then opens at once (no
+loading screen) while `/auth/verify` and fresh copies load in the background. If the session is refused, the
+user is signed out as usual. The copy is removed at sign-out and ignored after a day or for another user.
+The health check is never saved.
+
 **Live contract test.** `test/integration/selfAccount.live.test.ts` runs the real API modules
 against a running Main API. It is skipped unless `NOPS_LIVE_API_URL` is set. It changes data
 (passwords, usernames, deactivation), so only point it at a throwaway database. The file header
 lists the users and services it needs.
 
 ## Features with planned backends
+
+[API_COVERAGE.md](API_COVERAGE.md) lists every Main API endpoint the UI uses and what is still missing.
 
 Some screens are built ahead of their backend. When their endpoints are missing, they show an
 explicit "not available / not connected yet" state and **never fabricate data**:

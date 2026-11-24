@@ -19,7 +19,7 @@
 import * as yup from 'yup'
 
 /** Expiry choices for an invitation, in hours. The API allows 1 hour to 21 days. */
-export const INVITATION_EXPIRY_HOURS = [1, 24, 72, 168, 336, 504] as const
+export const INVITATION_EXPIRY_HOURS = [1, 2, 6, 12, 24, 72, 168, 336, 504] as const
 
 const HOUR_MS = 3_600_000
 

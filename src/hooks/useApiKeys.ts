@@ -23,6 +23,12 @@ import { ADMIN_KEYS, useAdminRefresh } from '@/hooks/useAdminRefresh'
 
 export const useApiKeys = () => useQuery({ queryKey: ADMIN_KEYS.apiKeys, queryFn: listApiKeys })
 
+/** One key, picked from the list (there's no fetch-one endpoint); `apiKey` is undefined when it doesn't exist. */
+export const useApiKey = (apiKeyId: number | null) => {
+  const query = useApiKeys()
+  return { ...query, apiKey: apiKeyId === null ? undefined : query.data?.find((k) => k.apiKeyId === apiKeyId) }
+}
+
 export const useCreateApiKey = () => {
   const refresh = useAdminRefresh(ADMIN_KEYS.apiKeys)
   return useMutation({ mutationFn: (input: ApiKeyInput) => createApiKey(input), onSuccess: refresh })

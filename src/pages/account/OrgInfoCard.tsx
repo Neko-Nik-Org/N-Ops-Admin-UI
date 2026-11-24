@@ -15,74 +15,89 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Organization card on the Account page: usage meters and plan limits. */
+/**
+ * Organization overview on Account › Organization, using the full page width: a details card on top,
+ * then usage meters and plan limits side by side.
+ */
 
+import { Building2, Gauge, ListChecks } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { AccountCard as Card } from '@/pages/account/AccountCard'
 import { SkeletonText } from '@/components/Skeleton'
 import { Meter } from '@/components/Meter'
 import { useOrgInfo } from '@/hooks/useAccount'
 import { describeOrgProfile } from '@/utils/orgProfile'
 import { formatBytes, formatDate, formatNumber } from '@/utils/format'
 
-/** One label / value row for a plan limit. */
-const Limit = ({ label, value }: { label: string; value: number }) => (
-  <div className="flex items-baseline justify-between gap-2 border-t border-border py-2.5 text-sm first:border-t-0">
-    <span className="text-text-muted">{label}</span>
-    <span className="text-text">{formatNumber(value)}</span>
+/** One label / value pair in the details card. */
+const Field = ({ label, wide, children }: { label: string; wide?: boolean; children: ReactNode }) => (
+  <div className={wide ? 'sm:col-span-2 lg:col-span-4' : undefined}>
+    <dt className="text-text-muted">{label}</dt>
+    <dd className="mt-0.5 break-words whitespace-pre-line text-text">{children}</dd>
   </div>
 )
 
-/** Loads `/user/self/org-info` and shows the organization's quotas and current usage. */
+/** One label / value row for a plan limit. */
+const Limit = ({ label, value }: { label: string; value: number }) => (
+  <div className="flex items-baseline justify-between gap-2 border-t border-border py-2.5 text-sm first:border-t-0 first:pt-0">
+    <span className="text-text-muted">{label}</span>
+    <span className="font-medium text-text">{formatNumber(value)}</span>
+  </div>
+)
+
+/** Loads `/user/self/org-info` and shows the organization's details, current usage and quotas. */
 export const OrgInfoCard = () => {
   const { data: org, isLoading, error } = useOrgInfo()
 
+  if (isLoading || error || !org) {
+    return (
+      <Card icon={<Building2 size={16} />} title="Organization">
+        {isLoading ? (
+          <SkeletonText lines={6} />
+        ) : (
+          <p className="text-sm text-text-muted">Couldn't load organization details: {error?.message ?? 'no data'}</p>
+        )}
+      </Card>
+    )
+  }
+
   return (
-    <section className="rounded-xl border border-border bg-surface-raised p-5">
-      <h2 className="mb-4 font-semibold text-text">Organization</h2>
-
-      {isLoading ? (
-        <SkeletonText lines={6} />
-      ) : error || !org ? (
-        <p className="text-sm text-text-muted">Couldn't load organization details: {error?.message ?? 'no data'}</p>
-      ) : (
-        <div className="flex flex-col gap-6">
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-text-muted">Name</dt>
-              <dd className="font-medium text-text">{org.organizationName}</dd>
-            </div>
-            <div>
-              <dt className="text-text-muted">Created</dt>
-              <dd className="text-text">{formatDate(org.createdAt)}</dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-text-muted">Organization ID</dt>
-              <dd className="font-mono text-xs break-all text-text">{org.organizationId}</dd>
-            </div>
-            {describeOrgProfile(org.organizationInfo).map(({ key, label, value }) => (
-              <div key={key} className={key === 'description' || key === 'address' ? 'sm:col-span-2' : undefined}>
-                <dt className="text-text-muted">{label}</dt>
-                <dd className="break-words whitespace-pre-line text-text">{value}</dd>
-              </div>
-            ))}
-          </dl>
-
-          <div className="flex flex-col gap-4">
-            <h3 className="text-xs font-medium tracking-wide text-text-muted uppercase">Usage</h3>
-            <Meter label="Users" used={org.users.current} total={org.users.limit} />
-            <Meter label="Vault projects" used={org.vaultProjects.current} total={org.vaultProjects.limit} />
-            <Meter label="AI credits" used={org.aiCredit.used} total={org.aiCredit.allocated} />
-            <Meter label="Storage" used={org.storageBytes.used} total={org.storageBytes.allocated} format={formatBytes} />
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <Card icon={<Building2 size={16} />} title="Organization" className="lg:col-span-3">
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="Name">
+            <span className="font-medium">{org.organizationName}</span>
+          </Field>
+          <Field label="Created">{formatDate(org.createdAt)}</Field>
+          <div className="sm:col-span-2">
+            <dt className="text-text-muted">Organization ID</dt>
+            <dd className="mt-0.5 font-mono text-xs break-all text-text">{org.organizationId}</dd>
           </div>
+          {describeOrgProfile(org.organizationInfo).map(({ key, label, value }) => (
+            <Field key={key} label={label} wide={key === 'description' || key === 'address'}>
+              {value}
+            </Field>
+          ))}
+        </dl>
+      </Card>
 
-          <div>
-            <h3 className="mb-1 text-xs font-medium tracking-wide text-text-muted uppercase">Limits</h3>
-            <Limit label="Servers" value={org.serverLimit} />
-            <Limit label="Workflows" value={org.workflowLimit} />
-            <Limit label="Secret keys per vault project" value={org.vaultKeysPerProjectLimit} />
-            <Limit label="Notes per vault project" value={org.vaultNotesPerProjectLimit} />
-          </div>
+      <Card icon={<Gauge size={16} />} title="Usage" className="lg:col-span-2">
+        <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+          <Meter label="Users" used={org.users.current} total={org.users.limit} />
+          <Meter label="Vault projects" used={org.vaultProjects.current} total={org.vaultProjects.limit} />
+          <Meter label="AI credits" used={org.aiCredit.used} total={org.aiCredit.allocated} />
+          <Meter label="Storage" used={org.storageBytes.used} total={org.storageBytes.allocated} format={formatBytes} />
         </div>
-      )}
-    </section>
+      </Card>
+
+      <Card icon={<ListChecks size={16} />} title="Limits">
+        <div>
+          <Limit label="Servers" value={org.serverLimit} />
+          <Limit label="Workflows" value={org.workflowLimit} />
+          <Limit label="Secret keys per vault project" value={org.vaultKeysPerProjectLimit} />
+          <Limit label="Notes per vault project" value={org.vaultNotesPerProjectLimit} />
+        </div>
+      </Card>
+    </div>
   )
 }

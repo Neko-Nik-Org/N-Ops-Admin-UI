@@ -357,6 +357,10 @@
 }
 
 /* ───────── form parts ───────── */
+/* Wider card for forms with two-column steps (invite) */
+.n-auth-card.n-auth-card--wide {
+  max-width: 34rem;
+}
 .n-auth-form {
   display: flex;
   flex-direction: column;

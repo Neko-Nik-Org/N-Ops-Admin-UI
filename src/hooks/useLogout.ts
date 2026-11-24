@@ -19,7 +19,7 @@
 
 import { useQueryClient } from '@tanstack/react-query'
 import { useSetAtom } from 'jotai'
-import { flushLastPage } from '@/hooks/useUiInfoSync'
+import { flushUiInfoBeforeSignOut } from '@/hooks/useUiInfoSync'
 import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { logout } from '@/api/session'
 import { currentUserAtom, sessionStatusAtom } from '@/store/session'
@@ -33,8 +33,8 @@ export const useLogout = () => {
 
   return useAsyncAction(
     async () => {
-      // remember the page they're on, to come back to it after the next sign-in
-      await flushLastPage(queryClient)
+      // send unsent preference changes, and the page they're on (to come back to it after the next sign-in)
+      await flushUiInfoBeforeSignOut(queryClient)
       try {
         await logout()
       } catch {

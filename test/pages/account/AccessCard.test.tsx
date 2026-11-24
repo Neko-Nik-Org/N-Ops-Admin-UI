@@ -27,7 +27,7 @@ const tags = [
 ]
 
 describe('AccessCard', () => {
-  it('shows permissions by group, tags, Linux users and approvals', async () => {
+  it('shows the permission matrix, tags, Linux users and approvals', async () => {
     api.get.mockResolvedValue({ data: tags })
     renderWithProviders(<AccessCard />, {
       user: makeUser({
@@ -38,8 +38,12 @@ describe('AccessCard', () => {
         canBypassApprovals: false,
       }),
     })
-    expect(screen.getByText('Create tags')).toHaveAttribute('title', 'tag:create')
-    expect(screen.getByText('View roles')).toBeInTheDocument()
+    expect(screen.getByText('Permissions · 3 granted')).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Infrastructure permissions' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Create tags' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Create tags' })).toBeDisabled()
+    expect(screen.getByRole('checkbox', { name: 'View roles' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Delete tags' })).not.toBeChecked()
     expect(screen.getByText('future:thing')).toBeInTheDocument() // unknown to the catalog, shown raw
     expect(await screen.findByText('staging')).toBeInTheDocument()
     expect(screen.getByText('deploy')).toBeInTheDocument()
@@ -60,7 +64,7 @@ describe('AccessCard', () => {
   it('hides Linux users and approvals until the full profile has loaded', () => {
     api.get.mockResolvedValue({ data: [] })
     renderWithProviders(<AccessCard />, { user: makeUser() })
-    expect(screen.getByText('Permissions')).toBeInTheDocument()
+    expect(screen.getByText(/^Permissions · /)).toBeInTheDocument()
     expect(screen.queryByText('Linux users')).not.toBeInTheDocument()
   })
 })

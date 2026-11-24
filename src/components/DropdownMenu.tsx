@@ -40,6 +40,8 @@ interface DropdownMenuProps {
    * wide table) can't clip it. It closes when the page scrolls or resizes.
    */
   floating?: boolean
+  /** Items, headers and separators span the menu's full width (edge to edge) instead of sitting inside its padding. */
+  flush?: boolean
   /**
    * Menu items (elements with a `menuitem*` role). Clicking one closes the menu and returns focus to
    * the trigger, unless the item has `data-keep-open`.
@@ -70,6 +72,7 @@ export const DropdownMenu = ({
   triggerClassName,
   widthClassName = 'w-40',
   floating = false,
+  flush = false,
   chevron = true,
   children,
 }: DropdownMenuProps) => {
@@ -196,7 +199,8 @@ export const DropdownMenu = ({
             onClick={onMenuClick}
             onKeyDown={onMenuKeyDown}
             className={cn(
-              'z-50 overflow-y-auto rounded-md border border-border bg-surface p-1 shadow-lg',
+              'z-50 overflow-y-auto rounded-md border border-border bg-surface shadow-lg',
+              flush ? 'py-1 [&_[role^=menuitem]]:rounded-none [&_[role^=menuitem]]:px-3' : 'p-1',
               !floating && 'absolute right-0',
               widthClassName,
             )}

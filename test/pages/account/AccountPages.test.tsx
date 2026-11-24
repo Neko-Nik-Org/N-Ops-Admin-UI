@@ -14,14 +14,16 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tests for src/pages/account/index.tsx (with UserDetailsCard, OrgInfoCard and the theme preference). */
+/** Tests for the Account pages: Profile (profile, details, theme), Security and Organization. */
 
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { themeAtom } from '@/store/theme'
 import { currentUserAtom, sessionStatusAtom } from '@/store/session'
 import { clearSessionToken, getSessionToken, setSessionToken } from '@/store/sessionToken'
-import { AccountPage } from '@/pages/account'
+import { AccountOrganizationPage } from '@/pages/account/organization'
+import { AccountProfilePage } from '@/pages/account/profile'
+import { AccountSecurityPage } from '@/pages/account/security'
 import { ApiError } from '@/types/api'
 import { api, makeUser, renderWithProviders } from '../../testUtils'
 
@@ -58,7 +60,7 @@ const mockGets = (usernameStatus = 200, details: object = {}) =>
 describe('AccountPage', () => {
   it("shows the signed-in user's profile", () => {
     mockGets()
-    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser({ isEmailVerified: false }) })
+    renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser({ isEmailVerified: false }) })
     expect(screen.getByText('Priya Rao')).toBeInTheDocument()
     expect(screen.getByText('priya')).toBeInTheDocument()
     expect(screen.getByText('priya@acme.dev')).toBeInTheDocument()
@@ -67,13 +69,13 @@ describe('AccountPage', () => {
 
   it('hides the profile when it is unknown (after a page reload)', () => {
     mockGets()
-    renderWithProviders(<AccountPage />, { route: '/account' })
-    expect(screen.queryByRole('heading', { name: 'Profile' })).not.toBeInTheDocument()
+    renderWithProviders(<AccountProfilePage />, { route: '/account/profile' })
+    expect(screen.queryByRole('heading', { name: 'Profile', level: 2 })).not.toBeInTheDocument()
   })
 
   it("shows the organization's details, usage and limits", async () => {
     mockGets()
-    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    renderWithProviders(<AccountOrganizationPage />, { route: '/account/organization', user: makeUser() })
 
     expect(await screen.findByText('org-123')).toBeInTheDocument()
     expect(api.get).toHaveBeenCalledWith('/user/self/org-info')
@@ -87,13 +89,13 @@ describe('AccountPage', () => {
 
   it('explains when the organization cannot be loaded', async () => {
     api.get.mockRejectedValue(new Error('Forbidden'))
-    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    renderWithProviders(<AccountOrganizationPage />, { route: '/account/organization', user: makeUser() })
     expect(await screen.findByText("Couldn't load organization details: Forbidden")).toBeInTheDocument()
   })
 
   it('changes the theme preference', () => {
     mockGets()
-    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    const { store } = renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser() })
     fireEvent.click(screen.getByRole('button', { name: 'Light theme' }))
     expect(store.get(themeAtom)).toBe('light')
     expect(screen.getByRole('button', { name: 'Light theme' })).toHaveAttribute('aria-pressed', 'true')
@@ -107,7 +109,7 @@ const typeCode = (code: string) =>
 describe('AccountPage — email verification', () => {
   it('only offers verification for an unverified email', () => {
     mockGets()
-    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser() })
     expect(screen.queryByRole('button', { name: 'Verify email' })).not.toBeInTheDocument()
   })
 
@@ -117,7 +119,10 @@ describe('AccountPage — email verification', () => {
     api.post.mockImplementation((url: string) =>
       Promise.resolve(url === '/auth/refresh' ? { data: { session_id: 'new' } } : { data: '' }),
     )
-    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser({ isEmailVerified: false }) })
+    const { store } = renderWithProviders(<AccountProfilePage />, {
+      route: '/account/profile',
+      user: makeUser({ isEmailVerified: false }),
+    })
 
     fireEvent.click(screen.getByRole('button', { name: 'Verify email' }))
     fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
@@ -136,7 +141,10 @@ describe('AccountPage — email verification', () => {
     mockGets()
     setSessionToken('s1', false)
     api.post.mockResolvedValue({ data: '' })
-    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser({ isEmailVerified: false }) })
+    const { store } = renderWithProviders(<AccountProfilePage />, {
+      route: '/account/profile',
+      user: makeUser({ isEmailVerified: false }),
+    })
 
     fireEvent.click(screen.getByRole('button', { name: 'Verify email' }))
     fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
@@ -154,7 +162,7 @@ describe('AccountPage — email verification', () => {
         ? Promise.reject(new ApiError('Verification code is incorrect, request a new one', 400))
         : Promise.resolve({ data: '' }),
     )
-    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser({ isEmailVerified: false }) })
+    renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser({ isEmailVerified: false }) })
 
     fireEvent.click(screen.getByRole('button', { name: 'Verify email' }))
     fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
@@ -169,7 +177,10 @@ describe('AccountPage — email verification', () => {
   it('treats "already verified" as done', async () => {
     mockGets()
     api.post.mockRejectedValue(new ApiError('Email is already verified', 409))
-    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser({ isEmailVerified: false }) })
+    const { store } = renderWithProviders(<AccountProfilePage />, {
+      route: '/account/profile',
+      user: makeUser({ isEmailVerified: false }),
+    })
 
     fireEvent.click(screen.getByRole('button', { name: 'Verify email' }))
     fireEvent.click(screen.getByRole('button', { name: 'Send code' }))
@@ -180,7 +191,7 @@ describe('AccountPage — email verification', () => {
 describe('AccountPage — username', () => {
   it('shows live availability and blocks a taken name', async () => {
     mockGets(409)
-    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser() })
 
     fireEvent.click(screen.getByRole('button', { name: 'Change username' }))
     fireEvent.change(screen.getByLabelText('New username'), { target: { value: 'taken_name' } })
@@ -197,7 +208,7 @@ describe('AccountPage — username', () => {
     api.post.mockImplementation((url: string) =>
       Promise.resolve(url === '/auth/refresh' ? { data: { session_id: 'new' } } : { data: '' }),
     )
-    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    const { store } = renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser() })
 
     fireEvent.click(screen.getByRole('button', { name: 'Change username' }))
     fireEvent.change(screen.getByLabelText('New username'), { target: { value: 'priya_r' } })
@@ -217,7 +228,7 @@ describe('AccountPage — username', () => {
         ? (clearSessionToken(), Promise.reject(new ApiError('Invalid session', 401))) // the axios interceptor clears the token on 401
         : Promise.resolve({ data: '' }),
     )
-    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    const { store } = renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser() })
 
     fireEvent.click(screen.getByRole('button', { name: 'Change username' }))
     fireEvent.change(screen.getByLabelText('New username'), { target: { value: 'priya_r' } })
@@ -258,7 +269,7 @@ describe('AccountPage — edit profile', () => {
 
   it('validates the name and email', async () => {
     mockWithProfile()
-    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser() })
     const dialog = openEditor()
     fireEvent.change(within(dialog).getByLabelText('Display name'), { target: { value: '  ' } })
     fireEvent.change(within(dialog).getByLabelText('Email'), { target: { value: 'nope' } })
@@ -271,7 +282,7 @@ describe('AccountPage — edit profile', () => {
   it('renames without sending the email, so it stays verified', async () => {
     mockWithProfile()
     api.put.mockResolvedValue({ data: 'Profile updated successfully' })
-    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    const { store } = renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser() })
     const dialog = openEditor()
     expect(within(dialog).queryByRole('note')).not.toBeInTheDocument()
     fireEvent.change(within(dialog).getByLabelText('Display name'), { target: { value: ' Priya R ' } })
@@ -285,7 +296,7 @@ describe('AccountPage — edit profile', () => {
 
   it('closes without a request when nothing changed', async () => {
     mockWithProfile()
-    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser() })
     const dialog = openEditor()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -299,7 +310,7 @@ describe('AccountPage — edit profile', () => {
     api.post.mockImplementation((url: string) =>
       Promise.resolve(url === '/auth/refresh' ? { data: { session_id: 'new' } } : { data: '' }),
     )
-    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    const { store } = renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser() })
     const dialog = openEditor()
     fireEvent.change(within(dialog).getByLabelText('Email'), { target: { value: 'priya@new.dev' } })
     expect(within(dialog).getByRole('note')).toHaveTextContent('Your new email will need verifying.')
@@ -317,7 +328,7 @@ describe('AccountPage — edit profile', () => {
     mockWithProfile()
     setSessionToken('old', false)
     api.put.mockResolvedValue({ data: 'Profile updated successfully' })
-    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    const { store } = renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser() })
     const dialog = openEditor()
     fireEvent.change(within(dialog).getByLabelText('Email'), { target: { value: 'priya@new.dev' } })
     expect(within(dialog).getByRole('note')).toHaveTextContent('You’ll be signed out after saving')
@@ -331,7 +342,7 @@ describe('AccountPage — edit profile', () => {
   it('explains a clash and reloads the profile in case the name was saved', async () => {
     mockWithProfile({ ...rawProfile, display_name: 'Priya R' })
     api.put.mockRejectedValue(new ApiError('SQL Database error', 417))
-    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    const { store } = renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser() })
     const dialog = openEditor()
     fireEvent.change(within(dialog).getByLabelText('Display name'), { target: { value: 'Priya R' } })
     fireEvent.change(within(dialog).getByLabelText('Email'), { target: { value: 'taken@acme.dev' } })
@@ -347,14 +358,14 @@ describe('AccountPage — edit profile', () => {
 describe('AccountPage — security', () => {
   it('is shown even when the profile is unknown', () => {
     mockGets()
-    renderWithProviders(<AccountPage />, { route: '/account' })
-    expect(screen.getByRole('heading', { name: 'Security' })).toBeInTheDocument()
+    renderWithProviders(<AccountSecurityPage />, { route: '/account/security' })
+    expect(screen.getByRole('heading', { name: 'Security', level: 2 })).toBeInTheDocument()
   })
 
   it('validates and changes the password', async () => {
     mockGets()
     api.post.mockResolvedValue({ data: '' })
-    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    renderWithProviders(<AccountSecurityPage />, { route: '/account/security', user: makeUser() })
 
     fireEvent.click(screen.getByRole('button', { name: 'Change password' }))
     const dialog = screen.getByRole('dialog')
@@ -372,11 +383,44 @@ describe('AccountPage — security', () => {
     )
   })
 
+  it('only loads the anti-phishing secret when asked to show it', async () => {
+    api.get.mockImplementation(async (url: string) => ({ data: url === '/user/self/anti-phishing-secret' ? 'blue-otter' : {} }))
+    renderWithProviders(<AccountSecurityPage />, { route: '/account/security', user: makeUser() })
+    expect(screen.getByText('••••••••')).toBeInTheDocument()
+    expect(api.get).not.toHaveBeenCalledWith('/user/self/anti-phishing-secret')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show anti-phishing secret' }))
+    expect(await screen.findByText('blue-otter')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Hide anti-phishing secret' }))
+    expect(screen.queryByText('blue-otter')).not.toBeInTheDocument()
+  })
+
+  it('validates and changes the anti-phishing secret', async () => {
+    api.get.mockImplementation(async (url: string) => ({ data: url === '/user/self/anti-phishing-secret' ? 'blue-otter' : {} }))
+    api.put.mockResolvedValue({ data: '' })
+    renderWithProviders(<AccountSecurityPage />, { route: '/account/security', user: makeUser() })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change secret' }))
+    const dialog = screen.getByRole('dialog')
+    const input = within(dialog).getByLabelText('Secret')
+    await waitFor(() => expect(input).toHaveValue('blue-otter'))
+    fireEvent.change(input, { target: { value: 'no spaces!' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save secret' }))
+    expect(await within(dialog).findByText('Use only letters, digits, - and _.')).toBeInTheDocument()
+    expect(api.put).not.toHaveBeenCalled()
+
+    fireEvent.change(input, { target: { value: 'green_heron' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save secret' }))
+    await waitFor(() =>
+      expect(api.put).toHaveBeenCalledWith('/user/self/anti-phishing-secret', JSON.stringify('green_heron'), expect.anything()),
+    )
+  })
+
   it('deactivates the account and signs out', async () => {
     mockGets()
     setSessionToken('s1', false)
     api.delete.mockResolvedValue({ data: '' })
-    const { store } = renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    const { store } = renderWithProviders(<AccountSecurityPage />, { route: '/account/security', user: makeUser() })
 
     fireEvent.click(screen.getByRole('button', { name: 'Deactivate' }))
     fireEvent.click(screen.getByRole('button', { name: 'Deactivate my account' }))
@@ -408,7 +452,7 @@ describe('AccountPage — profile details', () => {
       Pronouns: 'they/them',
       shifts: [1, 2],
     })
-    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser() })
     expect(await screen.findByText('SRE lead')).toBeInTheDocument()
     expect(screen.getByText('Department').nextSibling).toHaveTextContent('SRE')
     expect(screen.getByText(/^UTC \(.* there now\)$/)).toBeInTheDocument()
@@ -422,14 +466,14 @@ describe('AccountPage — profile details', () => {
 
   it('shows an empty state', async () => {
     mockGets()
-    renderWithProviders(<AccountPage />, { route: '/account' })
+    renderWithProviders(<AccountProfilePage />, { route: '/account/profile' })
     expect(await screen.findByText(/^No details yet\./)).toBeInTheDocument()
   })
 
   it('saves the structured details, keeping values it does not know', async () => {
     mockGets(200, { Team: 'SRE', shifts: [1, 2] })
     api.post.mockResolvedValue({ data: '' })
-    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser() })
     const form = await openEditor()
     expect(form.getByLabelText('Department or team')).toHaveValue('SRE') // moved from the free-form "Team"
     fireEvent.change(form.getByLabelText('Job title'), { target: { value: ' SRE lead ' } })
@@ -461,7 +505,7 @@ describe('AccountPage — profile details', () => {
 
   it('checks phones, hours, SSH keys and labels before saving', async () => {
     mockGets(200, { custom: { Team: 'SRE' } })
-    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser() })
+    renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser() })
     const form = await openEditor()
     fireEvent.change(form.getAllByLabelText('Phone')[0]!, { target: { value: 'call me' } })
     fireEvent.change(form.getByLabelText('Working hours from'), { target: { value: '18:00' } })
@@ -483,7 +527,7 @@ describe('AccountPage — email code characters', () => {
   it('accepts letters in the code (the API charset is configurable)', async () => {
     mockGets()
     api.post.mockResolvedValue({ data: '' })
-    renderWithProviders(<AccountPage />, { route: '/account', user: makeUser({ isEmailVerified: false }) })
+    renderWithProviders(<AccountProfilePage />, { route: '/account/profile', user: makeUser({ isEmailVerified: false }) })
 
     fireEvent.click(screen.getByRole('button', { name: 'Verify email' }))
     fireEvent.click(screen.getByRole('button', { name: 'Send code' }))

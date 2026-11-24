@@ -6,16 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="N-Ops Admin — sign in to the infrastructure control plane." />
     <!--
-      Boot screen theme. Saved settings (the chosen theme included) are encrypted and only the app can
+      First-paint theme. Saved settings (the chosen theme included) are encrypted and only the app can
       read them, so until it starts this follows the system's light / dark setting.
     -->
     <script>
       document.documentElement.dataset.theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
     </script>
     <!--
-      Boot screen: painted straight from this HTML, before any JavaScript or stylesheet arrives, so the
-      first paint isn't a blank white page. React replaces #root's contents when it mounts.
-      Colors match the ink / signal / muted tokens in src/index.css.
+      Page background before the app starts, so the first paint isn't a blank white page. The app's own
+      animated loader (ScreenLoader) takes over as soon as it mounts. Colors match the ink token in src/index.css.
     -->
     <style>
       html {
@@ -26,60 +25,12 @@
         background: #f4f6f8;
         color-scheme: light;
       }
-      .n-boot {
-        position: fixed;
-        inset: 0;
-        display: grid;
-        place-items: center;
-        align-content: center;
-        gap: 14px;
-        font:
-          500 14px/1.4 system-ui,
-          sans-serif;
-        color: #8d99a8;
-      }
-      html[data-theme='light'] .n-boot {
-        color: #5b6472;
-      }
-      .n-boot svg {
-        width: 64px;
-        height: 64px;
-        color: #4cf2c0;
-        animation: n-boot-pulse 1.6s ease-in-out infinite;
-      }
-      html[data-theme='light'] .n-boot svg {
-        color: #0e9b78;
-      }
-      @keyframes n-boot-pulse {
-        50% {
-          opacity: 0.45;
-        }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .n-boot svg {
-          animation: none;
-        }
-      }
     </style>
     <!-- Cloudflare Turnstile is loaded on demand by TurnstileWidget (sign-in page only) -->
     <title>N-Ops Admin</title>
   </head>
   <body>
-    <div id="root">
-      <div class="n-boot" role="status" aria-label="Loading N-Ops">
-        <svg viewBox="0 0 160 160" fill="none" aria-hidden="true">
-          <rect x="4" y="4" width="152" height="152" rx="40" stroke="currentColor" stroke-width="6" opacity="0.35" />
-          <path
-            d="M50 110 L50 50 L110 110 L110 50"
-            stroke="currentColor"
-            stroke-width="12"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-        <span>Loading N-Ops</span>
-      </div>
-    </div>
+    <div id="root"></div>
     <!-- runtime config (API URL, Turnstile key); written by the container on start, see docker/write-env.mjs -->
     <script src="/env.js"></script>
     <script type="module" src="/src/main.tsx"></script>

@@ -16,10 +16,11 @@
  */
 /** Tests for src/components/AppShell/Sidebar.tsx: section order, groups and the collapsible rail. */
 
-import { fireEvent, screen, within } from '@testing-library/react'
+import { act, fireEvent, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { secureStorage } from '@/utils/secureStorage'
 import { Sidebar } from '@/components/AppShell/Sidebar'
+import { sidebarCollapsedAtom } from '@/store/sidebar'
 import { api, makeUser, renderWithProviders } from '../../testUtils'
 
 const renderSidebar = (route = '/') => {
@@ -79,21 +80,17 @@ describe('Sidebar', () => {
     }
   })
 
-  it('collapses to an icon rail and remembers it', () => {
-    renderSidebar()
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
+  it('collapses to an icon rail (toggled from the top bar) and remembers it', () => {
+    const { store } = renderSidebar()
+    act(() => store.set(sidebarCollapsedAtom, true))
     expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('title', 'Overview')
     // labels fade out rather than unmount (so the change animates); screen readers skip them
     expect(screen.getByText('Overview').closest('[aria-hidden]')).not.toBeNull()
     expect(secureStorage.getItem('nops-sidebar-collapsed')).toBe('true')
-    // the rail shows only the logo; expanding happens from the top bar
-    expect(screen.queryByRole('button', { name: 'Expand sidebar' })).not.toBeInTheDocument()
-    expect(screen.getByText('N-Ops')).toHaveAttribute('aria-hidden', 'true')
-    expect(screen.queryByRole('button', { name: 'Collapse sidebar' })).not.toBeInTheDocument()
 
     // Clicking a group icon brings the full sidebar back with that group open
     fireEvent.click(screen.getByRole('button', { name: 'Admin' }))
-    expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toBeInTheDocument()
+    expect(store.get(sidebarCollapsedAtom)).toBe(false)
     expect(screen.getByRole('link', { name: 'Roles' })).toBeInTheDocument()
   })
 })

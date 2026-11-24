@@ -14,7 +14,7 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Validation for the Users page's forms: add user, edit name and email, role and policy, rename, reset password. */
+/** Validation for the Users pages' forms: add user, edit user, rename, reset password. */
 
 import * as yup from 'yup'
 import { passwordField, profileDetailsSchema, usernameField } from '@/utils/validation'
@@ -44,8 +44,8 @@ export const userSchema = yup.object({
 
 export type UserFormValues = yup.InferType<typeof userSchema>
 
-/** Admin editing someone's name and email. */
-export const adminProfileSchema = yup.object({
+/** Admin editing someone: name, email, role, access policy and profile details. */
+export const userEditSchema = yup.object({
   displayName: yup.string().trim().required('Enter their name.').max(100, 'Keep it to 100 characters or fewer.'),
   primaryEmail: yup
     .string()
@@ -53,18 +53,13 @@ export const adminProfileSchema = yup.object({
     .required('Enter their email.')
     .email('Enter a valid email address.')
     .max(254, 'Keep it to 254 characters or fewer.'),
-})
-
-export type AdminProfileFormValues = yup.InferType<typeof adminProfileSchema>
-
-/** Admin changing someone's role and access policy. */
-export const userAccessSchema = yup.object({
   roleId: yup.number().typeError('Pick a role.').required('Pick a role.').min(1, 'Pick a role.'),
   /** 0 = no access policy. */
   accessPolicyId: yup.number().default(0),
+  details: profileDetailsSchema,
 })
 
-export type UserAccessFormValues = yup.InferType<typeof userAccessSchema>
+export type UserEditFormValues = yup.InferType<typeof userEditSchema>
 
 /** Admin renaming a user. Pass the current name as `context.currentUserName` to reject "no change". */
 export const renameUserSchema = yup.object({

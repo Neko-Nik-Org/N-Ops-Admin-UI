@@ -200,3 +200,46 @@ export function DashboardSkeleton() {
     </SkeletonGroup>
   )
 }
+
+/**
+ * Any app page while its code downloads (lazy route): the toolbar row (path left, buttons right),
+ * then a table card. Shown inside the app shell, so the sidebar and top bar stay put.
+ */
+export function PageSkeleton() {
+  return (
+    <SkeletonGroup label="Loading page" className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-3">
+        <Skeleton width={180} height={14} />
+        <span className="flex gap-2">
+          <Skeleton width={84} height={30} radius={8} />
+          <Skeleton width={64} height={30} radius={8} />
+        </span>
+      </div>
+      <TableSkeleton rows={8} columns={5} />
+    </SkeletonGroup>
+  )
+}
+
+/** A sign-in page (login, 2FA, invite …) while its code downloads: a centred card with a title and fields. */
+export function AuthPageSkeleton() {
+  return (
+    <SkeletonGroup label="Loading page" className="grid min-h-dvh place-items-center p-4">
+      <div className="n-sk-card w-full max-w-sm">
+        <span className="n-sk-row">
+          <Skeleton width={36} height={36} radius={10} />
+          <span className="n-sk-stack" style={{ gap: 6 }}>
+            <Skeleton width="55%" height={16} />
+            <Skeleton width="80%" height={10} />
+          </span>
+        </span>
+        {[0, 1].map((i) => (
+          <span key={i} className="n-sk-stack" style={{ gap: 6 }}>
+            <Skeleton width={90} height={10} />
+            <Skeleton height={38} radius={8} />
+          </span>
+        ))}
+        <Skeleton height={40} radius={8} />
+      </div>
+    </SkeletonGroup>
+  )
+}

@@ -14,42 +14,29 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Admin › Roles (/admin/roles): permission sets for users, backed by `/user/roles/*`. */
+/**
+ * Admin › Roles (/admin/roles): permission sets for users, backed by `/user/roles/*`. Viewing,
+ * creating and editing a role each open their own page; deleting asks in a dialog.
+ */
 
 import { Copy, Eye, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useAtomValue } from 'jotai'
-import { Suspense, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/Badge'
 import { LoadingButton } from '@/components/LoadingButton'
 import { TableSkeleton } from '@/components/Skeleton'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { PageHeader } from '@/components/PageHeader'
 import { SearchInput } from '@/components/SearchInput'
-import { RoleViewDialog } from '@/pages/admin/roles/RoleViewDialog'
+import { NO_ROLE_EDIT, OUT_OF_SCOPE, RoleDeleteImpact } from '@/pages/admin/roles/RoleDetails'
 import { ALL_PERMISSIONS } from '@/constants/permissions'
+import { newRolePath, roleEditPath, rolePath } from '@/constants/routes'
 import { useDeleteRole, useRoles } from '@/hooks/useRoles'
 import { type Role } from '@/types/role'
 import { isRoleWithinScope, useHasPermissions } from '@/hooks/usePermissions'
 import { currentUserAtom } from '@/store/session'
 import { useTags } from '@/hooks/useTags'
-import { lazyNamed, usePreloadWhenIdle } from '@/utils/lazyNamed'
-
-// the role editor brings react-hook-form and yup, which the table doesn't need: it loads after it
-const RoleFormDialog = lazyNamed(() => import('@/pages/admin/roles/RoleFormDialog'), 'RoleFormDialog')
-
-/** Which dialog is open. `copy` opens the editor pre-filled from another role. */
-type DialogState =
-  | { kind: 'closed' }
-  | { kind: 'view'; role: Role }
-  | { kind: 'create'; from?: Role }
-  | { kind: 'edit'; role: Role }
-  | { kind: 'delete'; role: Role }
-
-/** Shown on edit / delete buttons for a role wider than the signed-in user's own access. */
-const OUT_OF_SCOPE = 'This role has permissions or tags your own role lacks, so you can’t change it.'
-
-/** Shown on a disabled Edit button. */
-const NO_UPDATE = 'Editing roles needs the “Edit roles” permission (user:role:edit), which your role doesn’t have.'
 
 /** Roles table: what each grants and where. Actions follow the `user:role:*` permissions. */
 export const AdminRolesPage = () => {
@@ -62,10 +49,9 @@ export const AdminRolesPage = () => {
   const { data: tags } = useTags()
   const tagName = (tagId: number) => tags?.find((t) => t.tagId === tagId)?.tagName ?? `#${tagId}`
   const { mutateAsync: remove } = useDeleteRole()
-  const [dialog, setDialog] = useState<DialogState>({ kind: 'closed' })
+  const [deleting, setDeleting] = useState<Role | null>(null)
   const [search, setSearch] = useState('')
-  const close = () => setDialog({ kind: 'closed' })
-  usePreloadWhenIdle(canView && (canCreate || canUpdate), RoleFormDialog.preload)
+  const navigate = useNavigate()
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -74,21 +60,13 @@ export const AdminRolesPage = () => {
     )
   }, [roles, search])
 
-  /** A copy starts as a new role with the same settings and a "(copy)" name. */
-  const editorRole =
-    dialog.kind === 'edit'
-      ? dialog.role
-      : dialog.kind === 'create' && dialog.from
-        ? { ...dialog.from, roleName: `${dialog.from.roleName} (copy)` }
-        : undefined
-
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Roles"
         actions={
           canCreate && (
-            <LoadingButton icon={<Plus size={15} />} onClick={() => setDialog({ kind: 'create' })}>
+            <LoadingButton icon={<Plus size={15} />} onClick={() => navigate(newRolePath())}>
               New role
             </LoadingButton>
           )
@@ -126,13 +104,12 @@ export const AdminRolesPage = () => {
                     return (
                       <tr key={role.roleId} className="border-t border-border align-top">
                         <td className="max-w-xs py-3">
-                          <button
-                            type="button"
-                            onClick={() => setDialog({ kind: 'view', role })}
+                          <Link
+                            to={rolePath(role.roleId)}
                             className="text-left text-sm font-medium text-text hover:text-signal hover:underline"
                           >
                             {role.roleName}
-                          </button>
+                          </Link>
                           <p className="text-xs text-text-muted">{role.roleDescription || '—'}</p>
                         </td>
                         <td className="py-3">
@@ -172,7 +149,7 @@ export const AdminRolesPage = () => {
                               icon={<Eye size={14} />}
                               aria-label={`View ${role.roleName}`}
                               title="View"
-                              onClick={() => setDialog({ kind: 'view', role })}
+                              onClick={() => navigate(rolePath(role.roleId))}
                             />
                             {canCreate && (
                               <LoadingButton
@@ -181,7 +158,7 @@ export const AdminRolesPage = () => {
                                 icon={<Copy size={14} />}
                                 aria-label={`Duplicate ${role.roleName}`}
                                 title="Duplicate"
-                                onClick={() => setDialog({ kind: 'create', from: role })}
+                                onClick={() => navigate(newRolePath(role.roleId))}
                               />
                             )}
                             <LoadingButton
@@ -189,9 +166,9 @@ export const AdminRolesPage = () => {
                               size="sm"
                               icon={<Pencil size={14} />}
                               aria-label={`Edit ${role.roleName}`}
-                              title={!canUpdate ? NO_UPDATE : inScope ? 'Edit' : OUT_OF_SCOPE}
+                              title={!canUpdate ? NO_ROLE_EDIT : inScope ? 'Edit' : OUT_OF_SCOPE}
                               disabled={!canUpdate || !inScope}
-                              onClick={() => setDialog({ kind: 'edit', role })}
+                              onClick={() => navigate(roleEditPath(role.roleId))}
                             />
                             {canDelete && (
                               <LoadingButton
@@ -201,7 +178,7 @@ export const AdminRolesPage = () => {
                                 aria-label={`Delete ${role.roleName}`}
                                 title={inScope ? 'Delete' : OUT_OF_SCOPE}
                                 disabled={!inScope}
-                                onClick={() => setDialog({ kind: 'delete', role })}
+                                onClick={() => setDeleting(role)}
                               />
                             )}
                           </div>
@@ -216,70 +193,15 @@ export const AdminRolesPage = () => {
         </section>
       )}
 
-      <RoleViewDialog
-        role={dialog.kind === 'view' ? dialog.role : null}
-        onClose={close}
-        actions={
-          dialog.kind === 'view' && (
-            <>
-              {canDelete && (
-                <LoadingButton
-                  variant="ghost"
-                  icon={<Trash2 size={15} />}
-                  disabled={!isRoleWithinScope(user, dialog.role)}
-                  title={isRoleWithinScope(user, dialog.role) ? undefined : OUT_OF_SCOPE}
-                  onClick={() => setDialog({ kind: 'delete', role: dialog.role })}
-                >
-                  Delete
-                </LoadingButton>
-              )}
-              {canCreate && (
-                <LoadingButton
-                  variant="secondary"
-                  icon={<Copy size={15} />}
-                  onClick={() => setDialog({ kind: 'create', from: dialog.role })}
-                >
-                  Duplicate
-                </LoadingButton>
-              )}
-              <LoadingButton
-                icon={<Pencil size={15} />}
-                disabled={!canUpdate || !isRoleWithinScope(user, dialog.role)}
-                title={!canUpdate ? NO_UPDATE : isRoleWithinScope(user, dialog.role) ? undefined : OUT_OF_SCOPE}
-                onClick={() => setDialog({ kind: 'edit', role: dialog.role })}
-              >
-                Edit
-              </LoadingButton>
-            </>
-          )
-        }
-      />
-      <Suspense fallback={null}>
-        {(dialog.kind === 'create' || dialog.kind === 'edit') && (
-          <RoleFormDialog
-            // a copy must save as a new role, so it's passed as a template, not as the role being edited
-            key={dialog.kind === 'create' && dialog.from ? `copy-${dialog.from.roleId}` : dialog.kind}
-            open
-            role={dialog.kind === 'edit' ? dialog.role : undefined}
-            template={dialog.kind === 'create' ? editorRole : undefined}
-            onClose={close}
-          />
-        )}
-      </Suspense>
       <ConfirmDialog
-        open={dialog.kind === 'delete'}
+        open={deleting !== null}
         title="Delete role"
         confirmLabel="Delete role"
-        successMessage={dialog.kind === 'delete' ? `Deleted ${dialog.role.roleName}.` : ''}
-        onConfirm={() => (dialog.kind === 'delete' ? remove(dialog.role.roleId) : Promise.resolve())}
-        onClose={close}
+        successMessage={deleting ? `Deleted ${deleting.roleName}.` : ''}
+        onConfirm={() => (deleting ? remove(deleting.roleId) : Promise.resolve())}
+        onClose={() => setDeleting(null)}
       >
-        {dialog.kind === 'delete' && (
-          <p>
-            Delete <span className="font-medium text-text">{dialog.role.roleName}</span>? A role that any user still has can't be
-            deleted: move those users to another role first. This can't be undone.
-          </p>
-        )}
+        {deleting && <RoleDeleteImpact role={deleting} />}
       </ConfirmDialog>
     </div>
   )

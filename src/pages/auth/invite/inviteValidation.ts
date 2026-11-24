@@ -15,10 +15,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Validation rules for the invite (create account) form. Username and password follow the API's rules. */
+/** Validation rules for the invite (create account) form. Username and password follow the API's rules; details are optional. */
 
 import * as yup from 'yup'
-import { passwordField, usernameField } from '@/utils/validation'
+import { passwordField, profileDetailsSchema, usernameField } from '@/utils/validation'
 
 export const inviteSchema = yup.object({
   displayName: yup.string().trim().required('Enter your name.').max(100, 'Keep it to 100 characters or fewer.'),
@@ -28,6 +28,8 @@ export const inviteSchema = yup.object({
     .string()
     .required('Type the password again.')
     .oneOf([yup.ref('password')], "The passwords don't match."),
+  /** Optional profile details, filled in on the later steps. */
+  details: profileDetailsSchema,
 })
 
 /** Values produced by the invite form after validation. */

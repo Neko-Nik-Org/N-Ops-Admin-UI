@@ -15,11 +15,13 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Profile card on the Account page. */
+/** Profile card on Account › Profile. */
 
 import { useAtomValue } from 'jotai'
+import { UserCircle } from 'lucide-react'
 import { useState } from 'react'
 import { LoadingButton } from '@/components/LoadingButton'
+import { AccountCard } from '@/pages/account/AccountCard'
 import { ChangeUsernameDialog } from '@/pages/account/ChangeUsernameDialog'
 import { EditProfileDialog } from '@/pages/account/EditProfileDialog'
 import { EmailVerificationDialog } from '@/components/EmailVerificationDialog'
@@ -30,7 +32,7 @@ import { cn } from '@/utils/cn'
  * The signed-in user's identity, with actions to change the username and verify the email.
  * Renders nothing if the profile is unknown (it is saved at sign-in and restored after a reload).
  */
-export const UserDetailsCard = () => {
+export const UserDetailsCard = ({ className }: { className?: string }) => {
   const user = useAtomValue(currentUserAtom)
   const [dialog, setDialog] = useState<'username' | 'email' | 'profile' | null>(null)
   if (!user) return null
@@ -38,14 +40,17 @@ export const UserDetailsCard = () => {
   const close = () => setDialog(null)
 
   return (
-    <section className="rounded-xl border border-border bg-surface-raised p-5">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <h2 className="font-semibold text-text">Profile</h2>
+    <AccountCard
+      icon={<UserCircle size={16} />}
+      title="Profile"
+      className={className}
+      actions={
         <LoadingButton variant="ghost" size="sm" onClick={() => setDialog('profile')}>
           Edit profile
         </LoadingButton>
-      </div>
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+      }
+    >
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-text-muted">Display name</dt>
           <dd className="font-medium text-text">{user.displayName}</dd>
@@ -83,6 +88,6 @@ export const UserDetailsCard = () => {
       <ChangeUsernameDialog open={dialog === 'username'} currentUserName={user.userName} onClose={close} />
       <EmailVerificationDialog open={dialog === 'email'} email={user.primaryEmail} onClose={close} />
       <EditProfileDialog open={dialog === 'profile'} user={user} onClose={close} />
-    </section>
+    </AccountCard>
   )
 }

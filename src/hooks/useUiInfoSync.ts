@@ -20,7 +20,7 @@
  * the last page they were on.
  */
 
-import type { QueryClient } from '@tanstack/react-query'
+import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { atom, useAtom, type PrimitiveAtom, type WritableAtom } from 'jotai'
 import { useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -30,26 +30,28 @@ import { ROUTES } from '@/constants/routes'
 import { selectedTagIdAtom } from '@/store/selectedTag'
 import { explorerViewAtom } from '@/store/vaultExplorerView'
 import { isRestorablePath, parseUiInfo, type UiInfo } from '@/utils/uiInfo'
-import { updateUiInfo, useUiInfo, useUpdateUiInfo } from './useAccount'
+import { flushUiInfo, updateUiInfo, useUiInfo, useUpdateUiInfo } from './useAccount'
 
 /** Set by a fresh sign-in: once the preferences load, go back to the page the user was last on. */
 export const returnToLastPageAtom = atom(false)
 
-/** How long someone stays on a page before it's saved as their last page (keeps requests down). */
+/** How long someone stays on a page before it counts as their last page (quick hops are ignored). */
 export const LAST_PAGE_SAVE_MS = 3000
 
 /** The page not yet saved as the last one, so signing out can save it straight away. */
 let unsavedPath: string | null = null
 
-/** Saves the current page as the last one now (on sign-out), giving up after a moment. */
-export const flushLastPage = async (queryClient: QueryClient): Promise<void> => {
-  if (!unsavedPath) return
-  const path = unsavedPath
-  unsavedPath = null
-  await Promise.race([
-    updateUiInfo(queryClient, { lastLocation: { path, at: new Date().toISOString() } }).catch(() => {}),
-    new Promise((resolve) => setTimeout(resolve, 1500)),
-  ])
+/**
+ * Sends every unsent preference change now, including the current page as the last one. Called
+ * before sign-out; gives up after a moment so signing out never hangs on it.
+ */
+export const flushUiInfoBeforeSignOut = async (queryClient: QueryClient): Promise<void> => {
+  if (unsavedPath) {
+    const path = unsavedPath
+    unsavedPath = null
+    void updateUiInfo(queryClient, { lastLocation: { path, at: new Date().toISOString() } }).catch(() => {})
+  }
+  await Promise.race([flushUiInfo(queryClient).catch(() => {}), new Promise((resolve) => setTimeout(resolve, 1500))])
 }
 
 /**
@@ -88,6 +90,17 @@ export const useUiInfoSync = (): void => {
   const info = raw ? parseUiInfo(raw).info : undefined
   const loaded = !!raw
   const update = useUpdateUiInfo()
+  const queryClient = useQueryClient()
+
+  // Changes are sent in batches (see updateUiInfo); send what's waiting when the tab is hidden or
+  // closed, so a change made just before leaving isn't lost.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') void flushUiInfo(queryClient).catch(() => {})
+    }
+    document.addEventListener('visibilitychange', onHide)
+    return () => document.removeEventListener('visibilitychange', onHide)
+  }, [queryClient])
 
   // ── theme: the newest choice wins (it can be picked on the sign-in page, before the account loads)
   const [theme, setTheme] = useAtom(themeAtom)

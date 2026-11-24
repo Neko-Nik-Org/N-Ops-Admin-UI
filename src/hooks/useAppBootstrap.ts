@@ -17,32 +17,56 @@
 
 /** Everything the startup screen (ScreenLoader) waits for before the dashboard first renders. */
 
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { queryOptions, useQueries, useQuery, type QueryClient, type QueryKey } from '@tanstack/react-query'
 import { useSetAtom } from 'jotai'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'react-toastify'
 import { currentUserAtom, sessionStatusAtom, type SessionStatus } from '@/store/session'
 import { clearSessionToken, getSessionToken } from '@/store/sessionToken'
 import { healthQuery } from '@/hooks/useServiceHealth'
 import { tagsQuery } from '@/hooks/useTags'
 import { InactiveAccountError } from '@/api/account'
+import { loadAppCode } from '@/routes/lazyPages'
 import { orgInfoQuery, profileQuery, uiInfoQuery, userDetailsQuery } from './useAccount'
 
 /** Status line for the saved-session check (`GET /auth/verify`, run by useSessionBootstrap). */
 export const SESSION_STEP_LABEL = 'Checking your session'
 
 /**
- * Startup requests, with the status line shown while each is pending. The health check needs no
- * sign-in, so it starts at once, alongside the session check; the rest wait for a valid session.
+ * The app's code (every signed-in page and the shared libraries), downloaded behind the startup
+ * screen so later page changes don't wait on the network. Once per page load; not per user.
+ */
+const appCodeQuery = queryOptions({
+  queryKey: ['system', 'app-code'],
+  queryFn: () => loadAppCode(window.location.pathname).then(() => true),
+  staleTime: Infinity,
+  gcTime: Infinity,
+  retry: false,
+})
+
+/**
+ * Startup steps, with the status line shown while each is pending. The health check and the app's
+ * code need no sign-in, so they start at once, alongside the session check; the rest wait for a valid session.
  */
 const STEPS = [
   { query: healthQuery, label: 'Checking N-Ops services', needsSession: false },
+  { query: appCodeQuery, label: 'Loading the app', needsSession: false },
   { query: profileQuery, label: 'Loading your profile and access', needsSession: true },
   { query: uiInfoQuery, label: 'Loading your preferences', needsSession: true },
   { query: userDetailsQuery, label: 'Loading your account details', needsSession: true },
   { query: orgInfoQuery, label: 'Loading organization details', needsSession: true },
   { query: tagsQuery, label: 'Loading your tags', needsSession: true },
 ] as const
+
+/**
+ * The signed-in user's startup data, saved (encrypted) across reloads by utils/queryPersistence, so a
+ * reload opens the app from it while fresh copies load. The health check is left out: it's not per
+ * user, and an old answer would be misleading.
+ */
+export const SAVED_STARTUP_QUERIES: readonly QueryKey[] = STEPS.filter((s) => s.needsSession).map((s) => s.query.queryKey)
+
+/** Owner of the saved startup data: the user in the cached profile. */
+export const startupDataOwner = (client: QueryClient): number | undefined => client.getQueryData(profileQuery.queryKey)?.userId
 
 /** Progress of the startup steps. */
 export interface AppBootstrapState {
@@ -76,6 +100,10 @@ export const useAppBootstrap = (status: SessionStatus): AppBootstrapState => {
     queries: STEPS.map(({ query, needsSession }) => ({ ...query, enabled: canFetch || !needsSession })),
   })
 
+  // Every per-user step already had data (restored from the saved copy) when startup began: the app
+  // opens from it at once and refreshes in the background, without waiting for the health check.
+  const [warm] = useState(() => STEPS.every((step, i) => !step.needsSession || results[i].data !== undefined))
+
   const setCurrentUser = useSetAtom(currentUserAtom)
   const setStatus = useSetAtom(sessionStatusAtom)
   // same cache entry as the profile step above (one request); read separately for its type
@@ -99,8 +127,10 @@ export const useAppBootstrap = (status: SessionStatus): AppBootstrapState => {
   const total = STEPS.length + 1
   const remaining = unfinished.length + (checking ? 1 : 0)
 
+  const userDataIn = unfinished.every((step) => !step.needsSession)
+
   return {
-    ready: signedIn && remaining === 0,
+    ready: signedIn && (remaining === 0 || (warm && userDataIn)),
     progress: (total - remaining) / total,
     pendingLabels: [...(checking ? [SESSION_STEP_LABEL] : []), ...running.map(({ label }) => label)],
   }

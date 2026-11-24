@@ -14,12 +14,15 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** "Your access" card on the Account page: what the signed-in user's role allows. */
+/** "Your access" card on Account › Security: what the signed-in user's role allows. */
 
 import { useAtomValue } from 'jotai'
+import { ShieldCheck } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Badge } from '@/components/Badge'
-import { PERMISSION_GROUPS } from '@/constants/permissions'
+import { AccountCard } from '@/pages/account/AccountCard'
+import { PermissionMatrix } from '@/components/PermissionMatrix'
+import { PERMISSION_MATRIX, rowKeys } from '@/constants/permissions'
 import { currentUserAtom } from '@/store/session'
 import { useTags } from '@/hooks/useTags'
 
@@ -34,57 +37,28 @@ const Row = ({ label, children }: { label: string; children: ReactNode }) => (
 const Muted = ({ children }: { children: ReactNode }) => <span className="text-text-muted">{children}</span>
 
 /**
- * Permissions (grouped as in the role editor), tags, Linux users and approval rights, from the
+ * Tags, Linux users, approval rights and a permission matrix (as on the role page), from the
  * profile loaded at startup (`/user/self/profile`). Renders nothing if the profile is unknown.
  */
-export const AccessCard = () => {
+export const AccessCard = ({ className }: { className?: string }) => {
   const user = useAtomValue(currentUserAtom)
   const { data: tags } = useTags()
   if (!user) return null
 
-  const known = new Set(PERMISSION_GROUPS.flatMap((g) => g.permissions.map((p) => p.key)))
-  const groups = PERMISSION_GROUPS.map((g) => ({
-    label: g.label,
-    held: g.permissions.filter((p) => user.permissions.includes(p.key)),
-  })).filter((g) => g.held.length)
+  const known = new Set(PERMISSION_MATRIX.flatMap((s) => s.rows.flatMap(rowKeys)))
   // permissions the API grants that this UI doesn't know about yet
   const other = user.permissions.filter((p) => !known.has(p))
   const tagName = (id: number) => tags?.find((t) => t.tagId === id)?.tagName ?? `#${id}`
   const scopeLoaded = user.allowedLinuxUsers !== undefined
 
   return (
-    <section className="rounded-xl border border-border bg-surface-raised p-5">
-      <h2 className="mb-1 font-semibold text-text">Your access</h2>
-      <p className="mb-4 text-sm text-text-muted">What your role lets you do. An admin can change it on the Roles page.</p>
+    <AccountCard
+      icon={<ShieldCheck size={16} />}
+      title="Your access"
+      description="What your role lets you do. An admin can change it on the Roles page."
+      className={className}
+    >
       <dl>
-        <Row label="Permissions">
-          {groups.length || other.length ? (
-            <ul className="flex w-full flex-col gap-2">
-              {groups.map((g) => (
-                <li key={g.label} className="flex flex-wrap items-baseline gap-1.5">
-                  <span className="mr-1 text-xs font-medium tracking-wide text-text-muted uppercase">{g.label}</span>
-                  {g.held.map((p) => (
-                    <Badge key={p.key} tone="neutral">
-                      <span title={p.key}>{p.label}</span>
-                    </Badge>
-                  ))}
-                </li>
-              ))}
-              {other.length > 0 && (
-                <li className="flex flex-wrap items-baseline gap-1.5">
-                  <span className="mr-1 text-xs font-medium tracking-wide text-text-muted uppercase">Other</span>
-                  {other.map((p) => (
-                    <Badge key={p} tone="neutral" mono>
-                      {p}
-                    </Badge>
-                  ))}
-                </li>
-              )}
-            </ul>
-          ) : (
-            <Muted>None</Muted>
-          )}
-        </Row>
         <Row label="Tags">
           {user.tags.length ? (
             user.tags.map((id) => (
@@ -117,6 +91,21 @@ export const AccessCard = () => {
           </>
         )}
       </dl>
-    </section>
+
+      <div className="flex flex-col gap-3">
+        <h3 className="text-sm font-semibold text-text">Permissions · {user.permissions.length} granted</h3>
+        <PermissionMatrix selected={user.permissions} readOnly emptyText="Your role has no permissions." />
+        {other.length > 0 && (
+          <div className="flex flex-wrap items-baseline gap-1.5">
+            <span className="mr-1 text-xs font-medium tracking-wide text-text-muted uppercase">Other</span>
+            {other.map((p) => (
+              <Badge key={p} tone="neutral" mono>
+                {p}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
+    </AccountCard>
   )
 }
