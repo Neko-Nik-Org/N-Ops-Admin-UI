@@ -20,6 +20,7 @@
 import { atom, type SetStateAction } from 'jotai'
 import type { CurrentUser } from '../types'
 import { storeProfile } from './profileStorage'
+import { securityRequirementsAtom } from './securityRequirements'
 
 /** 'checking' while the saved session is being verified on load, then signed in or out. */
 export type SessionStatus = 'checking' | 'authenticated' | 'unauthenticated'
@@ -39,5 +40,7 @@ export const currentUserAtom = atom(
     const next = typeof update === 'function' ? update(get(currentUserValueAtom)) : update
     set(currentUserValueAtom, next)
     storeProfile(next)
+    // signing out drops the policy requirements of that sign-in
+    if (!next) set(securityRequirementsAtom, null)
   },
 )

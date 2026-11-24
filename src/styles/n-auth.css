@@ -437,6 +437,14 @@
   color: var(--n-text);
   font: 400 0.9688rem var(--n-font);
 }
+.n-auth-input:has(input:disabled) {
+  border-color: var(--n-auth-field-line);
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+.n-auth-input input:disabled {
+  cursor: not-allowed;
+}
 .n-auth-input input::placeholder {
   color: var(--n-auth-placeholder);
 }

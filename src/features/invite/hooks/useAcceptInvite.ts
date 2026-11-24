@@ -15,22 +15,12 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Hook that accepts an invite and signs the new user in. */
+/** Hook that accepts an invitation by creating the account. */
 
 import { useAsyncAction } from '@/hooks/useAsyncAction'
-import { useApplySession } from '@/features/auth/hooks/useApplySession'
-import { acceptInvite } from '../api/invite'
-import type { AcceptInvitePayload } from '../types'
+import { joinInvite } from '../api/invite'
+import type { AcceptInvitePayload, InviteLink } from '../types'
 
-/** Drives the "Create account" LoadingButton. On success the invite response signs you straight in. */
-export const useAcceptInvite = (token: string) => {
-  const applySession = useApplySession()
-
-  return useAsyncAction(
-    async (payload: AcceptInvitePayload) => {
-      const response = await acceptInvite(token, payload)
-      applySession(response, false)
-    },
-    { successMs: 600 },
-  )
-}
+/** Drives the "Create account" LoadingButton. The API doesn't sign the new user in, so they sign in next. */
+export const useAcceptInvite = (link: InviteLink) =>
+  useAsyncAction((payload: AcceptInvitePayload) => joinInvite(link, payload), { successMs: 600 })

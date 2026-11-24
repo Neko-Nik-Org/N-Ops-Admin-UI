@@ -62,7 +62,7 @@ const LocationProbe = () => {
 }
 
 interface RenderOptions {
-  /** Initial URL, default "/". */
+  /** Initial URL, default "/"; may include a ?query. */
   route?: string
   /** History state for the initial URL (e.g. the 2FA context). */
   state?: unknown
@@ -78,12 +78,13 @@ interface RenderOptions {
  */
 export const renderWithProviders = (ui: ReactElement, { route = '/', state, path, user }: RenderOptions = {}) => {
   const { queryClient, store } = createTestState(user)
+  const [pathname, search = ''] = route.split('?')
   const result = render(
     <QueryClientProvider client={queryClient}>
       <Provider store={store}>
-        <MemoryRouter initialEntries={[{ pathname: route, state }]}>
+        <MemoryRouter initialEntries={[{ pathname, search: search && `?${search}`, state }]}>
           <Routes>
-            <Route path={path ?? route} element={ui} />
+            <Route path={path ?? pathname} element={ui} />
             <Route path="*" element={<LocationProbe />} />
           </Routes>
         </MemoryRouter>
@@ -170,10 +171,7 @@ export const rawAdminUser = (
   is_email_verified: true,
   is_active: true,
   role_id: roleId,
-  has_ip_restriction: false,
-  has_geo_restriction: false,
-  allowed_ips: [],
-  allowed_geo_locations: [],
+  access_restriction_policy_id: null as number | null,
   has_totp_2fa: true,
   has_email_2fa: false,
   created_at: '2026-06-01T08:00:00Z',
@@ -186,7 +184,7 @@ export const rawAdminUser = (
 export const RAW_USERS = [
   rawAdminUser(1, 'neko', 'Neko Nik', 1),
   rawAdminUser(2, 'priya', 'Priya Rao', 2, { has_email_2fa: true }),
-  rawAdminUser(3, 'marcus', 'Marcus Chen', 3, { has_ip_restriction: true, allowed_ips: ['203.0.113.0/24'] }),
+  rawAdminUser(3, 'marcus', 'Marcus Chen', 3, { access_restriction_policy_id: 1 }),
   rawAdminUser(4, 'aisha', 'Aisha Bello', 3, { has_totp_2fa: false, has_email_2fa: true }),
   rawAdminUser(5, 'tomas', 'Tomás Ruiz', 4, { has_totp_2fa: false }),
   rawAdminUser(6, 'lena', 'Lena Fischer', 4),
@@ -198,8 +196,7 @@ export const RAW_USERS = [
   rawAdminUser(8, 'olivia', 'Olivia Hart', 5),
   rawAdminUser(9, 'dev', 'Dev Malhotra', 3, { is_active: false, has_totp_2fa: false }),
   rawAdminUser(10, 'sara', 'Sara Lindqvist', 4, {
-    has_geo_restriction: true,
-    allowed_geo_locations: ['SE', 'NO'],
+    access_restriction_policy_id: 2,
     user_details: { team: 'Platform', on_call: true },
   }),
 ]
@@ -241,6 +238,32 @@ export const RAW_PROJECTS = [
   rawProject(4, 'internal-tools', 'Grafana, status page and other in-house tools.'),
 ]
 
+/** Access policies as `/policy/access-restriction/list` returns them (ids match RAW_USERS' policies). */
+export const RAW_POLICIES = [
+  {
+    policy_id: 1,
+    policy_name: 'Office only',
+    policy_description: 'HQ network',
+    enforce_totp_2fa: true,
+    enforce_email_2fa: false,
+    has_ip_restriction: true,
+    has_geo_restriction: false,
+    allowed_ips: ['203.0.113.0/24'],
+    allowed_geo_locations: [],
+  },
+  {
+    policy_id: 2,
+    policy_name: 'Nordics',
+    policy_description: '',
+    enforce_totp_2fa: false,
+    enforce_email_2fa: true,
+    has_ip_restriction: false,
+    has_geo_restriction: true,
+    allowed_ips: [],
+    allowed_geo_locations: ['SE', 'NO'],
+  },
+]
+
 /**
  * Answers the live read endpoints the admin and vault pages use (tags, roles, org-info, users, vault
  * projects, with the lists' name searches); anything else gets [].
@@ -251,10 +274,12 @@ export const serveLiveReads = ({
   orgInfo = RAW_ORG_INFO,
   projects = RAW_PROJECTS,
   users = RAW_USERS,
+  policies = RAW_POLICIES,
 } = {}) =>
   api.get.mockImplementation(async (url: string, config?: { params?: unknown }) => {
     if (url === '/tag/list') return { data: tags }
     if (url === '/user/roles/list') return { data: roles }
+    if (url === '/policy/access-restriction/list') return { data: policies }
     if (url === '/user/self/org-info') return { data: orgInfo }
     if (url === '/user/admin/list') {
       const q = String((config?.params as { user_name?: string } | undefined)?.user_name ?? '').toLowerCase()

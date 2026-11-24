@@ -22,7 +22,9 @@ import { useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { ScreenLoader } from '@/components/organisms/ScreenLoader'
 import { SESSION_STEP_LABEL, useAppBootstrap } from '@/features/account/hooks/useAppBootstrap'
-import { sessionStatusAtom } from '@/features/auth/store/session'
+import { pendingSetupSteps } from '@/features/auth/securitySetup'
+import { securityRequirementsAtom } from '@/features/auth/store/securityRequirements'
+import { currentUserAtom, sessionStatusAtom } from '@/features/auth/store/session'
 import { ROUTES } from '@/constants/routes'
 
 /** Full-screen loader shown while the saved session is still being verified. */
@@ -68,6 +70,17 @@ export const RequireAuth = ({ children }: { children: ReactNode }) => {
  * Renders its children only for signed-out users (login, 2FA, invite);
  * signed-in users are sent to the dashboard instead.
  */
+/**
+ * Sends every page to the security setup while the user's access policy requires a second factor
+ * they haven't turned on. Only a UI gate: the API itself must refuse requests until setup is done.
+ */
+export const RequireSecuritySetup = ({ children }: { children: ReactNode }) => {
+  const requirements = useAtomValue(securityRequirementsAtom)
+  const user = useAtomValue(currentUserAtom)
+  if (pendingSetupSteps(requirements, user).length) return <Navigate to={ROUTES.securitySetup} replace />
+  return <>{children}</>
+}
+
 export const RequireGuest = ({ children }: { children: ReactNode }) => {
   const status = useAtomValue(sessionStatusAtom)
 

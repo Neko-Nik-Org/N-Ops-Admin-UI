@@ -15,19 +15,23 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Preview shown before accepting: who invited the user, where, and with what access. */
-/** Types for the invite flow. */
+/** Types for accepting an invitation to join an organization. */
 
-export interface InviteDetails {
-  inviterName: string
-  organizationName: string
-  role: string
-  tags: string[]
+/**
+ * What the emailed link carries: `/invite?code=<base64 JSON>`, where the JSON is
+ * `{ email, invitation_code, invited_by, org_name }`. It's read in the browser; the API only checks
+ * the code when the account is created.
+ */
+export interface InviteLink {
   email: string
+  invitationCode: string
+  invitedBy: string
+  organizationName: string
 }
 
 /** What the new user fills in to create their account. */
 export interface AcceptInvitePayload {
-  fullName: string
+  userName: string
+  displayName: string
   password: string
 }

@@ -111,7 +111,13 @@ export const TwoFactorForm = ({ context }: { context: TwoFactorContext }) => {
     }
     setError(null)
     // TODO: show the server's message once /auth/verify-otp is real — right now any failure means "doesn't exist yet".
-    verify({ temporaryAuthToken: context.temporaryAuthToken, method, code: value, rememberMe: context.rememberMe })
+    verify({
+      temporaryAuthToken: context.temporaryAuthToken,
+      method,
+      code: value,
+      rememberMe: context.rememberMe,
+      requirements: context.requirements,
+    })
       .then(() => setDone(true))
       .catch(() => {
         setError("Two-factor verification isn't available on the server yet.")

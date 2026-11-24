@@ -19,7 +19,7 @@
  *
  * - jest-dom matchers (toBeInTheDocument, ...)
  * - runtime config, so src/config/env.ts can load
- * - small stand-ins for browser APIs jsdom lacks (<dialog> modals, matchMedia, ResizeObserver, canvas)
+ * - small stand-ins for browser APIs jsdom lacks (matchMedia, ResizeObserver, canvas)
  * - a mocked API client: every test controls responses via `api.get/post/put/delete` (see testUtils.tsx)
  * - a clean slate after each test: DOM, cookies, localStorage and mocks
  */
@@ -36,18 +36,6 @@ vi.mock('@/lib/axios', () => ({
   apiClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() },
   superAdminClient: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }))
-
-// jsdom has no modal dialogs: emulate the open/close state the Dialog component relies on
-if (!HTMLDialogElement.prototype.showModal) {
-  HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
-    this.setAttribute('open', '')
-  }
-  HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
-    if (!this.hasAttribute('open')) return
-    this.removeAttribute('open')
-    this.dispatchEvent(new Event('close'))
-  }
-}
 
 // theme.ts subscribes to the OS color scheme; tests always report "dark"
 window.matchMedia ??= (query: string) =>

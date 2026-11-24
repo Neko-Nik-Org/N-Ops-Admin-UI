@@ -25,6 +25,7 @@ import { Meter } from '@/components/molecules/Meter'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SkeletonText } from '@/components/molecules/Skeleton'
 import { useOrgInfo } from '@/features/account/hooks/useAccount'
+import { describeOrgProfile } from '@/features/account/orgProfile'
 import type { OrgInfo } from '@/features/account/types'
 import { formatBytes, formatDate, formatNumber } from '@/utils/format'
 
@@ -36,23 +37,9 @@ const Field = ({ label, children, wide }: { label: string; children: ReactNode; 
   </div>
 )
 
-/** Shows a free-form `organization_info` value as text. */
-const renderValue = (value: unknown): string =>
-  typeof value === 'string' ? value || '—' : value === null ? '—' : JSON.stringify(value)
-
-/** Turns an `organization_info` key like "contact_email" into "Contact email". */
-const humanize = (key: string) => {
-  const words = key
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/[_-]+/g, ' ')
-    .trim()
-    .toLowerCase()
-  return words.charAt(0).toUpperCase() + words.slice(1)
-}
-
 /** Name, id, creation date and whatever the operator stored in `organization_info`. */
 const ProfileCard = ({ org }: { org: OrgInfo }) => {
-  const extra = Object.entries(org.organizationInfo)
+  const extra = describeOrgProfile(org.organizationInfo)
   return (
     <section className="rounded-xl border border-border bg-surface-raised p-5">
       <h2 className="mb-1 font-semibold text-text">Profile</h2>
@@ -65,9 +52,9 @@ const ProfileCard = ({ org }: { org: OrgInfo }) => {
         <Field label="Organization ID" wide>
           <span className="font-mono text-xs break-all">{org.organizationId}</span>
         </Field>
-        {extra.map(([key, value]) => (
-          <Field key={key} label={humanize(key)}>
-            {renderValue(value)}
+        {extra.map(({ key, label, value }) => (
+          <Field key={key} label={label} wide={key === 'description' || key === 'address'}>
+            <span className="whitespace-pre-line">{value}</span>
           </Field>
         ))}
       </dl>

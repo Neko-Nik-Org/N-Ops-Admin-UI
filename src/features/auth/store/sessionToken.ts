@@ -25,6 +25,7 @@
 
 import Cookies from 'js-cookie'
 import { storeProfile } from './profileStorage'
+import { storeSecurityRequirements } from './securityRequirements'
 
 /** Cookie holding the session id returned by the API. */
 const SESSION_COOKIE = 'nops_session'
@@ -66,6 +67,7 @@ export const setSessionToken = (token: string, rememberMe: boolean): void => {
 /** Removes every session cookie and the saved profile (sign-out, 401 or failed verification). */
 export const clearSessionToken = (): void => {
   storeProfile(null)
+  storeSecurityRequirements(null)
   Cookies.remove(SESSION_COOKIE)
   Cookies.remove(REMEMBER_COOKIE)
   Cookies.remove(ISSUED_AT_COOKIE)

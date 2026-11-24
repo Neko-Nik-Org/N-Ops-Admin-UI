@@ -21,7 +21,7 @@ import { Lock, ShieldCheck, User } from 'lucide-react'
 import { useAtomValue } from 'jotai'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { resolvedThemeAtom } from '@/app/theme'
 import { AuthBanner, AuthField } from '@/components/molecules/AuthField'
 import { AuthCard } from '@/components/molecules/AuthCard'
@@ -43,6 +43,8 @@ export const LoginForm = () => {
   const theme = useAtomValue(resolvedThemeAtom)
   const [loginState, login] = useLogin()
   const navigate = useNavigate()
+  // set by the invite page after creating an account
+  const prefillUserName = (useLocation().state as { userName?: unknown } | null)?.userName
   // Signing in only works when the API and its dependencies are up; the button waits for a healthy check.
   const { data: health } = useServiceHealth()
   const servicesUp = health?.status === 'up'
@@ -53,7 +55,7 @@ export const LoginForm = () => {
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: yupResolver(loginSchema),
-    defaultValues: { userName: '', password: '', rememberMe: false },
+    defaultValues: { userName: typeof prefillUserName === 'string' ? prefillUserName : '', password: '', rememberMe: false },
   })
 
   const onSubmit = (values: LoginFormValues) => {

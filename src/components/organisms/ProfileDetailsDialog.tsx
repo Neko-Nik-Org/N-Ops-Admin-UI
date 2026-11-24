@@ -15,8 +15,9 @@
  * <https://www.gnu.org/licenses/>.
  */
 /**
- * Editor for the signed-in user's profile details (`/user/self/details`), in the structure from
- * features/account/profileDetails.ts. Values it doesn't know are saved back unchanged.
+ * Editor for profile details, in the structure from features/account/profileDetails.ts: the signed-in
+ * user's own (`/user/self/details`), or another user's when an admin passes `onSave`. Values it
+ * doesn't know are saved back unchanged.
  */
 
 import { yupResolver } from '@hookform/resolvers/yup'
@@ -88,7 +89,22 @@ const Group = ({ title, hint, children }: { title: string; hint?: string; childr
 
 const Grid = ({ children }: { children: ReactNode }) => <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>
 
-export const ProfileDetailsDialog = ({ open, details, onClose }: { open: boolean; details: JsonObject; onClose: () => void }) => {
+export const ProfileDetailsDialog = ({
+  open,
+  details,
+  onClose,
+  onSave,
+  title = 'Edit profile details',
+  description = "Visible to your organization's admins. Fill in what's useful; everything is optional.",
+}: {
+  open: boolean
+  details: JsonObject
+  onClose: () => void
+  /** Saves the whole details object; defaults to saving the signed-in user's own. */
+  onSave?: (details: JsonObject) => Promise<unknown>
+  title?: string
+  description?: string
+}) => {
   const { details: saved, preserved } = useMemo(() => parseProfileDetails(details), [details])
   // the browser's list can miss a saved zone (older names like Asia/Calcutta, or UTC), so add it back
   const zones = useMemo(
@@ -114,7 +130,7 @@ export const ProfileDetailsDialog = ({ open, details, onClose }: { open: boolean
   }, [open, saved, reset])
 
   const [saveState, save] = useAsyncAction(
-    (values: ProfileDetailsFormValues) => mutateAsync(serializeProfileDetails(fromForm(values), preserved)),
+    (values: ProfileDetailsFormValues) => (onSave ?? mutateAsync)(serializeProfileDetails(fromForm(values), preserved)),
     { successMs: 500 },
   )
   const onSubmit = (values: ProfileDetailsFormValues) =>
@@ -135,13 +151,7 @@ export const ProfileDetailsDialog = ({ open, details, onClose }: { open: boolean
   const preservedCount = Object.keys(preserved).length
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      size="lg"
-      title="Edit profile details"
-      description="Visible to your organization's admins. Fill in what's useful; everything is optional."
-    >
+    <Dialog open={open} onClose={onClose} size="lg" title={title} description={description}>
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5" noValidate>
         <Group title="Work">
           <Grid>

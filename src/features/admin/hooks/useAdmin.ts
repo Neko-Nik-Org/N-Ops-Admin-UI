@@ -17,6 +17,14 @@
 /** React Query hooks for the Admin section. Every change refreshes its list and the audit log. */
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  countAccessPolicyUsers,
+  createAccessPolicy,
+  deleteAccessPolicy,
+  fetchAccessPolicy,
+  listAccessPolicies,
+  updateAccessPolicy,
+} from '../api/accessPolicies'
 import { createApiKey, deleteApiKey, listApiKeys, updateApiKey } from '../api/apiKeys'
 import {
   createAuditExportSchedule,
@@ -29,6 +37,7 @@ import {
 } from '../api/auditLogs'
 import { orgInfoQuery, PROFILE_KEY } from '@/features/account/hooks/useAccount'
 import { useHasPermissions } from '@/features/auth/permissions'
+import { deleteInvitation, listInvitations, sendInvitation } from '../api/invitations'
 import { createRole, deleteRole, fetchRole, listRoles, updateRole } from '../api/roles'
 import {
   changeUserName,
@@ -38,14 +47,21 @@ import {
   getUser,
   listUsers,
   resetUserPassword,
+  updateUserAccess,
+  updateUserProfile,
   verifyUserEmail,
 } from '../api/users'
 import type {
+  AccessPolicy,
+  AccessPolicyInput,
+  AdminUser,
   AdminUserInput,
+  AdminUserProfileInput,
   ApiKeyInput,
   AuditExportFormat,
   AuditExportScheduleInput,
   AuditLogFilters,
+  InvitationInput,
   Role,
   RoleInput,
 } from '../types'
@@ -53,7 +69,9 @@ import type {
 /** Cache keys, all under ['admin'] so a sign-out clear catches them. */
 export const ADMIN_KEYS = {
   users: ['admin', 'users'],
+  invitations: ['admin', 'invitations'],
   roles: ['admin', 'roles'],
+  accessPolicies: ['admin', 'access-policies'],
   apiKeys: ['admin', 'api-keys'],
   audit: ['admin', 'audit'],
   schedules: ['admin', 'audit-schedules'],
@@ -102,7 +120,36 @@ export const useVerifyUserEmail = () => useUserMutation((userId: number) => veri
 
 export const useDeactivateUser = () => useUserMutation((userId: number) => deactivateUser(userId))
 
+export const useUpdateUserProfile = () =>
+  useUserMutation(({ user, input }: { user: AdminUser; input: AdminUserProfileInput }) =>
+    updateUserProfile(user.userId, input, user.primaryEmail),
+  )
+
+/** Role and access policy; rejects when the API didn't apply the change (see updateUserAccess). */
+export const useUpdateUserAccess = () =>
+  useUserMutation(
+    async ({ user, roleId, accessPolicyId }: { user: AdminUser; roleId: number; accessPolicyId: number | null }) => {
+      await updateUserAccess(user, { roleId, accessPolicyId })
+    },
+  )
+
 export const useDeleteUser = () => useUserMutation((userId: number) => deleteUser(userId), orgInfoQuery.queryKey)
+
+// ── Invitations ──────────────────────────────────────────
+
+/** Every pending invitation, from `/invite/list`. Pass `enabled: false` without `user:invite:view`. */
+export const useInvitations = ({ enabled = true }: { enabled?: boolean } = {}) =>
+  useQuery({ queryKey: ADMIN_KEYS.invitations, queryFn: listInvitations, enabled })
+
+export const useSendInvitation = () => {
+  const refresh = useRefresh(ADMIN_KEYS.invitations)
+  return useMutation({ mutationFn: (input: InvitationInput) => sendInvitation(input), onSuccess: refresh })
+}
+
+export const useDeleteInvitation = () => {
+  const refresh = useRefresh(ADMIN_KEYS.invitations)
+  return useMutation({ mutationFn: (invitationId: number) => deleteInvitation(invitationId), onSuccess: refresh })
+}
 
 // ── Roles ────────────────────────────────────────────────
 
@@ -148,6 +195,51 @@ export const useUpdateRole = () => {
 export const useDeleteRole = () => {
   const refresh = useRefresh(ADMIN_KEYS.roles)
   return useMutation({ mutationFn: (roleId: number) => deleteRole(roleId), onSuccess: refresh })
+}
+
+// ── Access policies ──────────────────────────────────────
+
+/** Every access policy, from `/policy/access-restriction/list`. Pass `enabled: false` without `policy:ar:view`. */
+export const useAccessPolicies = ({ enabled = true }: { enabled?: boolean } = {}) =>
+  useQuery({ queryKey: ADMIN_KEYS.accessPolicies, queryFn: listAccessPolicies, enabled })
+
+/** One policy fresh from `GET /policy/access-restriction/get/{id}`; idle while `policyId` is null. */
+export const useAccessPolicy = (policyId: number | null) =>
+  useQuery({
+    queryKey: [...ADMIN_KEYS.accessPolicies, policyId],
+    queryFn: () => fetchAccessPolicy(policyId as number),
+    enabled: policyId !== null,
+    retry: false,
+    gcTime: 0,
+  })
+
+/** How many users have the policy (`/check/{id}`), e.g. to warn before deleting it; idle while null. */
+export const useAccessPolicyUserCount = (policyId: number | null) =>
+  useQuery({
+    queryKey: [...ADMIN_KEYS.accessPolicies, policyId, 'users'],
+    queryFn: () => countAccessPolicyUsers(policyId as number),
+    enabled: policyId !== null,
+    retry: false,
+    gcTime: 0,
+  })
+
+export const useCreateAccessPolicy = () => {
+  const refresh = useRefresh(ADMIN_KEYS.accessPolicies)
+  return useMutation({ mutationFn: (input: AccessPolicyInput) => createAccessPolicy(input), onSuccess: refresh })
+}
+
+export const useUpdateAccessPolicy = () => {
+  const refresh = useRefresh(ADMIN_KEYS.accessPolicies)
+  return useMutation({
+    mutationFn: ({ policy, input }: { policy: AccessPolicy; input: AccessPolicyInput }) => updateAccessPolicy(policy, input),
+    // the rules may have saved before the name failed, so refresh either way
+    onSettled: refresh,
+  })
+}
+
+export const useDeleteAccessPolicy = () => {
+  const refresh = useRefresh(ADMIN_KEYS.accessPolicies)
+  return useMutation({ mutationFn: (policyId: number) => deleteAccessPolicy(policyId), onSuccess: refresh })
 }
 
 // ── API keys ─────────────────────────────────────────────

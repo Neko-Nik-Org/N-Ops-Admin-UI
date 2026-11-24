@@ -20,22 +20,24 @@
  */
 
 import { yupResolver } from '@hookform/resolvers/yup'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { toast } from 'react-toastify'
 import { Input } from '@/components/atoms/Input'
 import { Select } from '@/components/atoms/Select'
 import { Switch } from '@/components/atoms/Switch'
-import { Textarea } from '@/components/atoms/Textarea'
 import { Dialog } from '@/components/molecules/Dialog'
 import { FormField } from '@/components/molecules/FormField'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { isUsernameAvailable } from '@/features/account/api/account'
-import { useAdminUsers, useCreateUser, useRoleOptions } from '@/features/admin/hooks/useAdmin'
-import { splitList, userSchema, type UserFormValues } from '@/features/admin/schema/adminSchemas'
+import { useAccessPolicies, useAdminUsers, useCreateUser, useRoleOptions } from '@/features/admin/hooks/useAdmin'
+import { userSchema, type UserFormValues } from '@/features/admin/schema/adminSchemas'
+import { useHasPermissions } from '@/features/auth/permissions'
 import { useAsyncAction } from '@/hooks/useAsyncAction'
 
 const UserForm = ({ onClose }: { onClose: () => void }) => {
   const { roles, canView: canViewRoles } = useRoleOptions()
+  const canViewPolicies = useHasPermissions('policy:ar:view')
+  const { data: policies = [] } = useAccessPolicies({ enabled: canViewPolicies })
   const { data: users = [] } = useAdminUsers()
   const { mutateAsync: create } = useCreateUser()
   const [state, save] = useAsyncAction(create, { successMs: 500 })
@@ -43,7 +45,6 @@ const UserForm = ({ onClose }: { onClose: () => void }) => {
   const {
     register,
     handleSubmit,
-    control,
     setError,
     formState: { errors },
   } = useForm<UserFormValues>({
@@ -56,14 +57,9 @@ const UserForm = ({ onClose }: { onClose: () => void }) => {
       password: '',
       confirmPassword: '',
       isActive: true,
-      hasIpRestriction: false,
-      allowedIps: '',
-      hasGeoRestriction: false,
-      allowedGeoLocations: '',
+      accessPolicyId: 0,
     },
   })
-  const hasIpRestriction = useWatch({ control, name: 'hasIpRestriction' })
-  const hasGeoRestriction = useWatch({ control, name: 'hasGeoRestriction' })
 
   const onSubmit = async (v: UserFormValues) => {
     // the API reports a taken username or email only as a bare database error, so check first
@@ -88,10 +84,7 @@ const UserForm = ({ onClose }: { onClose: () => void }) => {
         roleId: Number(v.roleId),
         password: v.password,
         isActive: v.isActive,
-        hasIpRestriction: v.hasIpRestriction,
-        allowedIps: splitList(v.allowedIps),
-        hasGeoRestriction: v.hasGeoRestriction,
-        allowedGeoLocations: splitList(v.allowedGeoLocations).map((c) => c.toUpperCase()),
+        accessPolicyId: Number(v.accessPolicyId) || null,
       })
       if (welcomeEmailSent) toast.success(`Added ${v.displayName}. They've been sent a welcome email.`)
       else toast.warning(`Added ${v.displayName}, but the welcome email couldn't be sent. Share their sign-in details yourself.`)
@@ -179,41 +172,24 @@ const UserForm = ({ onClose }: { onClose: () => void }) => {
         so share it with them yourself.
       </p>
 
-      <div className="flex flex-col gap-4 rounded-lg border border-border p-4">
+      <FormField id="accessPolicyId" label="Access policy">
+        <Select id="accessPolicyId" disabled={!canViewPolicies} {...register('accessPolicyId')}>
+          <option value={0}>No access policy</option>
+          {policies.map((p) => (
+            <option key={p.policyId} value={p.policyId}>
+              {p.policyName}
+            </option>
+          ))}
+        </Select>
+        <p className="text-xs text-text-muted">
+          {canViewPolicies
+            ? 'Sets the 2FA they must use and where they can sign in from.'
+            : 'You need the “View access policies” permission (policy:ar:view) to pick a policy.'}
+        </p>
+      </FormField>
+
+      <div className="rounded-lg border border-border p-4">
         <Switch label="Active" description="Inactive users can't sign in." {...register('isActive')} />
-        <Switch
-          label="Restrict by IP address"
-          description="Only allow sign-in from the addresses below."
-          {...register('hasIpRestriction')}
-        />
-        {hasIpRestriction && (
-          <FormField id="allowedIps" label="Allowed IP addresses" error={errors.allowedIps?.message}>
-            <Textarea
-              id="allowedIps"
-              rows={3}
-              placeholder={'203.0.113.0/24\n198.51.100.7'}
-              className="font-mono"
-              hasError={!!errors.allowedIps}
-              {...register('allowedIps')}
-            />
-          </FormField>
-        )}
-        <Switch
-          label="Restrict by country"
-          description="Only allow sign-in from the countries below."
-          {...register('hasGeoRestriction')}
-        />
-        {hasGeoRestriction && (
-          <FormField id="allowedGeoLocations" label="Allowed countries" error={errors.allowedGeoLocations?.message}>
-            <Input
-              id="allowedGeoLocations"
-              placeholder="IN, US"
-              className="font-mono"
-              hasError={!!errors.allowedGeoLocations}
-              {...register('allowedGeoLocations')}
-            />
-          </FormField>
-        )}
       </div>
 
       <div className="flex justify-end gap-2 pt-1">

@@ -21,6 +21,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { createApiKey, listApiKeys } from '@/features/admin/api/apiKeys'
 import { exportAuditLogs, listAuditLogs, retentionStart } from '@/features/admin/api/auditLogs'
 import {
+  assignUserAccessPolicy,
+  assignUserRole,
   changeUserName,
   createUser,
   deactivateUser,
@@ -28,6 +30,8 @@ import {
   getUser,
   listUsers,
   resetUserPassword,
+  updateUserAccess,
+  updateUserProfile,
   verifyUserEmail,
 } from '@/features/admin/api/users'
 import { ApiError } from '@/types/api'
@@ -42,10 +46,7 @@ const newUser: AdminUserInput = {
   roleId: 4,
   password: 'Start#Pass1',
   isActive: true,
-  hasIpRestriction: false,
-  allowedIps: ['1.2.3.4'],
-  hasGeoRestriction: true,
-  allowedGeoLocations: ['IN'],
+  accessPolicyId: 2,
 }
 
 beforeEach(() => resetAdminMock())
@@ -57,7 +58,7 @@ describe('users', () => {
     const users = await listUsers()
     expect(users).toHaveLength(101)
     expect(api.get).toHaveBeenNthCalledWith(2, '/user/admin/list', { params: { limit: 100, offset: 100 } })
-    expect(users[100]).toMatchObject({ userId: 101, userName: 'last', primaryEmail: 'last@acme.dev', allowedGeoLocations: [] })
+    expect(users[100]).toMatchObject({ userId: 101, userName: 'last', primaryEmail: 'last@acme.dev', accessPolicyId: null })
   })
 
   it('fetches one user, and explains when the API answers null', async () => {
@@ -67,7 +68,7 @@ describe('users', () => {
     await expect(getUser(99)).rejects.toThrow('That user no longer exists.')
   })
 
-  it('creates a user with a base64 password, dropping lists whose restriction is off', async () => {
+  it('creates a user with a base64 password and an access policy', async () => {
     api.post.mockResolvedValueOnce({ data: 'User created successfully and a welcome email sent' })
     expect(await createUser(newUser)).toEqual({ welcomeEmailSent: true })
     expect(api.post).toHaveBeenCalledWith('/user/admin/create', {
@@ -78,10 +79,7 @@ describe('users', () => {
       is_active: true,
       role_id: 4,
       password: btoa('Start#Pass1'),
-      has_ip_restriction: false,
-      has_geo_restriction: true,
-      allowed_ips: [],
-      allowed_geo_locations: ['IN'],
+      access_restriction_policy_id: 2,
     })
   })
 
@@ -91,7 +89,9 @@ describe('users', () => {
     api.post.mockRejectedValueOnce(new ApiError('SQL Database error (E112)', 417, 'E112'))
     await expect(createUser(newUser)).rejects.toThrow(/username or email may already be in use/)
     api.post.mockRejectedValueOnce(new ApiError('Failed to create user in the database', 400))
-    await expect(createUser(newUser)).rejects.toThrow('That role no longer exists.')
+    await expect(createUser(newUser)).rejects.toThrow('That role or access policy no longer exists.')
+    api.post.mockRejectedValueOnce(new ApiError('Role or access restriction policy does not belong to the organization', 417))
+    await expect(createUser(newUser)).rejects.toThrow('That role or access policy no longer exists.')
   })
 
   it('calls the per-user admin endpoints', async () => {
@@ -106,6 +106,57 @@ describe('users', () => {
     expect(api.patch).toHaveBeenCalledWith('/user/admin/deactivate/3')
     await deleteUser(3)
     expect(api.delete).toHaveBeenCalledWith('/user/admin/delete/3')
+  })
+
+  it('updates a profile, sending the email only when it changed', async () => {
+    const details = { version: 1, work: { job_title: 'SRE' } }
+    await updateUserProfile(
+      3,
+      { displayName: ' Marcus C ', primaryEmail: 'marcus@acme.dev', userDetails: details },
+      'marcus@acme.dev',
+    )
+    expect(api.put).toHaveBeenCalledWith('/user/admin/update/3', {
+      display_name: 'Marcus C',
+      primary_email: null,
+      user_details: details,
+    })
+    await updateUserProfile(3, { displayName: 'Marcus', primaryEmail: 'm@acme.dev', userDetails: {} }, 'marcus@acme.dev')
+    expect(api.put).toHaveBeenLastCalledWith('/user/admin/update/3', {
+      display_name: 'Marcus',
+      primary_email: 'm@acme.dev',
+      user_details: {},
+    })
+    api.put.mockRejectedValueOnce(new ApiError('SQL Database error (E112)', 417, 'E112'))
+    await expect(updateUserProfile(3, { displayName: 'M', primaryEmail: 'x@acme.dev', userDetails: {} }, 'a')).rejects.toThrow(
+      'Someone else already uses that email.',
+    )
+  })
+
+  it('assigns a role, and a policy or none', async () => {
+    await assignUserRole(3, 5)
+    expect(api.put).toHaveBeenCalledWith('/user/admin/role/3/assign/5')
+    await assignUserAccessPolicy(3, 7)
+    expect(api.put).toHaveBeenCalledWith('/user/admin/ar-policy/3/assign', null, { params: { access_restriction_policy_id: 7 } })
+    await assignUserAccessPolicy(3, null)
+    expect(api.put).toHaveBeenLastCalledWith('/user/admin/ar-policy/3/assign', null, { params: {} })
+  })
+
+  it('changes only what differs, then checks the API really applied it', async () => {
+    const before = await (api.get.mockResolvedValueOnce({ data: rawAdminUser(3, 'marcus', 'Marcus', 3) }), getUser(3))
+    api.get.mockResolvedValueOnce({ data: rawAdminUser(3, 'marcus', 'Marcus', 3, { access_restriction_policy_id: 2 }) })
+    await expect(updateUserAccess(before, { roleId: 3, accessPolicyId: 2 })).resolves.toMatchObject({ accessPolicyId: 2 })
+    expect(api.put).toHaveBeenCalledTimes(1)
+    expect(api.put).toHaveBeenCalledWith('/user/admin/ar-policy/3/assign', null, { params: { access_restriction_policy_id: 2 } })
+
+    // the API answers 204 without removing the policy
+    const withPolicy = { ...before, accessPolicyId: 2 }
+    api.get.mockResolvedValueOnce({ data: rawAdminUser(3, 'marcus', 'Marcus', 3, { access_restriction_policy_id: 2 }) })
+    await expect(updateUserAccess(withPolicy, { roleId: 3, accessPolicyId: null })).rejects.toThrow(
+      "The API didn't remove the access policy.",
+    )
+
+    api.get.mockResolvedValueOnce({ data: rawAdminUser(3, 'marcus', 'Marcus', 3) })
+    await expect(updateUserAccess(before, { roleId: 9, accessPolicyId: null })).rejects.toThrow("The role didn't change.")
   })
 })
 

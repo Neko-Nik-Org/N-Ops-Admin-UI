@@ -116,3 +116,6 @@ export const formatRelative = (iso: string | null | undefined, fallback = 'Never
   const date = iso ? parseIso(iso) : null
   return date ? fromNow(date) : fallback
 }
+
+/** "3 users", "1 user". */
+export const usersLabel = (count: number): string => `${count} ${count === 1 ? 'user' : 'users'}`

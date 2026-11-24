@@ -19,6 +19,7 @@
 import { act, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { useLogin } from '@/features/auth/hooks/useLogin'
+import { loadSecurityRequirements, securityRequirementsAtom } from '@/features/auth/store/securityRequirements'
 import { currentUserAtom, sessionStatusAtom } from '@/features/auth/store/session'
 import { getSessionToken, isSessionRemembered } from '@/features/auth/store/sessionToken'
 import { api, renderHookWithProviders } from '../../../testUtils'
@@ -60,6 +61,36 @@ describe('useLogin', () => {
     expect(result.current[0]).toBe('success')
   })
 
+  it('stores what the access policy requires, and drops it at sign-out', async () => {
+    api.post.mockResolvedValue({
+      data: {
+        ...successResponse,
+        is_2fa_enforced: true,
+        data: { ...successResponse.data, enforce_email_2fa: true, enforce_totp_2fa: false },
+      },
+    })
+    const { result, store } = renderHookWithProviders(() => useLogin())
+    await act(async () => {
+      await result.current[1]({ credentials, turnstileToken: 't' })
+    })
+    expect(store.get(securityRequirementsAtom)).toEqual({ required: ['email'], enabled: [] })
+    // survives a reload, apart from the profile
+    expect(loadSecurityRequirements()).toEqual({ required: ['email'], enabled: [] })
+
+    act(() => store.set(currentUserAtom, null))
+    expect(store.get(securityRequirementsAtom)).toBeNull()
+    expect(loadSecurityRequirements()).toBeNull()
+  })
+
+  it('stores no requirements when the policy enforces nothing', async () => {
+    api.post.mockResolvedValue({ data: { ...successResponse, is_2fa_enforced: false } })
+    const { result, store } = renderHookWithProviders(() => useLogin())
+    await act(async () => {
+      await result.current[1]({ credentials, turnstileToken: 't' })
+    })
+    expect(store.get(securityRequirementsAtom)).toBeNull()
+  })
+
   it('hands back the 2FA challenge without signing in', async () => {
     api.post.mockResolvedValue({
       data: {
@@ -93,6 +124,7 @@ describe('useLogin', () => {
         hasTotp: false,
         hasEmail: true,
         rememberMe: true,
+        requirements: null,
       },
     })
     expect(getSessionToken()).toBeUndefined()

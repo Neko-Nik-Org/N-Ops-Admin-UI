@@ -17,28 +17,30 @@
 /** Create-account card shown on the invite page. */
 
 import { yupResolver } from '@hookform/resolvers/yup'
-import { Lock, ShieldCheck, User } from 'lucide-react'
+import { AtSign, Lock, Mail, ShieldCheck, User } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import { AuthBanner, AuthField } from '@/components/molecules/AuthField'
 import { AuthCard } from '@/components/molecules/AuthCard'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { useAcceptInvite } from '@/features/invite/hooks/useAcceptInvite'
 import { inviteSchema, type InviteFormValues } from '@/features/invite/schema/inviteSchema'
-import type { InviteDetails } from '@/features/invite/types'
+import type { InviteLink } from '@/features/invite/types'
 import { NAVIGATE_DELAY_MS } from '@/constants/config'
 import { ROUTES } from '@/constants/routes'
 
 /**
- * Shows who invited the user and with what access, then collects their name and
- * password. On success the user is signed in and sent to the dashboard.
+ * Shows who invited the user and where, then collects their name, username and password. On success
+ * they're sent to sign in, with the username filled in.
  */
-export const InviteForm = ({ token, details }: { token: string; details: InviteDetails }) => {
-  const [acceptState, accept] = useAcceptInvite(token)
+export const InviteForm = ({ link }: { link: InviteLink }) => {
+  const [acceptState, accept] = useAcceptInvite(link)
   const [formError, setFormError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
   const navigate = useNavigate()
+  const inviter = link.invitedBy || 'Someone'
 
   const {
     register,
@@ -46,70 +48,68 @@ export const InviteForm = ({ token, details }: { token: string; details: InviteD
     formState: { errors },
   } = useForm<InviteFormValues>({
     resolver: yupResolver(inviteSchema),
-    defaultValues: { fullName: '', password: '' },
+    defaultValues: { displayName: '', userName: '', password: '', confirmPassword: '' },
   })
 
   const onSubmit = (values: InviteFormValues) => {
     setFormError(null)
-    accept(values)
+    accept({ userName: values.userName, displayName: values.displayName, password: values.password })
       .then(() => {
-        setTimeout(() => navigate(ROUTES.overview, { replace: true }), NAVIGATE_DELAY_MS)
+        toast.success('Your account is ready. Sign in with your new password.')
+        setTimeout(
+          () => navigate(ROUTES.login, { replace: true, state: { userName: values.userName.trim() } }),
+          NAVIGATE_DELAY_MS,
+        )
       })
-      .catch(() => {
+      .catch((error: Error) => {
         setAttempt((n) => n + 1)
-        setFormError("Accepting invites isn't available on the server yet. Ask an admin to create your account for you.")
+        setFormError(error.message || "Couldn't create your account. Try again.")
       })
   }
 
   return (
     <AuthCard
-      title={<>Join {details.organizationName}</>}
+      hideIcon
+      title={<>Join {link.organizationName || 'your organization'}</>}
       subtitle={
         <span className="n-auth-inviter">
           <span className="n-auth-avatar" aria-hidden="true">
-            {details.inviterName.charAt(0).toUpperCase()}
+            {inviter.charAt(0).toUpperCase()}
           </span>
           <span>
-            <b>{details.inviterName}</b> invited you to N-Ops
+            <b>{inviter}</b> invited you to N-Ops
           </span>
         </span>
       }
     >
-      <dl className="n-auth-summary">
-        <div className="n-auth-summary__row">
-          <dt>Role</dt>
-          <dd>
-            <b>{details.role}</b>
-          </dd>
-        </div>
-        <div className="n-auth-summary__row">
-          <dt>Tags</dt>
-          <dd className="n-auth-summary__tags">
-            {details.tags.map((tag) => (
-              <span key={tag} className="n-auth-tag">
-                {tag}
-              </span>
-            ))}
-          </dd>
-        </div>
-        <div className="n-auth-summary__row">
-          <dt>Email</dt>
-          <dd className="n-auth-mono">{details.email}</dd>
-        </div>
-      </dl>
-
       <form className="n-auth-form" onSubmit={handleSubmit(onSubmit)} noValidate>
         {formError && <AuthBanner key={attempt}>{formError}</AuthBanner>}
 
+        {/* the invitation is for this address; the API takes it from the invitation, so it can't be changed */}
+        <AuthField id="inviteEmail" label="Email" type="email" icon={<Mail size={18} />} value={link.email} disabled readOnly />
+
         <AuthField
-          id="fullName"
-          label="Full name"
+          id="displayName"
+          label="Your name"
           icon={<User size={18} />}
-          placeholder="Your name"
+          placeholder="Priya Rao"
           autoComplete="name"
           autoFocus
-          error={errors.fullName?.message}
-          {...register('fullName')}
+          error={errors.displayName?.message}
+          {...register('displayName')}
+        />
+
+        <AuthField
+          id="userName"
+          label="Username"
+          icon={<AtSign size={18} />}
+          placeholder="priya"
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          error={errors.userName?.message}
+          hint="You sign in with this."
+          {...register('userName')}
         />
 
         <AuthField
@@ -117,11 +117,20 @@ export const InviteForm = ({ token, details }: { token: string; details: InviteD
           label="Create a password"
           type="password"
           icon={<Lock size={18} />}
-          placeholder="A long passphrase"
           autoComplete="new-password"
           error={errors.password?.message}
-          hint="Use a long passphrase you don't use anywhere else."
+          hint="8–64 characters with an uppercase letter, a lowercase letter, a digit and a symbol."
           {...register('password')}
+        />
+
+        <AuthField
+          id="confirmPassword"
+          label="Confirm password"
+          type="password"
+          icon={<Lock size={18} />}
+          autoComplete="new-password"
+          error={errors.confirmPassword?.message}
+          {...register('confirmPassword')}
         />
 
         <LoadingButton
@@ -137,10 +146,10 @@ export const InviteForm = ({ token, details }: { token: string; details: InviteD
       </form>
 
       <div className="n-auth-note">
-        <p>You'll be signed in automatically.</p>
+        <p>You'll sign in with your new username and password next.</p>
         <p className="n-auth-note__audit">
           <ShieldCheck size={15} />
-          What you can see and do depends on your role and tags, set by your admin.
+          What you can see and do depends on the role your admin picked for you.
         </p>
       </div>
     </AuthCard>

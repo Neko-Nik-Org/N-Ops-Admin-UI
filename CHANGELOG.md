@@ -22,6 +22,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
   soon as you're on any other page.
 - Admin › Users: add users, change a username, reset a password, mark an email verified, deactivate
   and delete users. Users and their details come from the live API.
+- Accepting an invitation: the emailed link opens a create-account page with who invited you and
+  where; you pick your name, username and password, then sign in.
+- Super Admin: invite an organization's first admin by email.
+- Super Admin: an organization's profile is a form with set fields (legal name, description, website,
+  industry, size, contacts including support and security emails, phone, country, time zone,
+  address). Older free-form values stay editable under "Other fields". The organization's own pages
+  show these fields with readable labels.
+- Admin › Users: edit someone's name, email and profile details, and change their role and access
+  policy. Users show their access policy (its 2FA and sign-in limits) instead of per-user IP and
+  country fields, and Add user picks an access policy.
+- Admin › Invitations: invite someone by email with a role, an optional access policy, an expiry
+  (1 hour to 21 days) and a note, see pending and expired invitations, and revoke them. Roles can
+  grant the new View / Send / Revoke invitations permissions.
 - Admin › Roles: permissions as a View / Create / Edit / Delete matrix, and a read-only role view.
 - Vault: inside a project, Env, Conf and Notes are tabs.
 - Workflows: list and detail pages with the flow diagram and run history (sample data until the API
@@ -47,6 +60,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - One CI/CD workflow that builds the Docker image once, then pushes and deploys that image.
 - Editing roles needs `user:role:edit`, matching the API.
 - Toasts show above open dialogs, without a countdown bar.
+- Dialogs and toasts no longer use the browser's top layer, so password managers (Bitwarden's inline
+  menu and "Save login" prompt) show above them instead of being covered and switching themselves
+  off.
 - Collapsing and expanding the sidebar animates smoothly.
 
 ### Fixed

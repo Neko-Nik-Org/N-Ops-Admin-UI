@@ -59,10 +59,8 @@ export interface AdminUser {
   isEmailVerified: boolean
   hasTotp2fa: boolean
   hasEmail2fa: boolean
-  hasIpRestriction: boolean
-  allowedIps: string[]
-  hasGeoRestriction: boolean
-  allowedGeoLocations: string[]
+  /** The access policy whose 2FA and sign-in limits apply to them; null for none. */
+  accessPolicyId: number | null
   /** Free-form JSON the API keeps with the user. */
   userDetails: Record<string, unknown>
   createdAt: string
@@ -80,11 +78,16 @@ export interface AdminUserInput {
   /** Sent base64-encoded, like at sign-in. */
   password: string
   isActive: boolean
-  hasIpRestriction: boolean
-  allowedIps: string[]
-  hasGeoRestriction: boolean
-  /** Two-letter country codes, e.g. "IN". */
-  allowedGeoLocations: string[]
+  accessPolicyId: number | null
+}
+
+/** What an admin can change on someone's profile (`PUT /user/admin/update/{id}`). */
+export interface AdminUserProfileInput {
+  displayName: string
+  /** Only sent when it changed, because the API marks any email it's sent as unverified. */
+  primaryEmail: string
+  /** Replaces the whole object. */
+  userDetails: Record<string, unknown>
 }
 
 /** A role: a permission set, optionally scoped to tags (`user_role` + `role_tag`). */
@@ -104,6 +107,57 @@ export interface Role {
 
 /** Fields set when creating or editing a role. */
 export type RoleInput = Omit<Role, 'roleId' | 'createdAt' | 'updatedAt'>
+
+/**
+ * A pending invitation to join the organization (`organization_invitation`). It is deleted when
+ * revoked, and the API's cleanup job removes it some time after it expires.
+ */
+export interface Invitation {
+  invitationId: number
+  email: string
+  /** Message from the inviter, shown in the email; '' when none. */
+  invitationNotes: string
+  /** Role the invitee gets on joining. */
+  roleId: number
+  /** Access policy the invitee gets on joining; null for none. */
+  accessPolicyId: number | null
+  invitedAt: string
+  expiresAt: string
+}
+
+/** What sending an invitation takes. */
+export interface InvitationInput {
+  /** Lowercase; the API refuses uppercase letters. */
+  email: string
+  invitationNotes: string
+  roleId: number
+  accessPolicyId: number | null
+  /** Between 1 hour and 21 days from now (the API's limits). */
+  expiresAt: Date
+}
+
+/**
+ * An access restriction policy (`access_restriction_policy`): sign-in rules a user can be given —
+ * required second factors, and the IP ranges or countries they may sign in from.
+ */
+export interface AccessPolicy {
+  policyId: number
+  policyName: string
+  policyDescription: string
+  /** Users with this policy must set up an authenticator app (TOTP). */
+  enforceTotp2fa: boolean
+  /** Users with this policy must set up email codes. */
+  enforceEmail2fa: boolean
+  hasIpRestriction: boolean
+  /** IPv4 addresses or CIDR ranges. */
+  allowedIps: string[]
+  hasGeoRestriction: boolean
+  /** Two-letter country codes, e.g. "IN". */
+  allowedGeoLocations: string[]
+}
+
+/** Fields set when creating or editing an access policy. */
+export type AccessPolicyInput = Omit<AccessPolicy, 'policyId'>
 
 /**
  * An API key. It acts with an existing role's permissions, limited to one tag and to the vault

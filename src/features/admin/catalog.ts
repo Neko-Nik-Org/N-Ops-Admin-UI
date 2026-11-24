@@ -16,7 +16,7 @@
  */
 /**
  * Every permission a role can grant, grouped for the role editor, plus the audit log's
- * action types. The tag:*, user:*, user:role:* and vault:project:* permissions exist in the API
+ * action types. The tag:*, user:*, user:invite:*, user:role:*, policy:ar:* and vault:project:* permissions exist in the API
  * today (docs/Permissions.md); the rest are the planned ones from the admin modules.
  */
 
@@ -48,12 +48,29 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
     ],
   },
   {
+    label: 'Invitations',
+    permissions: [
+      { key: 'user:invite:view', label: 'View invitations' },
+      { key: 'user:invite:create', label: 'Send invitations' },
+      { key: 'user:invite:delete', label: 'Revoke invitations' },
+    ],
+  },
+  {
     label: 'Roles',
     permissions: [
       { key: 'user:role:view', label: 'View roles' },
       { key: 'user:role:create', label: 'Create roles' },
       { key: 'user:role:edit', label: 'Edit roles' },
       { key: 'user:role:delete', label: 'Delete roles' },
+    ],
+  },
+  {
+    label: 'Access policies',
+    permissions: [
+      { key: 'policy:ar:view', label: 'View access policies' },
+      { key: 'policy:ar:create', label: 'Create access policies' },
+      { key: 'policy:ar:edit', label: 'Edit access policies' },
+      { key: 'policy:ar:delete', label: 'Delete access policies' },
     ],
   },
   {
@@ -139,8 +156,16 @@ export const PERMISSION_MATRIX: readonly PermissionSection[] = [
       { label: 'Organization', actions: { view: 'org:view', edit: 'org:edit' } },
       { label: 'Users', actions: { view: 'user:view', create: 'user:create', edit: 'user:edit', delete: 'user:delete' } },
       {
+        label: 'Invitations',
+        actions: { view: 'user:invite:view', create: 'user:invite:create', delete: 'user:invite:delete' },
+      },
+      {
         label: 'Roles',
         actions: { view: 'user:role:view', create: 'user:role:create', edit: 'user:role:edit', delete: 'user:role:delete' },
+      },
+      {
+        label: 'Access policies',
+        actions: { view: 'policy:ar:view', create: 'policy:ar:create', edit: 'policy:ar:edit', delete: 'policy:ar:delete' },
       },
       {
         label: 'API keys',

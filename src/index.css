@@ -117,18 +117,3 @@
     transition-duration: 0.01ms !important;
   }
 }
-
-/*
- * The popover that holds the toasts (see src/lib/toastLayer.ts). Undo the browser's popover box
- * styles: the toast container positions itself (fixed, top right), so this wrapper takes no space.
- */
-.toast-layer {
-  inset: 0 0 auto auto;
-  width: 0;
-  height: 0;
-  margin: 0;
-  padding: 0;
-  overflow: visible;
-  border: 0;
-  background: transparent;
-}

@@ -16,13 +16,26 @@
  */
 /**
  * Admin › Users (/admin/users): people in the organization, from `/user/admin/list`. Click someone to
- * see their details (from `/user/admin/fetch/{id}`) and act on them: change their username, set a new
- * password, mark their email verified, deactivate or delete them (all need `user:edit`). Adding needs
- * `user:create` + `user:role:view`. There's no endpoint yet for editing a user's name, email, role or
- * sign-in restrictions.
+ * see their details (from `/user/admin/fetch/{id}`) and act on them: edit their name, email and
+ * profile details, change their role and access policy, change their username, set a new password,
+ * mark their email verified, deactivate or delete them (all need `user:edit`). Adding needs
+ * `user:create` + `user:role:view`.
  */
 
-import { AtSign, Ban, BadgeCheck, KeyRound, Lock, Mail, ShieldCheck, Trash2, UserPlus } from 'lucide-react'
+import {
+  AtSign,
+  Ban,
+  BadgeCheck,
+  IdCard,
+  KeyRound,
+  Lock,
+  Mail,
+  Pencil,
+  ShieldCheck,
+  Trash2,
+  UserCog,
+  UserPlus,
+} from 'lucide-react'
 import { Suspense, useMemo, useState, type ReactNode } from 'react'
 import { Badge } from '@/components/atoms/Badge'
 import { Select } from '@/components/atoms/Select'
@@ -37,7 +50,10 @@ import { currentUserAtom } from '@/features/auth/store/session'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'
 import { SkeletonText, TableSkeleton } from '@/components/molecules/Skeleton'
+import { TwoFactorBadges } from '@/components/organisms/AccessPolicyViewDialog'
+import { countryName } from '@/constants/countries'
 import {
+  useAccessPolicies,
   useAdminUser,
   useAdminUsers,
   useDeactivateUser,
@@ -45,7 +61,7 @@ import {
   useRoleOptions,
   useVerifyUserEmail,
 } from '@/features/admin/hooks/useAdmin'
-import type { AdminUser } from '@/features/admin/types'
+import type { AccessPolicy, AdminUser } from '@/features/admin/types'
 import { useHasPermissions } from '@/features/auth/permissions'
 import { errorStatus } from '@/types/api'
 import { cn } from '@/utils/cn'
@@ -56,6 +72,17 @@ import { lazyNamed, usePreloadWhenIdle } from '@/utils/lazyNamed'
 const UserFormDialog = lazyNamed(() => import('@/components/organisms/UserFormDialog'), 'UserFormDialog')
 const RenameUserDialog = lazyNamed(() => import('@/components/organisms/UserActionDialogs'), 'RenameUserDialog')
 const ResetPasswordDialog = lazyNamed(() => import('@/components/organisms/UserActionDialogs'), 'ResetPasswordDialog')
+const EditUserProfileDialog = lazyNamed(() => import('@/components/organisms/UserActionDialogs'), 'EditUserProfileDialog')
+const EditUserDetailsDialog = lazyNamed(() => import('@/components/organisms/UserActionDialogs'), 'EditUserDetailsDialog')
+const UserAccessDialog = lazyNamed(() => import('@/components/organisms/UserActionDialogs'), 'UserAccessDialog')
+
+/** Looks up access policies by id, for the table and details; empty without `policy:ar:view`. */
+const usePolicyLookup = () => {
+  const canView = useHasPermissions('policy:ar:view')
+  const { data: policies = [] } = useAccessPolicies({ enabled: canView })
+  return (policyId: number | null): AccessPolicy | { policyId: number; policyName: string } | null =>
+    policyId === null ? null : (policies.find((p) => p.policyId === policyId) ?? { policyId, policyName: `Policy #${policyId}` })
+}
 
 /** Initials for the avatar, e.g. "Priya Rao" → "PR". */
 const initials = (name: string) =>
@@ -112,16 +139,19 @@ const List = ({ items, empty }: { items: string[]; empty: string }) =>
 const UserDetails = ({
   userId,
   roleName,
+  policyOf,
   actions,
 }: {
   userId: number
   roleName: (id: number) => string
+  policyOf: ReturnType<typeof usePolicyLookup>
   /** Buttons for this user, under the details. */
   actions?: (user: AdminUser) => ReactNode
 }) => {
   const { data: user, isLoading, error } = useAdminUser(userId)
   if (isLoading) return <SkeletonText lines={8} />
   if (error || !user) return <p className="text-sm text-danger">{error?.message ?? 'Could not load this user.'}</p>
+  const policy = policyOf(user.accessPolicyId)
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
@@ -153,11 +183,34 @@ const UserDetails = ({
           </dl>
         </Section>
 
-        <Section icon={<Lock size={13} aria-hidden="true" />} title="Sign-in restrictions">
-          <p className="text-sm text-text">IP addresses: {user.hasIpRestriction ? 'restricted' : 'any'}</p>
-          {user.hasIpRestriction && <List items={user.allowedIps} empty="No addresses allowed." />}
-          <p className="text-sm text-text">Locations: {user.hasGeoRestriction ? 'restricted' : 'any'}</p>
-          {user.hasGeoRestriction && <List items={user.allowedGeoLocations} empty="No locations allowed." />}
+        <Section icon={<Lock size={13} aria-hidden="true" />} title="Access policy">
+          {!policy ? (
+            <p className="text-sm text-text-muted">None: no required 2FA, and they can sign in from anywhere.</p>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-text">{policy.policyName}</p>
+              {'allowedIps' in policy && (
+                <>
+                  <div className="flex flex-wrap gap-1">
+                    <TwoFactorBadges policy={policy} />
+                  </div>
+                  <p className="text-sm text-text">
+                    IP addresses: {policy.hasIpRestriction && policy.allowedIps.length ? 'restricted' : 'any'}
+                  </p>
+                  {policy.hasIpRestriction && <List items={policy.allowedIps} empty="No addresses allowed." />}
+                  <p className="text-sm text-text">
+                    Countries: {policy.hasGeoRestriction && policy.allowedGeoLocations.length ? 'restricted' : 'any'}
+                  </p>
+                  {policy.hasGeoRestriction && (
+                    <List
+                      items={policy.allowedGeoLocations.map((c) => `${countryName(c)} (${c})`)}
+                      empty="No countries allowed."
+                    />
+                  )}
+                </>
+              )}
+            </>
+          )}
         </Section>
       </div>
 
@@ -193,7 +246,13 @@ export const AdminUsersPage = () => {
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [adding, setAdding] = useState(false)
-  const [action, setAction] = useState<{ kind: 'rename' | 'password' | 'deactivate' | 'delete'; user: AdminUser } | null>(null)
+  const [action, setAction] = useState<{
+    kind: 'profile' | 'details' | 'access' | 'rename' | 'password' | 'deactivate' | 'delete'
+    user: AdminUser
+  } | null>(null)
+  const policyOf = usePolicyLookup()
+  const canChangeRole = useHasPermissions('user:view', 'user:edit', 'user:role:view')
+  const canChangePolicy = useHasPermissions('user:view', 'user:edit', 'policy:ar:view')
   const me = useAtomValue(currentUserAtom)
   const canCreate = useHasPermissions('user:view', 'user:create', 'user:role:view')
   // every change to an existing user, deleting included, needs user:edit in the API
@@ -243,6 +302,38 @@ export const AdminUsersPage = () => {
     const notSelf = isMe ? 'Use the Account page to change your own account.' : undefined
     return (
       <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+        <LoadingButton
+          variant="secondary"
+          size="sm"
+          icon={<Pencil size={14} />}
+          disabled={isMe}
+          title={notSelf}
+          onClick={() => setAction({ kind: 'profile', user })}
+        >
+          Edit name and email
+        </LoadingButton>
+        <LoadingButton
+          variant="secondary"
+          size="sm"
+          icon={<IdCard size={14} />}
+          disabled={isMe}
+          title={notSelf}
+          onClick={() => setAction({ kind: 'details', user })}
+        >
+          Edit profile details
+        </LoadingButton>
+        {(canChangeRole || canChangePolicy) && (
+          <LoadingButton
+            variant="secondary"
+            size="sm"
+            icon={<UserCog size={14} />}
+            disabled={isMe}
+            title={isMe ? 'You can’t change your own role or access policy.' : undefined}
+            onClick={() => setAction({ kind: 'access', user })}
+          >
+            Change role or policy
+          </LoadingButton>
+        )}
         <LoadingButton
           variant="secondary"
           size="sm"
@@ -399,8 +490,9 @@ export const AdminUsersPage = () => {
                             <div className="flex flex-wrap gap-1">
                               <Badge tone={user.isActive ? 'signal' : 'neutral'}>{user.isActive ? 'Active' : 'Inactive'}</Badge>
                               {!user.isEmailVerified && <Badge tone="warning">Email unverified</Badge>}
-                              {user.hasIpRestriction && <Badge tone="accent">IP limited</Badge>}
-                              {user.hasGeoRestriction && <Badge tone="accent">Location limited</Badge>}
+                              {user.accessPolicyId !== null && (
+                                <Badge tone="accent">{policyOf(user.accessPolicyId)?.policyName}</Badge>
+                              )}
                             </div>
                           </td>
                           <td className="py-3 text-sm text-text-muted">{lastSignIn(user)}</td>
@@ -414,13 +506,18 @@ export const AdminUsersPage = () => {
           </section>
 
           <Dialog open={selected !== null} onClose={() => setSelectedId(null)} size="lg" title="User details">
-            {selected !== null && <UserDetails key={selected} userId={selected} roleName={roleName} actions={userActions} />}
+            {selected !== null && (
+              <UserDetails key={selected} userId={selected} roleName={roleName} policyOf={policyOf} actions={userActions} />
+            )}
           </Dialog>
 
           <Suspense fallback={null}>
             {adding && <UserFormDialog open onClose={() => setAdding(false)} />}
             {action?.kind === 'rename' && <RenameUserDialog user={action.user} onClose={closeAction} />}
             {action?.kind === 'password' && <ResetPasswordDialog user={action.user} onClose={closeAction} />}
+            {action?.kind === 'profile' && <EditUserProfileDialog user={action.user} onClose={closeAction} />}
+            {action?.kind === 'details' && <EditUserDetailsDialog user={action.user} onClose={closeAction} />}
+            {action?.kind === 'access' && <UserAccessDialog user={action.user} onClose={closeAction} />}
           </Suspense>
           <ConfirmDialog
             open={action?.kind === 'deactivate'}

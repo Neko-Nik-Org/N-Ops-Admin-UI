@@ -58,6 +58,17 @@ The UI talks to [N-Ops Main API](https://github.com/Neko-Nik-Org/N-Ops-Main-API)
   email codes according to the account's `has_totp_2fa`/`has_email_2fa` flags. `/auth/verify-otp`
   and `/auth/resend-otp` are **not released in the Main API yet**. Until they are, the client
   expects the shapes in `features/auth/api/twoFactor.ts` and shows a clear toast when a call fails.
+- **Enforced 2FA (access policies).** Sign-in also reports `is_2fa_enforced` and, per factor,
+  `enforce_<factor>_2fa` (with `has_<factor>_2fa` on a 2FA challenge). `features/auth/securitySetup.ts`
+  turns those into ordered setup steps (email: verify the address, then turn on email codes; TOTP:
+  add an authenticator app and confirm one code). They are stored apart from the profile
+  (`store/securityRequirements.ts`) because only sign-in reports them, and cleared at sign-out.
+  While any step is pending, `RequireSecuritySetup` sends every app route to `/security-setup`
+  (`SecuritySetupPage`), which offers only the steps and sign-out. To add a factor (e.g. passkeys),
+  add it to `SECOND_FACTORS` and `FACTOR_SETUP` and give its step a view in `STEP_VIEWS`.
+  The `/user/2fa/*` setup endpoints are **not released in the Main API yet**. Their expected shapes are
+  in `features/auth/api/twoFactorSetup.ts`; a 404 tells the user setup isn't available yet. This is a
+  UI gate only: the API must also refuse other requests until setup is done.
 - Permission checks (`features/auth/permissions.ts`) mirror the Main API's RBAC
   (`docs/Permissions.md` in that repo) and tag scoping, where an empty tag list means every tag.
   They only hide or disable UI. The API's `403` is the real enforcement.
@@ -99,9 +110,13 @@ lists the users and services it needs.
 Some screens are built ahead of their backend. When their endpoints are missing, they show an
 explicit "not available / not connected yet" state and **never fabricate data**:
 
-- **Invite** (`/invite/:token`): expects `GET /invite/:token` for the preview and
-  `POST /invite/:token/accept`, which returns the same shape as `/auth/login` so the new user is
-  signed in straight away.
+- **Invite** (`/invite?code=…`): the emailed link's `code` is base64 JSON
+  (`{ email, invitation_code, invited_by, org_name }`), decoded in the browser by
+  `parseInviteCode` (`features/invite/api/invite.ts`). The form posts to `POST /invite/join/{code}`,
+  which needs no session and answers 200 with no body, so the new user is sent to sign in with the
+  username filled in. The API takes the full create-user body but uses the invitation's email, role
+  and policy, so those fields are placeholders. Sending and revoking invitations is Admin ›
+  Invitations (`features/admin/api/invitations.ts`).
 - **Overview dashboard**: tag filters use the real `GET /tag/list`. Fleet, approvals, workflow, and
   alert data expects one aggregate `GET /dashboard/overview`. Actions not wired up yet show a toast
   instead of failing silently.

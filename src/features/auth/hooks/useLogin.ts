@@ -19,6 +19,7 @@
 
 import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { login } from '../api/login'
+import { readSecurityRequirements } from '../securitySetup'
 import { useApplySession } from './useApplySession'
 import type { LoginCredentials, LoginOutcome } from '../types'
 
@@ -41,6 +42,7 @@ export const useLogin = () => {
             hasTotp: response.data.has_totp_2fa,
             hasEmail: response.data.has_email_2fa,
             rememberMe: credentials.rememberMe,
+            requirements: readSecurityRequirements({ ...response.data }),
           },
         }
       }

@@ -14,43 +14,78 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tests for src/features/invite/api/invite.ts: the URL token can't redirect the request to another endpoint. */
+/** Tests for src/features/invite/api/invite.ts: reading the emailed link and joining. */
 
 import { describe, expect, it } from 'vitest'
-import { acceptInvite, getInviteDetails } from '@/features/invite/api/invite'
+import { joinInvite, parseInviteCode } from '@/features/invite/api/invite'
+import { ApiError } from '@/types/api'
 import { api } from '../../../testUtils'
 
-// what React Router hands over for /invite/..%2F..%2Ftag%2Fdelete%2F5%3F: already decoded
-const CRAFTED = '../../tag/delete/5?'
+/** The example link from the Main API's invite email. */
+const EMAILED =
+  'eyJlbWFpbCI6ImFsZW5mcmFuazMwQGdtYWlsLmNvbSIsImludml0YXRpb25fY29kZSI6IjZyYTJ5UjltRyIsImludml0ZWRfYnkiOiJBbGVuIiwib3JnX25hbWUiOiJOZWtvIE5payJ9'
 
-describe('invite api', () => {
-  it('accepts an invite with the name and password', async () => {
-    api.post.mockResolvedValue({ data: { session_id: 's1' } })
-    await expect(acceptInvite('abc123', { fullName: 'Priya', password: 'long passphrase' })).resolves.toEqual({
-      session_id: 's1',
+const encode = (value: unknown) => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(value))))
+
+const link = { email: 'new@acme.dev', invitationCode: '6ra2yR9mG', invitedBy: 'Alen', organizationName: 'Acme' }
+
+describe('parseInviteCode', () => {
+  it('reads the link the API emails', () => {
+    expect(parseInviteCode(EMAILED)).toEqual({
+      email: 'alenfrank30@gmail.com',
+      invitationCode: '6ra2yR9mG',
+      invitedBy: 'Alen',
+      organizationName: 'Neko Nik',
     })
-    expect(api.post).toHaveBeenCalledWith('/invite/abc123/accept', { full_name: 'Priya', password: 'long passphrase' })
   })
 
-  it('fetches a normal token as-is', async () => {
-    api.get.mockResolvedValue({ data: { organizationName: 'Acme' } })
-    await expect(getInviteDetails('abc123')).resolves.toEqual({ organizationName: 'Acme' })
-    expect(api.get).toHaveBeenCalledWith('/invite/abc123')
+  it('handles unicode, and a + that arrived as a space', () => {
+    const code = encode({ email: 'a@b.co', invitation_code: 'x', invited_by: 'Zoë ✓', org_name: 'Ünïcode >>>' })
+    expect(code).toContain('+')
+    expect(parseInviteCode(code.replace(/\+/g, ' '))).toMatchObject({ invitedBy: 'Zoë ✓', organizationName: 'Ünïcode >>>' })
   })
 
-  // Security audit #3: the token must be encodeURIComponent'd. Re-enable once that fix is in invite.ts.
-  it.skip('encodes a crafted token so it stays inside /invite/', async () => {
-    api.get.mockResolvedValue({ data: {} })
-    await getInviteDetails(CRAFTED)
-    expect(api.get).toHaveBeenCalledWith('/invite/..%2F..%2Ftag%2Fdelete%2F5%3F')
+  it('rejects anything that is not a whole invitation', () => {
+    expect(parseInviteCode(null)).toBeNull()
+    expect(parseInviteCode('')).toBeNull()
+    expect(parseInviteCode('not base64!')).toBeNull()
+    expect(parseInviteCode(btoa('not json'))).toBeNull()
+    expect(parseInviteCode(encode({ email: 'a@b.co' }))).toBeNull()
+    expect(parseInviteCode(encode({ invitation_code: 'x' }))).toBeNull()
+    expect(parseInviteCode(encode(['x']))).toBeNull()
   })
+})
 
-  it.skip('accepts with the name and password, encoding the token too', async () => {
-    api.post.mockResolvedValue({ data: {} })
-    await acceptInvite(CRAFTED, { fullName: 'Priya', password: 'long passphrase' })
-    expect(api.post).toHaveBeenCalledWith('/invite/..%2F..%2Ftag%2Fdelete%2F5%3F/accept', {
-      full_name: 'Priya',
-      password: 'long passphrase',
+describe('joinInvite', () => {
+  it('posts the new account to /invite/join/{code} with a base64 password', async () => {
+    api.post.mockResolvedValue({ data: '' })
+    await joinInvite(link, { userName: ' priya ', displayName: ' Priya Rao ', password: 'Start#Pass1' })
+    expect(api.post).toHaveBeenCalledWith('/invite/join/6ra2yR9mG', {
+      user_name: 'priya',
+      display_name: 'Priya Rao',
+      primary_email: 'new@acme.dev',
+      user_details: {},
+      is_active: true,
+      role_id: 0,
+      password: btoa('Start#Pass1'),
+      access_restriction_policy_id: null,
     })
+  })
+
+  it('keeps a crafted code inside /invite/join/', async () => {
+    api.post.mockResolvedValue({ data: '' })
+    await joinInvite({ ...link, invitationCode: '../../tag/delete/5?' }, { userName: 'a', displayName: 'A', password: 'x' })
+    expect(api.post).toHaveBeenCalledWith('/invite/join/..%2F..%2Ftag%2Fdelete%2F5%3F', expect.anything())
+  })
+
+  it('explains an expired or used invitation and a taken username', async () => {
+    api.post.mockRejectedValueOnce(new ApiError('Invalid or expired invitation code.', 400))
+    await expect(joinInvite(link, { userName: 'a', displayName: 'A', password: 'x' })).rejects.toThrow(
+      'This invitation has expired or was already used.',
+    )
+    api.post.mockRejectedValueOnce(new ApiError('SQL Database error (E112)', 417, 'E112'))
+    await expect(joinInvite(link, { userName: 'a', displayName: 'A', password: 'x' })).rejects.toThrow(
+      'That username may be taken.',
+    )
   })
 })

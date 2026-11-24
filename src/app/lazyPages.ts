@@ -28,8 +28,10 @@ import { APP_PAGES, ROUTES } from '@/constants/routes'
 /** One import per page module; each page is a named export with the module's own name. */
 const loaders = {
   AccountPage: () => import('@/pages/AccountPage'),
+  AdminAccessPoliciesPage: () => import('@/pages/admin/AdminAccessPoliciesPage'),
   AdminApiKeysPage: () => import('@/pages/admin/AdminApiKeysPage'),
   AdminAuditLogsPage: () => import('@/pages/admin/AdminAuditLogsPage'),
+  AdminInvitationsPage: () => import('@/pages/admin/AdminInvitationsPage'),
   AdminOrganizationPage: () => import('@/pages/admin/AdminOrganizationPage'),
   AdminRolesPage: () => import('@/pages/admin/AdminRolesPage'),
   AdminUsersPage: () => import('@/pages/admin/AdminUsersPage'),
@@ -41,6 +43,7 @@ const loaders = {
   OrganizationDetailPage: () => import('@/pages/superAdmin/OrganizationDetailPage'),
   OrganizationsPage: () => import('@/pages/superAdmin/OrganizationsPage'),
   OverviewPage: () => import('@/pages/OverviewPage'),
+  SecuritySetupPage: () => import('@/pages/SecuritySetupPage'),
   SuperAdminShell: () => import('@/pages/superAdmin/SuperAdminShell'),
   TagsPage: () => import('@/pages/TagsPage'),
   TwoFactorPage: () => import('@/pages/TwoFactorPage'),
@@ -54,8 +57,10 @@ const page = <K extends string, P extends object>(load: () => Promise<Record<K, 
   lazy(() => load().then((m) => ({ default: m[name] })))
 
 export const AccountPage = page(loaders.AccountPage, 'AccountPage')
+export const AdminAccessPoliciesPage = page(loaders.AdminAccessPoliciesPage, 'AdminAccessPoliciesPage')
 export const AdminApiKeysPage = page(loaders.AdminApiKeysPage, 'AdminApiKeysPage')
 export const AdminAuditLogsPage = page(loaders.AdminAuditLogsPage, 'AdminAuditLogsPage')
+export const AdminInvitationsPage = page(loaders.AdminInvitationsPage, 'AdminInvitationsPage')
 export const AdminOrganizationPage = page(loaders.AdminOrganizationPage, 'AdminOrganizationPage')
 export const AdminRolesPage = page(loaders.AdminRolesPage, 'AdminRolesPage')
 export const AdminUsersPage = page(loaders.AdminUsersPage, 'AdminUsersPage')
@@ -65,6 +70,7 @@ export const InvitePage = page(loaders.InvitePage, 'InvitePage')
 export const LoginPage = page(loaders.LoginPage, 'LoginPage')
 export const NotFoundPage = page(loaders.NotFoundPage, 'NotFoundPage')
 export const OverviewPage = page(loaders.OverviewPage, 'OverviewPage')
+export const SecuritySetupPage = page(loaders.SecuritySetupPage, 'SecuritySetupPage')
 export const SuperAdminShell = page(loaders.SuperAdminShell, 'SuperAdminShell')
 export const OrganizationsPage = page(loaders.OrganizationsPage, 'OrganizationsPage')
 export const OrganizationDetailPage = page(loaders.OrganizationDetailPage, 'OrganizationDetailPage')
@@ -84,8 +90,10 @@ const ROUTE_LOADERS: Array<[pattern: string, load: () => Promise<unknown>]> = [
   [ROUTES.tags, loaders.TagsPage],
   [ROUTES.adminOrganization, loaders.AdminOrganizationPage],
   [ROUTES.adminUsers, loaders.AdminUsersPage],
+  [ROUTES.adminInvitations, loaders.AdminInvitationsPage],
   [ROUTES.adminApiKeys, loaders.AdminApiKeysPage],
   [ROUTES.adminRoles, loaders.AdminRolesPage],
+  [ROUTES.adminAccessPolicies, loaders.AdminAccessPoliciesPage],
   [ROUTES.adminAuditLogs, loaders.AdminAuditLogsPage],
   [ROUTES.workflowDetail, loaders.WorkflowDetailPage],
   [ROUTES.workflows, loaders.WorkflowsPage],
@@ -93,6 +101,7 @@ const ROUTE_LOADERS: Array<[pattern: string, load: () => Promise<unknown>]> = [
   [ROUTES.vaultProject, loaders.VaultPage],
   [ROUTES.vault, loaders.VaultPage],
   [ROUTES.account, loaders.AccountPage],
+  [ROUTES.securitySetup, loaders.SecuritySetupPage],
   [ROUTES.superAdminOrganization, loaders.OrganizationDetailPage],
   [ROUTES.superAdmin, loaders.OrganizationsPage],
 ]

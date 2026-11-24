@@ -19,23 +19,23 @@
 import { describe, expect, it } from 'vitest'
 import { inviteSchema } from '@/features/invite/schema/inviteSchema'
 
+const valid = { displayName: '  Priya  ', userName: 'priya', password: 'Start#Pass1', confirmPassword: 'Start#Pass1' }
+
 describe('inviteSchema', () => {
-  it('accepts a name and a password of 8+ characters, trimming both', async () => {
-    await expect(inviteSchema.validate({ fullName: '  Priya  ', password: ' 12345678 ' })).resolves.toEqual({
-      fullName: 'Priya',
-      password: '12345678',
-    })
+  it('accepts a name, username and matching passwords, trimming the name', async () => {
+    await expect(inviteSchema.validate(valid)).resolves.toMatchObject({ displayName: 'Priya', userName: 'priya' })
   })
 
-  it('requires a full name', async () => {
-    await expect(inviteSchema.validate({ fullName: '  ', password: '12345678' })).rejects.toThrow('Enter your full name.')
+  it('requires a name and a username', async () => {
+    await expect(inviteSchema.validate({ ...valid, displayName: '  ' })).rejects.toThrow('Enter your name.')
+    await expect(inviteSchema.validate({ ...valid, userName: '' })).rejects.toThrow('Choose a username.')
   })
 
-  it('requires a password', async () => {
-    await expect(inviteSchema.validate({ fullName: 'Priya', password: '' })).rejects.toThrow('Create a password.')
-  })
-
-  it('rejects passwords shorter than 8 characters', async () => {
-    await expect(inviteSchema.validate({ fullName: 'Priya', password: '1234567' })).rejects.toThrow('Use at least 8 characters.')
+  it("applies the API's password rules and checks the confirmation", async () => {
+    await expect(inviteSchema.validateAt('password', { ...valid, password: '' })).rejects.toThrow('Create a password.')
+    await expect(inviteSchema.validate({ ...valid, password: 'short', confirmPassword: 'short' })).rejects.toThrow()
+    await expect(inviteSchema.validate({ ...valid, confirmPassword: 'Other#Pass1' })).rejects.toThrow(
+      "The passwords don't match.",
+    )
   })
 })

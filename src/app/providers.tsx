@@ -21,9 +21,9 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { useAtomValue } from 'jotai'
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
-import { toast, ToastContainer } from 'react-toastify'
+import { createPortal } from 'react-dom'
+import { ToastContainer } from 'react-toastify'
 import { queryClient } from '@/lib/queryClient'
-import { raiseToasts, setToastLayer } from '@/lib/toastLayer'
 import { sessionStatusAtom } from '@/features/auth/store/session'
 import { resolvedThemeAtom } from './theme'
 
@@ -47,9 +47,6 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
   const resolvedTheme = useAtomValue(resolvedThemeAtom)
   useClearUserCacheOnSignOut()
 
-  // a new toast comes to the front, even over a dialog opened since the last one
-  useEffect(() => toast.onChange(({ status }) => status === 'added' && raiseToasts()), [])
-
   /** Every color token in index.css is keyed off this attribute. */
   useEffect(() => {
     document.documentElement.dataset.theme = resolvedTheme
@@ -58,10 +55,14 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
   return (
     <QueryClientProvider client={queryClient}>
       {children}
-      {/* a popover, so toasts can sit above open dialogs (see lib/toastLayer) */}
-      <div ref={setToastLayer} popover="manual" className="toast-layer">
-        <ToastContainer theme={resolvedTheme} position="top-right" autoClose={4000} hideProgressBar />
-      </div>
+      {/*
+        Outside the app root, so toasts stay clickable while a dialog makes the app inert, and stacked
+        above dialogs by z-index alone (not the browser's top layer, which password managers need).
+      */}
+      {createPortal(
+        <ToastContainer theme={resolvedTheme} position="top-right" autoClose={4000} hideProgressBar />,
+        document.body,
+      )}
     </QueryClientProvider>
   )
 }

@@ -19,7 +19,7 @@
  * usage, plan limits, profile and billing details, with rename, enable / disable and delete.
  */
 
-import { ArrowLeft, Ban, CheckCircle2, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, Ban, CheckCircle2, Pencil, Send, Trash2 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Badge } from '@/components/atoms/Badge'
@@ -30,9 +30,16 @@ import { Meter } from '@/components/molecules/Meter'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SkeletonText } from '@/components/molecules/Skeleton'
 import { ROUTES } from '@/constants/routes'
+import { describeOrgProfile } from '@/features/account/orgProfile'
 import { useOrganization, useSetOrganizationActive } from '@/features/superAdmin/hooks/useOrganizations'
 import { formatBytes, formatDateTime, formatNumber } from '@/utils/format'
-import { DeleteOrganizationDialog, DetailsDialog, LimitsDialog, RenameOrganizationDialog } from './OrganizationDialogs'
+import {
+  DeleteOrganizationDialog,
+  DetailsDialog,
+  InviteAdminDialog,
+  LimitsDialog,
+  RenameOrganizationDialog,
+} from './OrganizationDialogs'
 
 const Card = ({ title, onEdit, children }: { title: string; onEdit?: () => void; children: ReactNode }) => (
   <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface-raised p-5">
@@ -54,15 +61,15 @@ const Card = ({ title, onEdit, children }: { title: string; onEdit?: () => void;
   </section>
 )
 
-/** Label / value pairs from a free-form details object. */
+/** Label / value pairs from a details object: the profile's fields in order, then anything else. */
 const DetailsList = ({ details, empty }: { details: Record<string, unknown>; empty: string }) => {
-  const entries = Object.entries(details)
+  const entries = describeOrgProfile(details)
   return entries.length ? (
     <dl className="flex flex-col gap-3">
-      {entries.map(([key, value]) => (
+      {entries.map(({ key, label, value }) => (
         <div key={key} className="flex flex-col gap-0.5">
-          <dt className="text-sm text-text-muted">{humanize(key)}</dt>
-          <dd className="text-sm break-words text-text">{show(value)}</dd>
+          <dt className="text-sm text-text-muted">{label}</dt>
+          <dd className="text-sm break-words whitespace-pre-line text-text">{value}</dd>
         </div>
       ))}
     </dl>
@@ -78,22 +85,10 @@ const Limit = ({ label, value }: { label: string; value: number }) => (
   </div>
 )
 
-/** "contact_email" → "Contact email". */
-const humanize = (key: string) => {
-  const words = key
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/[_-]+/g, ' ')
-    .trim()
-    .toLowerCase()
-  return words.charAt(0).toUpperCase() + words.slice(1)
-}
-
-const show = (value: unknown) => (typeof value === 'string' ? value || '—' : value === null ? '—' : JSON.stringify(value))
-
 export const OrganizationDetailPage = () => {
   const { organizationId = '' } = useParams()
   const { data: org, isLoading, error } = useOrganization(organizationId)
-  const [dialog, setDialog] = useState<'rename' | 'state' | 'limits' | 'profile' | 'billing' | 'delete' | null>(null)
+  const [dialog, setDialog] = useState<'rename' | 'invite' | 'state' | 'limits' | 'profile' | 'billing' | 'delete' | null>(null)
   const close = () => setDialog(null)
   const { mutateAsync: setActive } = useSetOrganizationActive()
   const navigate = useNavigate()
@@ -127,6 +122,9 @@ export const OrganizationDetailPage = () => {
         badge={<Badge tone={org.isActive ? 'signal' : 'neutral'}>{org.isActive ? 'Active' : 'Disabled'}</Badge>}
         actions={
           <>
+            <LoadingButton variant="secondary" size="sm" icon={<Send size={14} />} onClick={() => setDialog('invite')}>
+              Invite admin
+            </LoadingButton>
             <LoadingButton variant="secondary" size="sm" icon={<Pencil size={14} />} onClick={() => setDialog('rename')}>
               Rename
             </LoadingButton>
@@ -173,6 +171,7 @@ export const OrganizationDetailPage = () => {
       </div>
 
       <RenameOrganizationDialog org={dialog === 'rename' ? org : null} onClose={close} />
+      <InviteAdminDialog org={dialog === 'invite' ? org : null} onClose={close} />
       <LimitsDialog org={dialog === 'limits' ? org : null} onClose={close} />
       <DetailsDialog
         org={dialog === 'profile' || dialog === 'billing' ? org : null}

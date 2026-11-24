@@ -53,15 +53,20 @@ export const ROUTES = {
   admin: '/admin',
   adminOrganization: '/admin/organization',
   adminUsers: '/admin/users',
+  adminInvitations: '/admin/invitations',
   adminApiKeys: '/admin/api-keys',
   adminRoles: '/admin/roles',
+  adminAccessPolicies: '/admin/access-policies',
   tags: '/admin/tags',
   adminAuditLogs: '/admin/audit-logs',
   account: '/account',
+  /** Forced 2FA setup required by the user's access policy; outside the app shell. */
+  securitySetup: '/security-setup',
   login: '/login',
   twoFactor: '/login/verify-2fa',
   forgotPassword: '/login/forgot-password',
-  invite: '/invite/:token',
+  /** Accept an invitation; the emailed link is `/invite?code=<base64 JSON>`. */
+  invite: '/invite',
   /**
    * Super admin (all organizations), behind the API's admin key rather than a user's sign-in.
    * Deliberately not linked from anywhere in the app.
@@ -113,8 +118,10 @@ export const APP_SECTIONS: readonly AppSection[] = [
     children: [
       { path: ROUTES.adminOrganization, title: 'Organization' },
       { path: ROUTES.adminUsers, title: 'Users' },
+      { path: ROUTES.adminInvitations, title: 'Invitations' },
       { path: ROUTES.adminApiKeys, title: 'API keys' },
       { path: ROUTES.adminRoles, title: 'Roles' },
+      { path: ROUTES.adminAccessPolicies, title: 'Access policies' },
       { path: ROUTES.tags, title: 'Tags' },
       { path: ROUTES.adminAuditLogs, title: 'Audit logs' },
     ],

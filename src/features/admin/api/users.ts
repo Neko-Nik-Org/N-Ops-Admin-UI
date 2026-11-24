@@ -17,14 +17,14 @@
 /**
  * Users in the organization (`/user/admin/*`). Everything here needs `user:view`; creating also needs
  * `user:create` + `user:role:view`, and every change to an existing user needs `user:edit` (deleting
- * included: the API checks `user:edit`, not `user:delete`). There is no endpoint yet for editing a
- * user's name, email, role or sign-in restrictions (`users::update_user` is still commented out).
+ * included: the API checks `user:edit`, not `user:delete`). A user's sign-in rules come from the
+ * access policy they're given, not from fields on the user.
  */
 
 import { apiClient } from '@/lib/axios'
 import { ApiError, errorCode } from '@/types/api'
 import { toBase64 } from '@/utils/base64'
-import type { AdminUser, AdminUserInput } from '../types'
+import type { AdminUser, AdminUserInput, AdminUserProfileInput } from '../types'
 
 /** A user as `/user/admin/list` and `/user/admin/fetch/{id}` return it (`UserProfileListing`). */
 export interface RawAdminUser {
@@ -36,10 +36,7 @@ export interface RawAdminUser {
   is_email_verified: boolean
   is_active: boolean
   role_id: number
-  has_ip_restriction: boolean
-  has_geo_restriction: boolean
-  allowed_ips: string[] | null
-  allowed_geo_locations: string[] | null
+  access_restriction_policy_id: number | null
   has_totp_2fa: boolean
   has_email_2fa: boolean
   created_at: string
@@ -57,10 +54,7 @@ export const toAdminUser = (u: RawAdminUser): AdminUser => ({
   isEmailVerified: u.is_email_verified,
   hasTotp2fa: u.has_totp_2fa,
   hasEmail2fa: u.has_email_2fa,
-  hasIpRestriction: u.has_ip_restriction,
-  allowedIps: u.allowed_ips ?? [],
-  hasGeoRestriction: u.has_geo_restriction,
-  allowedGeoLocations: u.allowed_geo_locations ?? [],
+  accessPolicyId: u.access_restriction_policy_id ?? null,
   userDetails: u.user_details ?? {},
   createdAt: u.created_at,
   updatedAt: u.updated_at,
@@ -116,10 +110,7 @@ export const createUser = async (input: AdminUserInput): Promise<{ welcomeEmailS
       is_active: input.isActive,
       role_id: input.roleId,
       password: toBase64(input.password),
-      has_ip_restriction: input.hasIpRestriction,
-      has_geo_restriction: input.hasGeoRestriction,
-      allowed_ips: input.hasIpRestriction ? input.allowedIps : [],
-      allowed_geo_locations: input.hasGeoRestriction ? input.allowedGeoLocations : [],
+      access_restriction_policy_id: input.accessPolicyId,
     })
     return { welcomeEmailSent: true }
   } catch (error) {
@@ -132,9 +123,9 @@ export const createUser = async (input: AdminUserInput): Promise<{ welcomeEmailS
         (error as ApiError).status,
         code,
       )
-    // the role isn't in this organization (deleted since the list loaded)
-    if (error instanceof ApiError && error.message.startsWith('Failed to create user'))
-      throw new ApiError('That role no longer exists. Refresh and pick another one.', error.status, code)
+    // the role or policy isn't in this organization (deleted since the list loaded)
+    if (error instanceof ApiError && /^Failed to create user|does not belong to the organization/.test(error.message))
+      throw new ApiError('That role or access policy no longer exists. Refresh and pick another one.', error.status, code)
     throw error
   }
 }
@@ -168,4 +159,65 @@ export const deactivateUser = async (userId: number): Promise<void> => {
  */
 export const deleteUser = async (userId: number): Promise<void> => {
   await apiClient.delete(`/user/admin/delete/${userId}`)
+}
+
+/**
+ * `PUT /user/admin/update/{id}` — sets the user's display name and profile details (the whole
+ * object), and their email when `previousEmail` differs. A new email is marked unverified.
+ */
+export const updateUserProfile = async (userId: number, input: AdminUserProfileInput, previousEmail: string): Promise<void> => {
+  const email = input.primaryEmail.trim()
+  try {
+    await apiClient.put(`/user/admin/update/${userId}`, {
+      display_name: input.displayName.trim(),
+      primary_email: email && email !== previousEmail ? email : null,
+      user_details: input.userDetails,
+    })
+  } catch (error) {
+    // a taken email comes back as a bare database error
+    if (errorCode(error) === 'E112')
+      throw new ApiError('Someone else already uses that email. (E112)', (error as ApiError).status, 'E112')
+    throw error
+  }
+}
+
+/**
+ * `PUT /user/admin/role/{id}/assign/{roleId}` — gives the user another role. Needs `user:view` +
+ * `user:edit` + `user:role:view`, and can't be used on yourself. The API answers 204 even when the
+ * role isn't in the organization, so callers should check the user afterwards.
+ */
+export const assignUserRole = async (userId: number, roleId: number): Promise<void> => {
+  await apiClient.put(`/user/admin/role/${userId}/assign/${roleId}`)
+}
+
+/**
+ * `PUT /user/admin/ar-policy/{id}/assign?access_restriction_policy_id=` — gives the user an access
+ * policy (`null` for none). Needs `user:view` + `user:edit` + `policy:ar:view`, and can't be used on
+ * yourself. Like the role endpoint it answers 204 whether or not anything changed.
+ */
+export const assignUserAccessPolicy = async (userId: number, policyId: number | null): Promise<void> => {
+  await apiClient.put(`/user/admin/ar-policy/${userId}/assign`, null, {
+    params: policyId === null ? {} : { access_restriction_policy_id: policyId },
+  })
+}
+
+/**
+ * Changes the user's role and/or access policy (only what differs from `user`), then reads the user
+ * back: the API answers 204 even when it changed nothing, so that's the only way to know it worked.
+ */
+export const updateUserAccess = async (
+  user: AdminUser,
+  { roleId, accessPolicyId }: { roleId: number; accessPolicyId: number | null },
+): Promise<AdminUser> => {
+  if (roleId !== user.roleId) await assignUserRole(user.userId, roleId)
+  if (accessPolicyId !== user.accessPolicyId) await assignUserAccessPolicy(user.userId, accessPolicyId)
+  const saved = await getUser(user.userId)
+  if (saved.roleId !== roleId) throw new Error("The role didn't change. It may have been deleted. Refresh and try again.")
+  if (saved.accessPolicyId !== accessPolicyId)
+    throw new Error(
+      accessPolicyId === null
+        ? "The API didn't remove the access policy. Removing a policy from a user doesn't work on this server yet; pick another policy instead."
+        : "The access policy didn't change. It may have been deleted. Refresh and try again.",
+    )
+  return saved
 }

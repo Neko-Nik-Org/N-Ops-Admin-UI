@@ -17,7 +17,7 @@
 
 /** Dialog that verifies the signed-in user's primary email with an emailed one-time code. */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { toast } from 'react-toastify'
 import { OtpInput } from '@/components/molecules/OtpInput'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
@@ -58,12 +58,24 @@ export const EmailVerificationDialog = ({ open, email, onClose }: EmailVerificat
     description={`We'll email a ${EMAIL_CODE_LENGTH}-character code to ${email}.`}
   >
     {/* Dialog only renders children while open, so every opening starts from a fresh first step. */}
-    <VerificationSteps email={email} onClose={onClose} />
+    <EmailVerificationSteps email={email} onDone={() => setTimeout(onClose, 500)} onCancel={onClose} />
   </Dialog>
 )
 
 /** The dialog body: the send step, then the code step. */
-const VerificationSteps = ({ email, onClose }: Omit<EmailVerificationDialogProps, 'open'>) => {
+/** Props for EmailVerificationSteps. */
+interface EmailVerificationStepsProps {
+  email: string
+  /** Runs once the email is verified (and the session updated). */
+  onDone: () => void
+  /** Shows a Cancel button on the first step. */
+  onCancel?: () => void
+  /** Replaces the first step's explanation. */
+  intro?: ReactNode
+}
+
+/** Send a code, type it, done. Used by the dialog and by the forced security setup. */
+export const EmailVerificationSteps = ({ email, onDone, onCancel, intro }: EmailVerificationStepsProps) => {
   const { sync, signOut } = useSyncSelfSession()
   const [step, setStep] = useState<Step>('start')
   const [code, setCode] = useState('')
@@ -86,7 +98,7 @@ const VerificationSteps = ({ email, onClose }: Omit<EmailVerificationDialogProps
       return
     }
     toast.success(message(result))
-    setTimeout(onClose, 500)
+    onDone()
   }
 
   const [sendState, send] = useAsyncAction(sendEmailVerification, { successMs: 800 })
@@ -134,12 +146,14 @@ const VerificationSteps = ({ email, onClose }: Omit<EmailVerificationDialogProps
   return step === 'start' ? (
     <>
       <p className="text-sm text-text-muted">
-        A verified email lets N-Ops send you alerts and notifications. The code expires 5 minutes after it is sent.
+        {intro ?? 'A verified email lets N-Ops send you alerts and notifications.'} The code expires 5 minutes after it is sent.
       </p>
       <div className="flex justify-end gap-2">
-        <LoadingButton variant="ghost" onClick={onClose}>
-          Cancel
-        </LoadingButton>
+        {onCancel && (
+          <LoadingButton variant="ghost" onClick={onCancel}>
+            Cancel
+          </LoadingButton>
+        )}
         <LoadingButton state={sendState} loadingText="Sending" successText="Sent" onClick={onSend}>
           Send code
         </LoadingButton>

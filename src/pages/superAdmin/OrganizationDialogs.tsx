@@ -15,8 +15,8 @@
  * <https://www.gnu.org/licenses/>.
  */
 /**
- * Super-admin dialogs for organizations: create, rename, plan limits, profile / billing details and
- * delete. The API checks almost nothing itself (see features/superAdmin/api/organizations.ts), so
+ * Super-admin dialogs for organizations: create, rename, invite an admin, plan limits, profile /
+ * billing details and delete. The API checks almost nothing itself (see features/superAdmin/api/organizations.ts), so
  * every form validates before sending.
  */
 
@@ -37,6 +37,8 @@ import {
 import { toast } from 'react-toastify'
 import * as yup from 'yup'
 import { Input } from '@/components/atoms/Input'
+import { Select } from '@/components/atoms/Select'
+import { Textarea } from '@/components/atoms/Textarea'
 import { Switch } from '@/components/atoms/Switch'
 import { Dialog } from '@/components/molecules/Dialog'
 import { FormField } from '@/components/molecules/FormField'
@@ -45,12 +47,26 @@ import {
   useCheckOrganizationName,
   useCreateOrganization,
   useDeleteOrganization,
+  useInviteOrganizationAdmin,
   useRenameOrganization,
   useUpdateOrganizationDetails,
   useUpdateOrganizationLimits,
 } from '@/features/superAdmin/hooks/useOrganizations'
 import type { Organization, OrganizationLimits } from '@/features/superAdmin/types'
 import { useAsyncAction } from '@/hooks/useAsyncAction'
+import { COUNTRY_OPTIONS, isCountryCode } from '@/constants/countries'
+import {
+  COMPANY_SIZES,
+  emptyOrgProfile,
+  INDUSTRIES,
+  ORG_PROFILE_FIELDS,
+  ORG_PROFILE_GROUPS,
+  parseOrgProfile,
+  serializeOrgProfile,
+  type OrgProfileField,
+  type OrgProfileValues,
+} from '@/features/account/orgProfile'
+import { timeZones } from '@/features/account/profileDetails'
 import { formatBytes, formatNumber } from '@/utils/format'
 
 const GB = 1024 ** 3
@@ -320,6 +336,138 @@ const Buttons = ({
   </div>
 )
 
+// ── organization profile ─────────────────────────────────
+
+/** Validation for one profile field, from its kind. Every field is optional. */
+const profileFieldRule = (f: OrgProfileField) => {
+  const base = yup
+    .string()
+    .trim()
+    .default('')
+    .max(f.max, `At most ${formatNumber(f.max)} characters.`)
+  switch (f.kind) {
+    case 'email':
+      return base.email('Enter a valid email address.')
+    case 'url':
+      return base.matches(/^https?:\/\/[^\s.]+\.\S+$/, {
+        message: 'Enter a full address, like https://example.com.',
+        excludeEmptyString: true,
+      })
+    case 'tel':
+      return base.matches(/^\+?[\d\s().-]{5,}$/, { message: 'Use digits, spaces and + ( ) - only.', excludeEmptyString: true })
+    case 'country':
+      return base.test('country', 'Pick a country from the list.', (v) => !v || isCountryCode(v))
+    default:
+      return base
+  }
+}
+
+const profileShape = yup.object(
+  Object.fromEntries(ORG_PROFILE_FIELDS.map((f) => [f.key, profileFieldRule(f)])) as Record<
+    keyof OrgProfileValues,
+    ReturnType<typeof profileFieldRule>
+  >,
+)
+
+const KNOWN_PROFILE_KEYS = new Set<string>(ORG_PROFILE_FIELDS.map((f) => f.key))
+
+/** Extra label / value rows; a label can't reuse one of the fields above. */
+const extrasShape = rowsShape.test('not-known', 'Use the field above instead.', function notKnown(rows) {
+  for (const [i, r] of (rows ?? []).entries())
+    if (KNOWN_PROFILE_KEYS.has((r.label ?? '').trim()))
+      return this.createError({ path: `${this.path}[${i}].label`, message: 'That one has its own field above.' })
+  return true
+})
+
+/** The structured profile inputs, grouped. `prefix` is the form path of the profile object, e.g. "profile.". */
+const OrgProfileFields = ({
+  register,
+  errors,
+  prefix,
+  timezone,
+}: {
+  // the create and edit forms differ in shape; each passes its own register for the same field names
+  register: UseFormRegister<any> // eslint-disable-line @typescript-eslint/no-explicit-any
+  errors: FieldErrors<OrgProfileValues> | undefined
+  prefix: string
+  /** The saved time zone, kept in the list even if this browser doesn't know it. */
+  timezone?: string
+}) => {
+  const zones = [...new Set([...timeZones(), 'UTC', ...(timezone ? [timezone] : [])])].sort()
+  const input = (f: OrgProfileField) => {
+    const id = `orgp-${f.key}`
+    const props = { id, hasError: !!errors?.[f.key], ...register(`${prefix}${f.key}`) }
+    switch (f.kind) {
+      case 'textarea':
+        return <Textarea rows={f.key === 'description' ? 3 : 2} maxLength={f.max} placeholder={f.placeholder} {...props} />
+      case 'industry':
+      case 'size':
+        return (
+          <Select {...props}>
+            <option value="">Not set</option>
+            {(f.kind === 'industry' ? INDUSTRIES : COMPANY_SIZES).map((o) => (
+              <option key={o} value={o}>
+                {f.kind === 'size' ? `${o} people` : o}
+              </option>
+            ))}
+          </Select>
+        )
+      case 'country':
+        return (
+          <Select {...props}>
+            <option value="">Not set</option>
+            {COUNTRY_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        )
+      case 'timezone':
+        return (
+          <Select {...props}>
+            <option value="">Not set</option>
+            {zones.map((z) => (
+              <option key={z} value={z}>
+                {z.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </Select>
+        )
+      default:
+        return (
+          <Input
+            type={f.kind === 'url' ? 'url' : f.kind}
+            inputMode={f.kind === 'url' ? 'url' : f.kind === 'email' ? 'email' : f.kind === 'tel' ? 'tel' : undefined}
+            autoComplete="off"
+            maxLength={f.max}
+            placeholder={f.placeholder}
+            {...props}
+          />
+        )
+    }
+  }
+  return (
+    <>
+      {ORG_PROFILE_GROUPS.map((group) => (
+        <fieldset key={group} className="flex flex-col gap-3">
+          <legend className="mb-1 text-xs font-medium tracking-wide text-text-muted uppercase">{group}</legend>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {ORG_PROFILE_FIELDS.filter((f) => f.group === group).map((f) => (
+              <div key={f.key} className={f.kind === 'textarea' ? 'sm:col-span-2' : undefined}>
+                <FormField id={`orgp-${f.key}`} label={f.label} error={errors?.[f.key]?.message}>
+                  {input(f)}
+                  {f.hint && !errors?.[f.key] && <p className="text-xs text-text-muted">{f.hint}</p>}
+                </FormField>
+              </div>
+            ))}
+          </div>
+        </fieldset>
+      ))}
+    </>
+  )
+}
+
 const nameField = () => yup.string().trim().required('Enter a name.').max(NAME_MAX, `At most ${NAME_MAX} characters.`)
 
 /** Fails a form's name field when the API says the name is taken (the check is exact, as is the database). */
@@ -340,7 +488,7 @@ const createSchema = yup.object({
   organizationName: nameField(),
   isActive: yup.boolean().default(true),
   limits: yup.object(limitsShape),
-  profile: rowsShape,
+  profile: profileShape,
   billing: rowsShape,
 })
 type CreateValues = yup.InferType<typeof createSchema>
@@ -361,10 +509,7 @@ const CreateForm = ({ onClose, onCreated }: { onClose: () => void; onCreated?: (
       organizationName: '',
       isActive: true,
       limits: toLimitsValues(DEFAULT_LIMITS),
-      profile: [
-        { label: 'website', value: '' },
-        { label: 'contact_email', value: '' },
-      ],
+      profile: emptyOrgProfile(),
       billing: [],
     },
   })
@@ -378,10 +523,7 @@ const CreateForm = ({ onClose, onCreated }: { onClose: () => void; onCreated?: (
       await save({
         organizationName: v.organizationName,
         isActive: v.isActive,
-        organizationInfo: joinDetails(
-          v.profile.filter((r) => r.value.trim()),
-          {},
-        ),
+        organizationInfo: serializeOrgProfile(v.profile),
         billingInfo: joinDetails(v.billing, {}),
         ...fromLimitsValues(v.limits),
       })
@@ -409,13 +551,8 @@ const CreateForm = ({ onClose, onCreated }: { onClose: () => void; onCreated?: (
         <LimitInputs register={register} errors={errors.limits ?? {}} prefix="limits." />
       </Section>
       <Section title="Profile">
-        <DetailRows
-          control={control}
-          register={register}
-          errors={errors.profile}
-          name="profile"
-          placeholder="Shown to the organization's admins (website, contact email, address…)."
-        />
+        <p className="-mt-1 text-xs text-text-muted">Optional. Shown to the organization's own admins.</p>
+        <OrgProfileFields register={register} errors={errors.profile} prefix="profile." />
       </Section>
       <Section title="Billing">
         <DetailRows
@@ -495,6 +632,65 @@ export const RenameOrganizationDialog = ({ org, onClose }: { org: Organization |
   </Dialog>
 )
 
+// ── invite an admin ──────────────────────────────────────
+
+const InviteAdminForm = ({ org, onClose }: { org: Organization; onClose: () => void }) => {
+  const { mutateAsync: invite } = useInviteOrganizationAdmin()
+  const [state, send] = useAsyncAction(invite, { successMs: 500 })
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<{ email: string }>({
+    resolver: yupResolver(
+      yup.object({
+        email: yup
+          .string()
+          .trim()
+          .required('Enter their email.')
+          .email('Enter a valid email address.')
+          .max(254, 'Keep it to 254 characters or fewer.'),
+      }),
+    ),
+    defaultValues: { email: '' },
+  })
+
+  const onSubmit = ({ email }: { email: string }) =>
+    send({ organizationId: org.organizationId, email })
+      .then(() => {
+        toast.success(`Invitation sent to ${email.toLowerCase()}.`)
+        setTimeout(onClose, 500)
+      })
+      .catch((error: Error) => toast.error(error.message))
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
+      <FormField id="orgAdminEmail" label="Email" error={errors.email?.message}>
+        <Input
+          id="orgAdminEmail"
+          type="email"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          placeholder="admin@company.com"
+          hasError={!!errors.email}
+          {...register('email')}
+        />
+      </FormField>
+      <p className="-mt-2 text-xs text-text-muted">
+        They get every permission, through a role named “Super Admin - Initial Automated Invite”. The link works for 7 days.
+      </p>
+      <Buttons onClose={onClose} state={state} label="Send invitation" />
+    </form>
+  )
+}
+
+export const InviteAdminDialog = ({ org, onClose }: { org: Organization | null; onClose: () => void }) => (
+  <Dialog open={!!org} onClose={onClose} title={org ? `Invite an admin to ${org.organizationName}` : ''}>
+    {org && <InviteAdminForm org={org} onClose={onClose} />}
+  </Dialog>
+)
+
 // ── plan limits ──────────────────────────────────────────
 
 const LimitsForm = ({ org, onClose }: { org: Organization; onClose: () => void }) => {
@@ -553,6 +749,58 @@ export const LimitsDialog = ({ org, onClose }: { org: Organization | null; onClo
 
 // ── profile / billing details ────────────────────────────
 
+const profileFormSchema = yup.object({ profile: profileShape, extras: extrasShape })
+type ProfileFormValues = yup.InferType<typeof profileFormSchema>
+
+/** The structured profile, plus any other text fields already saved (editable) and other values (kept). */
+const ProfileForm = ({ org, onClose }: { org: Organization; onClose: () => void }) => {
+  const { values, extras, kept } = parseOrgProfile(org.organizationInfo)
+  const { mutateAsync: update } = useUpdateOrganizationDetails()
+  const [state, save] = useAsyncAction(update, { successMs: 500 })
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ProfileFormValues>({
+    resolver: yupResolver(profileFormSchema),
+    defaultValues: { profile: values, extras },
+  })
+
+  const onSubmit = (v: ProfileFormValues) =>
+    save({ organizationId: org.organizationId, which: 'profile', details: serializeOrgProfile(v.profile, v.extras, kept) })
+      .then(() => {
+        toast.success(`Saved the profile for ${org.organizationName}.`)
+        setTimeout(onClose, 500)
+      })
+      .catch((error: Error) => toast.error(error.message))
+
+  const keptCount = Object.keys(kept).length
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5" noValidate>
+      <OrgProfileFields register={register} errors={errors.profile} prefix="profile." timezone={values.timezone} />
+      <fieldset className="flex flex-col gap-2 border-t border-border pt-4">
+        <legend className="contents">
+          <span className="text-xs font-medium tracking-wide text-text-muted uppercase">Other fields</span>
+        </legend>
+        <DetailRows
+          control={control}
+          register={register}
+          errors={errors.extras}
+          name="extras"
+          placeholder="Anything else worth showing, as a label and value."
+        />
+      </fieldset>
+      {keptCount > 0 && (
+        <p className="text-xs text-text-muted">
+          {keptCount === 1 ? '1 other saved value is' : `${keptCount} other saved values are`} kept as they are.
+        </p>
+      )}
+      <Buttons onClose={onClose} state={state} label="Save profile" />
+    </form>
+  )
+}
+
 const DetailsForm = ({ org, which, onClose }: { org: Organization; which: 'profile' | 'billing'; onClose: () => void }) => {
   const { rows, kept } = splitDetails(which === 'profile' ? org.organizationInfo : org.billingInfo)
   const { mutateAsync: update } = useUpdateOrganizationDetails()
@@ -605,10 +853,17 @@ export const DetailsDialog = ({
     open={!!org}
     onClose={onClose}
     size="lg"
-    title={org ? `${which === 'profile' ? 'Profile' : 'Billing'} details for ${org.organizationName}` : ''}
-    description={which === 'profile' ? "Shown to the organization's own admins." : 'Only super admins see these.'}
+    title={org ? `${which === 'profile' ? 'Profile' : 'Billing details'} for ${org.organizationName}` : ''}
+    description={
+      which === 'profile' ? "Shown to the organization's own admins. Every field is optional." : 'Only super admins see these.'
+    }
   >
-    {org && <DetailsForm key={which} org={org} which={which} onClose={onClose} />}
+    {org &&
+      (which === 'profile' ? (
+        <ProfileForm org={org} onClose={onClose} />
+      ) : (
+        <DetailsForm key={which} org={org} which={which} onClose={onClose} />
+      ))}
   </Dialog>
 )
 

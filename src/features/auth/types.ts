@@ -21,6 +21,8 @@
  * Snake_case interfaces mirror the Main API's JSON; camelCase ones are the app's own shapes.
  */
 
+import type { SecurityRequirements } from './securitySetup'
+
 export interface LoginCredentials {
   userName: string
   password: string
@@ -67,14 +69,18 @@ export interface RawSessionProfile {
 export interface LoginSuccessResponse {
   message: string
   is_2fa_required: false
+  /** Whether the user's access policy requires a second factor. */
+  is_2fa_enforced?: boolean
   session_id: string
-  data: RawSessionProfile
+  data: RawSessionProfile & { enforce_email_2fa?: boolean; enforce_totp_2fa?: boolean }
 }
 
 /** Login response when a second factor is required: includes a temporary token for the 2FA step. */
 export interface LoginTwoFactorResponse {
   message: string
   is_2fa_required: true
+  /** Whether the user's access policy requires a second factor. */
+  is_2fa_enforced?: boolean
   temporary_auth_token: string
   data: {
     display_name: string
@@ -83,6 +89,9 @@ export interface LoginTwoFactorResponse {
     is_email_verified: boolean
     has_email_2fa: boolean
     has_totp_2fa: boolean
+    /** Set by the user's access policy. */
+    enforce_email_2fa?: boolean
+    enforce_totp_2fa?: boolean
     last_login_at: string
   }
 }
@@ -101,6 +110,8 @@ export interface TwoFactorContext {
   hasTotp: boolean
   hasEmail: boolean
   rememberMe: boolean
+  /** Second factors the user's access policy requires, and which they have; null when none are required. */
+  requirements: SecurityRequirements | null
 }
 
 /** Supported second factors: authenticator app code or emailed code. */

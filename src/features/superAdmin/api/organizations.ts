@@ -231,6 +231,29 @@ export const updateOrganizationDetails = (
   })
 
 /**
+ * `POST /super-admin/organization/invite/{id}/admin` (201) — emails `email` an invitation to join the
+ * organization with full permissions, valid 7 days. The API makes a "Super Admin - Initial Automated
+ * Invite" role for it the first time. It doesn't check for an existing account or invitation first,
+ * so a used email only comes back as a database error.
+ */
+export const inviteOrganizationAdmin = (adminKey: string, organizationId: string, email: string): Promise<void> =>
+  withKey(async () => {
+    await superAdminClient
+      .post(`/super-admin/organization/invite/${path(organizationId)}/admin`, JSON.stringify(email.trim().toLowerCase()), {
+        headers: { ...headers(adminKey), 'Content-Type': 'application/json' },
+      })
+      .catch((error: unknown) => {
+        if (errorCode(error) === 'E112')
+          throw new ApiError(
+            'That email already has an N-Ops account or a pending invitation. (E112)',
+            errorStatus(error),
+            'E112',
+          )
+        throw error
+      })
+  })
+
+/**
  * `DELETE /super-admin/organization/delete/{id}` — permanently deletes the organization and, through
  * the database's cascades, its users, roles, tags, API keys and vault data. 226 (already gone) counts as done.
  */

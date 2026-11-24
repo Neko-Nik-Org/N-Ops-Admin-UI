@@ -16,11 +16,12 @@
  */
 /** Super admin › Organizations (/super-admin): every organization with its plan and usage. */
 
-import { Plus } from 'lucide-react'
+import { Pencil, Plus, Send, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Badge } from '@/components/atoms/Badge'
 import { Select } from '@/components/atoms/Select'
+import { DropdownMenu, menuItemClass } from '@/components/molecules/DropdownMenu'
 import { LoadingButton } from '@/components/molecules/LoadingButton'
 import { PageHeader } from '@/components/molecules/PageHeader'
 import { SearchInput } from '@/components/molecules/SearchInput'
@@ -28,7 +29,25 @@ import { TableSkeleton } from '@/components/molecules/Skeleton'
 import { superAdminOrganizationPath } from '@/constants/routes'
 import { useOrganizations } from '@/features/superAdmin/hooks/useOrganizations'
 import { formatBytes, formatDate, formatNumber } from '@/utils/format'
-import { NewOrganizationDialog } from './OrganizationDialogs'
+import type { Organization } from '@/features/superAdmin/types'
+import {
+  DeleteOrganizationDialog,
+  DetailsDialog,
+  InviteAdminDialog,
+  LimitsDialog,
+  NewOrganizationDialog,
+  RenameOrganizationDialog,
+} from './OrganizationDialogs'
+
+type RowAction = 'invite' | 'rename' | 'limits' | 'profile' | 'billing' | 'delete'
+
+/** The Edit menu's items, each opening the same dialog as on the organization's own page. */
+const EDIT_ITEMS: Array<[RowAction, string]> = [
+  ['rename', 'Rename'],
+  ['limits', 'Plan limits'],
+  ['profile', 'Profile'],
+  ['billing', 'Billing details'],
+]
 
 /** "used / total" with a thin bar; warning color past 85 %. */
 const Usage = ({ used, total, format = formatNumber }: { used: number; total: number; format?: (n: number) => string }) => {
@@ -54,6 +73,9 @@ export const OrganizationsPage = () => {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [creating, setCreating] = useState(false)
+  const [action, setAction] = useState<{ kind: RowAction; org: Organization } | null>(null)
+  const close = () => setAction(null)
+  const orgFor = (kind: RowAction) => (action?.kind === kind ? action.org : null)
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -108,6 +130,9 @@ export const OrganizationsPage = () => {
                     <th className="pb-2 font-medium">Storage</th>
                     <th className="pb-2 font-medium">AI credit</th>
                     <th className="pb-2 font-medium">Created</th>
+                    <th className="pb-2 font-medium">
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -138,6 +163,46 @@ export const OrganizationsPage = () => {
                           <Usage used={o.aiCredit.used} total={o.aiCredit.allocated} />
                         </td>
                         <td className="py-3 text-sm text-text-muted">{formatDate(o.createdAt)}</td>
+                        {/* the buttons act on their own; a click or Enter there doesn't open the organization */}
+                        <td className="py-3 pr-2" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            <LoadingButton
+                              variant="ghost"
+                              size="sm"
+                              icon={<Send size={14} />}
+                              aria-label={`Invite an admin to ${o.organizationName}`}
+                              title="Invite admin"
+                              onClick={() => setAction({ kind: 'invite', org: o })}
+                            />
+                            <DropdownMenu
+                              label={`Edit ${o.organizationName}`}
+                              menuLabel="Edit"
+                              trigger={<Pencil size={14} aria-hidden="true" />}
+                              triggerClassName="border-transparent bg-transparent"
+                              floating
+                            >
+                              {EDIT_ITEMS.map(([kind, label]) => (
+                                <button
+                                  key={kind}
+                                  type="button"
+                                  role="menuitem"
+                                  className={menuItemClass}
+                                  onClick={() => setAction({ kind, org: o })}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </DropdownMenu>
+                            <LoadingButton
+                              variant="ghost"
+                              size="sm"
+                              icon={<Trash2 size={14} />}
+                              aria-label={`Delete ${o.organizationName}`}
+                              title="Delete"
+                              onClick={() => setAction({ kind: 'delete', org: o })}
+                            />
+                          </div>
+                        </td>
                       </tr>
                     )
                   })}
@@ -147,6 +212,16 @@ export const OrganizationsPage = () => {
           )}
         </section>
       )}
+
+      <InviteAdminDialog org={orgFor('invite')} onClose={close} />
+      <RenameOrganizationDialog org={orgFor('rename')} onClose={close} />
+      <LimitsDialog org={orgFor('limits')} onClose={close} />
+      <DetailsDialog
+        org={orgFor('profile') ?? orgFor('billing')}
+        which={action?.kind === 'billing' ? 'billing' : 'profile'}
+        onClose={close}
+      />
+      <DeleteOrganizationDialog org={orgFor('delete')} onClose={close} onDeleted={close} />
     </>
   )
 }

@@ -27,7 +27,7 @@ import { AdminAuditLogsPage } from '@/pages/admin/AdminAuditLogsPage'
 import { AdminOrganizationPage } from '@/pages/admin/AdminOrganizationPage'
 import { AdminRolesPage } from '@/pages/admin/AdminRolesPage'
 import { AdminUsersPage } from '@/pages/admin/AdminUsersPage'
-import { api, makeUser, RAW_ORG_INFO, rawRole, renderWithProviders, serveLiveReads } from '../../testUtils'
+import { api, makeUser, RAW_ORG_INFO, RAW_USERS, rawRole, renderWithProviders, serveLiveReads } from '../../testUtils'
 
 const render = (ui: React.ReactElement, route: string) =>
   renderWithProviders(ui, { route, user: makeUser({ permissions: ['tag:create', 'user:role:view'] }) })
@@ -64,7 +64,7 @@ describe('AdminOrganizationPage', () => {
 })
 
 describe('AdminUsersPage', () => {
-  const renderUsers = (permissions = ['user:view', 'user:role:view']) =>
+  const renderUsers = (permissions = ['user:view', 'user:role:view', 'policy:ar:view']) =>
     renderWithProviders(<AdminUsersPage />, { route: '/admin/users', user: makeUser({ permissions }) })
 
   it('lists the real users and filters them by search, role and status', async () => {
@@ -87,12 +87,13 @@ describe('AdminUsersPage', () => {
   it("shows a user's details in a dialog, fetched by id", async () => {
     renderUsers()
     const sara = (await screen.findByText('Sara Lindqvist')).closest('tr') as HTMLElement
-    expect(within(sara).getByText('Location limited')).toBeInTheDocument()
+    expect(within(sara).getByText('Nordics')).toBeInTheDocument()
     fireEvent.click(sara)
     const pane = screen.getByRole('dialog', { name: 'User details' })
     expect(await within(pane).findByText('sara@acme.dev')).toBeInTheDocument()
     expect(api.get).toHaveBeenCalledWith('/user/admin/fetch/10')
-    expect(within(pane).getByText('SE')).toBeInTheDocument()
+    expect(within(pane).getByText('Sweden (SE)')).toBeInTheDocument()
+    expect(within(pane).getAllByText('Email code')).toHaveLength(2) // the policy requires it; her own 2FA row
     expect(within(pane).getByText('Platform')).toBeInTheDocument() // from user_details
     fireEvent.click(within(pane).getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('dialog', { name: 'User details' })).not.toBeInTheDocument()
@@ -238,6 +239,55 @@ describe('AdminUsersPage', () => {
     expect(api.put).toHaveBeenCalledWith('/user/admin/reset/password/7', JSON.stringify(btoa('New#Pass12')), expect.anything())
   })
 
+  it("edits a user's name and email, keeping their profile details", async () => {
+    api.put.mockResolvedValue({ data: undefined })
+    renderUsers(EDITOR)
+    const details = await openUser('Sara Lindqvist')
+    fireEvent.click(await details.findByRole('button', { name: 'Edit name and email' }))
+    const form = within(await screen.findByRole('dialog', { name: 'Edit Sara Lindqvist' }))
+    fireEvent.change(form.getByLabelText('Name'), { target: { value: 'Sara L' } })
+    fireEvent.click(form.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText('Saved Sara L.')).toBeInTheDocument()
+    expect(api.put).toHaveBeenCalledWith('/user/admin/update/10', {
+      display_name: 'Sara L',
+      primary_email: null,
+      user_details: { team: 'Platform', on_call: true },
+    })
+  })
+
+  it("changes a user's role and access policy, and checks the API applied it", async () => {
+    const users = RAW_USERS.map((u) => ({ ...u }))
+    serveLiveReads({ users })
+    api.put.mockImplementation(async (url: string, _body?: unknown, config?: unknown) => {
+      const marcus = users.find((u) => u.user_id === 3)!
+      if (url === '/user/admin/role/3/assign/4') marcus.role_id = 4
+      if (url === '/user/admin/ar-policy/3/assign')
+        marcus.access_restriction_policy_id =
+          (config as { params: { access_restriction_policy_id?: number } }).params.access_restriction_policy_id ?? null
+      return { data: undefined }
+    })
+    renderUsers([...EDITOR, 'policy:ar:view'])
+    const details = await openUser('Marcus Chen')
+    expect(await details.findByText('Office only')).toBeInTheDocument()
+    fireEvent.click(details.getByRole('button', { name: 'Change role or policy' }))
+    const form = within(await screen.findByRole('dialog', { name: "Change Marcus Chen's access" }))
+    await waitFor(() => expect(form.getByLabelText('Access policy')).toHaveValue('1'))
+    fireEvent.change(form.getByLabelText('Role'), { target: { value: '4' } })
+    fireEvent.change(form.getByLabelText('Access policy'), { target: { value: '2' } })
+    fireEvent.click(form.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText("Updated Marcus Chen's access.")).toBeInTheDocument()
+    expect(api.put).toHaveBeenCalledWith('/user/admin/role/3/assign/4')
+    expect(api.put).toHaveBeenCalledWith('/user/admin/ar-policy/3/assign', null, { params: { access_restriction_policy_id: 2 } })
+    expect(await details.findByText('Nordics')).toBeInTheDocument()
+  })
+
+  it("doesn't offer to change your own role or policy", async () => {
+    renderUsers([...EDITOR, 'policy:ar:view'])
+    const details = await openUser('Neko Nik')
+    expect(await details.findByRole('button', { name: 'Change role or policy' })).toBeDisabled()
+    expect(details.getByRole('button', { name: 'Edit name and email' })).toBeDisabled()
+  })
+
   it('shows no actions without user:edit', async () => {
     renderUsers()
     const details = await openUser('Marcus Chen')
@@ -305,7 +355,7 @@ describe('AdminRolesPage', () => {
   it('lists live roles with their permissions, tags and approval flags', async () => {
     renderRoles()
     const row = (await screen.findByText('Operator')).closest('tr') as HTMLElement
-    expect(within(row).getByText('2 of 36')).toBeInTheDocument()
+    expect(within(row).getByText('2 of 43')).toBeInTheDocument()
     expect(within(row).getByText('production')).toBeInTheDocument()
     expect(within(row).getByText('Approver')).toBeInTheDocument()
     expect(screen.queryByText('Mock data')).not.toBeInTheDocument()

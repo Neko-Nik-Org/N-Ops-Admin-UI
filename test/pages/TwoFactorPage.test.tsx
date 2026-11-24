@@ -30,6 +30,7 @@ const context: TwoFactorContext = {
   hasTotp: true,
   hasEmail: true,
   rememberMe: false,
+  requirements: null,
 }
 
 const renderTwoFactor = (state: TwoFactorContext | null = context) =>

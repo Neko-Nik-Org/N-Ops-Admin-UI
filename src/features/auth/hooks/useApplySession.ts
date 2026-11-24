@@ -19,6 +19,8 @@
 
 import { useSetAtom } from 'jotai'
 import { returnToLastPageAtom } from '@/features/account/hooks/useUiInfoSync'
+import { readSecurityRequirements, type SecurityRequirements } from '../securitySetup'
+import { securityRequirementsAtom } from '../store/securityRequirements'
 import { currentUserAtom, sessionStatusAtom } from '../store/session'
 import { setSessionToken } from '../store/sessionToken'
 import { toCurrentUser, type LoginSuccessResponse } from '../types'
@@ -28,10 +30,16 @@ export const useApplySession = () => {
   const setCurrentUser = useSetAtom(currentUserAtom)
   const setSessionStatus = useSetAtom(sessionStatusAtom)
   const setReturnToLastPage = useSetAtom(returnToLastPageAtom)
+  const setRequirements = useSetAtom(securityRequirementsAtom)
 
-  return (response: LoginSuccessResponse, rememberMe: boolean) => {
+  /**
+   * `requirements` overrides what the response says about the access policy: after a 2FA challenge
+   * the challenge response knew which factors the user already has, the final one may not.
+   */
+  return (response: LoginSuccessResponse, rememberMe: boolean, requirements?: SecurityRequirements | null) => {
     setSessionToken(response.session_id, rememberMe)
     setCurrentUser(toCurrentUser(response.data))
+    setRequirements(requirements !== undefined ? requirements : readSecurityRequirements({ ...response.data }))
     setReturnToLastPage(true) // back to the page they were last on, once their preferences load
     setSessionStatus('authenticated')
   }

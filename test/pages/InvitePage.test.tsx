@@ -18,75 +18,71 @@
 
 import { fireEvent, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { getSessionToken } from '@/features/auth/store/sessionToken'
 import { InvitePage } from '@/pages/InvitePage'
+import { ApiError } from '@/types/api'
 import { api, renderWithProviders } from '../testUtils'
 
-const details = {
-  inviterName: 'arjun',
-  organizationName: 'Acme',
-  role: 'Operator',
-  tags: ['production', 'staging'],
-  email: 'new@acme.dev',
-}
+const CODE = btoa(JSON.stringify({ email: 'new@acme.dev', invitation_code: 'abc123', invited_by: 'Arjun', org_name: 'Acme' }))
 
-const renderInvite = () => renderWithProviders(<InvitePage />, { route: '/invite/abc123', path: '/invite/:token' })
-
-describe('InvitePage', () => {
-  it('shows the invite: who, where, role, tags and email', async () => {
-    api.get.mockResolvedValue({ data: details })
-    renderInvite()
-
-    expect(await screen.findByRole('heading', { name: 'Join Acme' })).toBeInTheDocument()
-    expect(api.get).toHaveBeenCalledWith('/invite/abc123')
-    expect(screen.getByText('Operator')).toBeInTheDocument()
-    expect(screen.getByText('production')).toBeInTheDocument()
-    expect(screen.getByText('staging')).toBeInTheDocument()
-    expect(screen.getByText('new@acme.dev')).toBeInTheDocument()
+const renderInvite = (code: string | null = CODE) =>
+  renderWithProviders(<InvitePage />, {
+    route: code === null ? '/invite' : `/invite?code=${code}`,
+    path: '/invite',
   })
 
-  it('explains when the invite cannot be loaded', async () => {
-    api.get.mockRejectedValue(new Error('Not Found'))
+const fill = () => {
+  fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'New Person' } })
+  fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'newperson' } })
+  fireEvent.change(screen.getByLabelText('Create a password'), { target: { value: 'Start#Pass1' } })
+  fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'Start#Pass1' } })
+}
+
+describe('InvitePage', () => {
+  it('shows who invited you, where, and your email, from the link alone', async () => {
     renderInvite()
-    expect(await screen.findByRole('heading', { name: "This invite isn't available" })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Join Acme' })).toBeInTheDocument()
+    expect(screen.getByText('Arjun')).toBeInTheDocument()
+    const email = screen.getByLabelText('Email')
+    expect(email).toHaveValue('new@acme.dev')
+    expect(email).toBeDisabled()
+    expect(api.get).not.toHaveBeenCalledWith(expect.stringContaining('/invite'), expect.anything())
+  })
+
+  it('explains a missing or broken code', async () => {
+    renderInvite(null)
+    expect(await screen.findByRole('heading', { name: "This invite link isn't valid" })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to sign in' })).toHaveAttribute('href', '/login')
   })
 
   it('validates the form', async () => {
-    api.get.mockResolvedValue({ data: details })
     renderInvite()
     fireEvent.click(await screen.findByRole('button', { name: 'Create account' }))
-    expect(await screen.findByText('Enter your full name.')).toBeInTheDocument()
+    expect(await screen.findByText('Enter your name.')).toBeInTheDocument()
+    expect(screen.getByText('Choose a username.')).toBeInTheDocument()
     expect(screen.getByText('Create a password.')).toBeInTheDocument()
     expect(api.post).not.toHaveBeenCalled()
   })
 
-  it('creates the account, signs in and goes to the dashboard', async () => {
-    api.get.mockResolvedValue({ data: details })
-    api.post.mockResolvedValue({
-      data: { is_2fa_required: false, session_id: 'new-session', data: { permissions: [], tags: [] } },
-    })
+  it('creates the account, then sends you to sign in', async () => {
+    api.post.mockResolvedValue({ data: '' })
     renderInvite()
-
-    fireEvent.change(await screen.findByLabelText('Full name'), { target: { value: 'New Person' } })
-    fireEvent.change(screen.getByLabelText('Create a password'), { target: { value: 'a long passphrase' } })
+    await screen.findByRole('heading', { name: 'Join Acme' })
+    fill()
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
 
-    expect(await screen.findByTestId('location', {}, { timeout: 2000 })).toHaveTextContent(/^\/$/)
-    expect(api.post).toHaveBeenCalledWith('/invite/abc123/accept', { full_name: 'New Person', password: 'a long passphrase' })
-    expect(getSessionToken()).toBe('new-session')
+    expect(await screen.findByTestId('location', {}, { timeout: 2000 })).toHaveTextContent(/^\/login$/)
+    expect(api.post).toHaveBeenCalledWith(
+      '/invite/join/abc123',
+      expect.objectContaining({ user_name: 'newperson', display_name: 'New Person', primary_email: 'new@acme.dev' }),
+    )
   })
 
-  it('explains when accepting is not supported yet', async () => {
-    api.get.mockResolvedValue({ data: details })
-    api.post.mockRejectedValue(new Error('Not Found'))
+  it('shows why the API refused', async () => {
+    api.post.mockRejectedValue(new ApiError('Invalid or expired invitation code.', 400))
     renderInvite()
-
-    fireEvent.change(await screen.findByLabelText('Full name'), { target: { value: 'New Person' } })
-    fireEvent.change(screen.getByLabelText('Create a password'), { target: { value: 'a long passphrase' } })
+    await screen.findByRole('heading', { name: 'Join Acme' })
+    fill()
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
-
-    expect(await screen.findByText(/Accepting invites isn't available on the server yet/)).toBeInTheDocument()
-    expect(getSessionToken()).toBeUndefined()
+    expect(await screen.findByText(/This invitation has expired or was already used/)).toBeInTheDocument()
   })
 })

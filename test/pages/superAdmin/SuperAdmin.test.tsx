@@ -17,7 +17,7 @@
 /** Tests for the super-admin pages (/super-admin): the key prompt, the organization list and one organization. */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { AxiosRequestConfig } from 'axios'
 import { createStore, Provider } from 'jotai'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -192,7 +192,8 @@ describe('Super admin: managing organizations', () => {
 
     fireEvent.change(form.getByLabelText('Users'), { target: { value: '40' } })
     fireEvent.change(form.getByLabelText('Storage (GB)'), { target: { value: '2.5' } })
-    fireEvent.change(form.getByLabelText('profile value 1'), { target: { value: 'https://initech.example' } })
+    fireEvent.change(form.getByLabelText('Website'), { target: { value: 'https://initech.example' } })
+    fireEvent.change(form.getByLabelText('Country'), { target: { value: 'IN' } })
     fireEvent.click(within(form.getByRole('group', { name: 'Billing' })).getByRole('button', { name: 'Add field' }))
     fireEvent.change(form.getByLabelText('billing label 1'), { target: { value: 'gst' } })
     fireEvent.change(form.getByLabelText('billing value 1'), { target: { value: '29ABCDE1234F1Z5' } })
@@ -203,7 +204,7 @@ describe('Super admin: managing organizations', () => {
       '/super-admin/organization/create',
       {
         organization_name: 'Initech',
-        organization_info: { website: 'https://initech.example' }, // the empty contact_email row is left out
+        organization_info: { website: 'https://initech.example', country: 'IN' }, // empty fields are left out
         billing_info: { gst: '29ABCDE1234F1Z5' },
         is_active: true,
         allocated_ai_credit: 1000,
@@ -219,6 +220,39 @@ describe('Super admin: managing organizations', () => {
     )
   })
 
+  it('acts on an organization from its row without opening it', async () => {
+    client.post.mockResolvedValue({ data: '' })
+    client.delete.mockResolvedValue({ data: '' })
+    openWithKey('/super-admin')
+    const row = (await screen.findByText('Globex')).closest('tr') as HTMLElement
+
+    // Edit: a menu of the organization page's edit dialogs
+    fireEvent.click(within(row).getByRole('button', { name: 'Edit Globex' }))
+    expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual([
+      'Rename',
+      'Plan limits',
+      'Profile',
+      'Billing details',
+    ])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Plan limits' }))
+    expect(screen.getByRole('dialog', { name: /Globex/ })).toBeInTheDocument()
+    fireEvent.click(within(screen.getByRole('dialog', { name: /Globex/ })).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByTestId('location')).not.toBeInTheDocument() // still on the list
+
+    fireEvent.click(within(row).getByRole('button', { name: 'Invite an admin to Globex' }))
+    const invite = dialog('Invite an admin to Globex')
+    fireEvent.change(invite.getByLabelText('Email'), { target: { value: 'boss@globex.dev' } })
+    fireEvent.click(invite.getByRole('button', { name: 'Send invitation' }))
+    expect(await screen.findByText('Invitation sent to boss@globex.dev.')).toBeInTheDocument()
+    expect(client.post).toHaveBeenCalledWith('/super-admin/organization/invite/b-2/admin', '"boss@globex.dev"', expect.anything())
+
+    fireEvent.click(within(row).getByRole('button', { name: 'Delete Globex' }))
+    const del = dialog('Delete organization')
+    fireEvent.change(del.getByLabelText('Type Globex to confirm'), { target: { value: 'Globex' } })
+    fireEvent.click(del.getByRole('button', { name: 'Delete organization' }))
+    await waitFor(() => expect(client.delete).toHaveBeenCalledWith('/super-admin/organization/delete/b-2', { headers: key }))
+  })
+
   it('renames an organization, refusing a name another one has', async () => {
     client.put.mockResolvedValue({ data: '' })
     openWithKey('/super-admin/organizations/a-1')
@@ -231,6 +265,19 @@ describe('Super admin: managing organizations', () => {
     fireEvent.click(form.getByRole('button', { name: 'Rename' }))
     expect(await screen.findByText('Renamed to Acme Corp.')).toBeInTheDocument()
     expect(client.put).toHaveBeenCalledWith('/super-admin/organization/update/name/a-1', '"Acme Corp"', {
+      headers: { ...key, 'Content-Type': 'application/json' },
+    })
+  })
+
+  it('invites an admin to an organization with a lowercase email', async () => {
+    client.post.mockResolvedValue({ data: '' })
+    openWithKey('/super-admin/organizations/a-1')
+    fireEvent.click(await screen.findByRole('button', { name: 'Invite admin' }))
+    const form = dialog('Invite an admin to Acme')
+    fireEvent.change(form.getByLabelText('Email'), { target: { value: 'Boss@Acme.dev' } })
+    fireEvent.click(form.getByRole('button', { name: 'Send invitation' }))
+    expect(await screen.findByText('Invitation sent to boss@acme.dev.')).toBeInTheDocument()
+    expect(client.post).toHaveBeenCalledWith('/super-admin/organization/invite/a-1/admin', '"boss@acme.dev"', {
       headers: { ...key, 'Content-Type': 'application/json' },
     })
   })
@@ -266,6 +313,50 @@ describe('Super admin: managing organizations', () => {
       expect.objectContaining({ allocated_ai_credit: 5000, allocated_storage_bytes: 20 * 1024 ** 3, user_limit: 25 }),
       { headers: key },
     )
+  })
+
+  it('edits the profile in its fields, keeping older values', async () => {
+    client.put.mockResolvedValue({ data: '' })
+    ORGS[0] = rawOrg('a-1', 'Acme', {
+      organization_info: { description: 'Rockets', country: 'IN', metadata: 'abc', tier: 3 },
+    })
+    try {
+      openWithKey('/super-admin/organizations/a-1')
+      expect(await screen.findByText('India (IN)')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Edit profile' }))
+      const form = dialog('Profile for Acme')
+      expect(form.getByLabelText('Description')).toHaveValue('Rockets')
+      expect(form.getByLabelText('extras value 1')).toHaveValue('abc') // an older free-form field
+      expect(form.getByText('1 other saved value is kept as they are.')).toBeInTheDocument()
+
+      fireEvent.change(form.getByLabelText('Support email'), { target: { value: 'not-an-email' } })
+      fireEvent.change(form.getByLabelText('Website'), { target: { value: 'acme.example' } })
+      fireEvent.click(form.getByRole('button', { name: 'Save profile' }))
+      expect(await form.findByText('Enter a valid email address.')).toBeInTheDocument()
+      expect(form.getByText('Enter a full address, like https://example.com.')).toBeInTheDocument()
+      expect(client.put).not.toHaveBeenCalled()
+
+      fireEvent.change(form.getByLabelText('Support email'), { target: { value: 'help@acme.example' } })
+      fireEvent.change(form.getByLabelText('Website'), { target: { value: 'https://acme.example' } })
+      fireEvent.change(form.getByLabelText('Industry'), { target: { value: 'Healthcare' } })
+      fireEvent.change(form.getByLabelText('Description'), { target: { value: '' } })
+      fireEvent.click(form.getByRole('button', { name: 'Save profile' }))
+      expect(await screen.findByText('Saved the profile for Acme.')).toBeInTheDocument()
+      expect(client.put).toHaveBeenCalledWith(
+        '/super-admin/organization/update/basic/a-1',
+        {
+          tier: 3,
+          metadata: 'abc',
+          website: 'https://acme.example',
+          industry: 'Healthcare',
+          support_email: 'help@acme.example',
+          country: 'IN',
+        },
+        { headers: key },
+      )
+    } finally {
+      ORGS[0] = rawOrg('a-1', 'Acme')
+    }
   })
 
   it('edits billing details, keeping non-text values', async () => {

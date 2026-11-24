@@ -18,7 +18,7 @@
 /** Small popover menu anchored to a trigger button: shared by the Topbar theme and profile menus. */
 
 import { ChevronDown } from 'lucide-react'
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { cn } from '@/utils/cn'
 
 interface DropdownMenuProps {
@@ -32,6 +32,11 @@ interface DropdownMenuProps {
   triggerClassName?: string
   /** Menu width class, default w-40. */
   widthClassName?: string
+  /**
+   * Positions the menu against the window instead of its parent, so a scrolling container (like a
+   * wide table) can't clip it. It closes when the page scrolls or resizes.
+   */
+  floating?: boolean
   /**
    * Menu items (elements with a `menuitem*` role). Clicking one closes the menu and returns focus to
    * the trigger, unless the item has `data-keep-open`.
@@ -56,9 +61,11 @@ export const DropdownMenu = ({
   trigger,
   triggerClassName,
   widthClassName = 'w-40',
+  floating = false,
   children,
 }: DropdownMenuProps) => {
   const [open, setOpen] = useState(false)
+  const [position, setPosition] = useState<CSSProperties>()
   const rootRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -72,8 +79,26 @@ export const DropdownMenu = ({
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [open])
+    // a floating menu would drift away from its trigger, so it closes instead
+    const onMove = () => setOpen(false)
+    if (floating) {
+      window.addEventListener('scroll', onMove, true)
+      window.addEventListener('resize', onMove)
+    }
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('scroll', onMove, true)
+      window.removeEventListener('resize', onMove)
+    }
+  }, [open, floating])
+
+  const toggle = () => {
+    if (!open && floating && buttonRef.current) {
+      const r = buttonRef.current.getBoundingClientRect()
+      setPosition({ position: 'fixed', top: r.bottom + 6, right: window.innerWidth - r.right })
+    }
+    setOpen((o) => !o)
+  }
 
   const close = () => {
     setOpen(false)
@@ -109,7 +134,7 @@ export const DropdownMenu = ({
         title={menuLabel}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
         className={cn(
           'flex items-center gap-1 rounded-md border border-border bg-surface-raised px-2 py-1.5 text-text-muted hover:border-border-strong hover:text-text',
           triggerClassName,
@@ -130,7 +155,12 @@ export const DropdownMenu = ({
           aria-label={menuLabel}
           onClick={onMenuClick}
           onKeyDown={onMenuKeyDown}
-          className={cn('absolute right-0 z-50 mt-1.5 rounded-md border border-border bg-surface p-1 shadow-lg', widthClassName)}
+          style={floating ? position : undefined}
+          className={cn(
+            'z-50 rounded-md border border-border bg-surface p-1 shadow-lg',
+            !floating && 'absolute right-0 mt-1.5',
+            widthClassName,
+          )}
         >
           {children}
         </div>

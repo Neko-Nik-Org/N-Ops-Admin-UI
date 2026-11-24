@@ -15,29 +15,79 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** API calls for accepting an invitation to join an organization. */
+/** Accepting an invitation to join an organization (`POST /invite/join/{code}`). */
 
 import { apiClient } from '@/lib/axios'
-import type { LoginSuccessResponse } from '@/features/auth/types'
-import type { AcceptInvitePayload, InviteDetails } from '../types'
+import { ApiError, errorCode } from '@/types/api'
+import { toBase64 } from '@/utils/base64'
+import type { AcceptInvitePayload, InviteLink } from '../types'
 
-/**
- * There's no invite feature on N-Ops-Main-API yet — no table, no route, not even a commented-out
- * stub (unlike `/auth/verify-otp`). These paths/shapes are this app's best guess at the contract,
- * kept here as the integration point to adjust once the backend lands.
- */
-
-/** Looks up who sent the invite, for which organization, role and tags. */
-export const getInviteDetails = async (token: string): Promise<InviteDetails> => {
-  const { data } = await apiClient.get<InviteDetails>(`/invite/${token}`)
-  return data
+/** Decodes base64 (standard or URL-safe, padding optional) to a UTF-8 string. */
+const fromBase64 = (value: string): string => {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+  const bytes = Uint8Array.from(atob(padded), (c) => c.charCodeAt(0))
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
 }
 
-/** Guessed to return the same shape as `/auth/login`'s success response, so accepting signs you in. */
-export const acceptInvite = async (token: string, payload: AcceptInvitePayload): Promise<LoginSuccessResponse> => {
-  const { data } = await apiClient.post<LoginSuccessResponse>(`/invite/${token}/accept`, {
-    full_name: payload.fullName,
-    password: payload.password,
-  })
-  return data
+const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
+
+/**
+ * Reads the `code` query parameter of an invitation link. The API doesn't URL-encode it, so a `+` in
+ * the base64 arrives as a space, which is put back. Null when it isn't a readable invitation.
+ */
+export const parseInviteCode = (code: string | null | undefined): InviteLink | null => {
+  if (!code) return null
+  try {
+    const raw: unknown = JSON.parse(fromBase64(code.trim().replace(/ /g, '+')))
+    if (!raw || typeof raw !== 'object') return null
+    const r = raw as Record<string, unknown>
+    const link: InviteLink = {
+      email: text(r.email),
+      invitationCode: text(r.invitation_code),
+      invitedBy: text(r.invited_by),
+      organizationName: text(r.org_name),
+    }
+    return link.invitationCode && link.email ? link : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * `POST /invite/join/{code}` (no session needed) — creates the account in the inviting organization,
+ * with the role and access policy the invitation was sent with, then deletes the invitation. Answers
+ * 200 with no body: the new user signs in afterwards.
+ *
+ * The body is the API's full create-user shape, but it ignores the email, role, policy and active
+ * flag and takes them from the invitation, so those are only placeholders.
+ */
+export const joinInvite = async (link: InviteLink, payload: AcceptInvitePayload): Promise<void> => {
+  try {
+    await apiClient.post(`/invite/join/${encodeURIComponent(link.invitationCode)}`, {
+      user_name: payload.userName.trim(),
+      display_name: payload.displayName.trim(),
+      primary_email: link.email,
+      user_details: {},
+      is_active: true,
+      role_id: 0,
+      password: toBase64(payload.password),
+      access_restriction_policy_id: null,
+    })
+  } catch (error) {
+    // a taken username and a full plan both come back as a bare database error
+    if (errorCode(error) === 'E112')
+      throw new ApiError(
+        "Couldn't create your account. That username may be taken. Try another one, or ask your admin if it keeps failing. (E112)",
+        (error as ApiError).status,
+        'E112',
+      )
+    if (error instanceof ApiError && /invalid or expired/i.test(error.message))
+      throw new ApiError(
+        'This invitation has expired or was already used. Ask whoever invited you to send a new one.',
+        error.status,
+        errorCode(error),
+      )
+    throw error
+  }
 }

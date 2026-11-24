@@ -24,15 +24,17 @@
 
 import { Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { RequireAuth, RequireGuest } from './guards'
+import { RequireAuth, RequireGuest, RequireSecuritySetup } from './guards'
 import { AppShell } from '@/components/templates/AppShell'
 import { ScreenLoader } from '@/components/organisms/ScreenLoader'
 import { APP_PAGES, APP_SECTIONS, ROUTES, VAULT_REDIRECTS } from '@/constants/routes'
 import { useForgetSuperAdminKeyElsewhere } from '@/features/superAdmin/store/adminKey'
 import {
   AccountPage,
+  AdminAccessPoliciesPage,
   AdminApiKeysPage,
   AdminAuditLogsPage,
+  AdminInvitationsPage,
   AdminOrganizationPage,
   AdminRolesPage,
   AdminUsersPage,
@@ -45,6 +47,7 @@ import {
   OrganizationDetailPage,
   OrganizationsPage,
   OverviewPage,
+  SecuritySetupPage,
   SuperAdminShell,
   TagsPage,
   TwoFactorPage,
@@ -59,8 +62,10 @@ const BUILT_PAGES: Partial<Record<string, ReactNode>> = {
   [ROUTES.tags]: <TagsPage />,
   [ROUTES.adminOrganization]: <AdminOrganizationPage />,
   [ROUTES.adminUsers]: <AdminUsersPage />,
+  [ROUTES.adminInvitations]: <AdminInvitationsPage />,
   [ROUTES.adminApiKeys]: <AdminApiKeysPage />,
   [ROUTES.adminRoles]: <AdminRolesPage />,
+  [ROUTES.adminAccessPolicies]: <AdminAccessPoliciesPage />,
   [ROUTES.adminAuditLogs]: <AdminAuditLogsPage />,
   [ROUTES.workflows]: <WorkflowsPage />,
 }
@@ -119,11 +124,22 @@ export const AppRouter = () => {
               </RequireGuest>
             }
           />
+          {/* Signed in, but the access policy requires 2FA setup first: the only page open until it's done */}
+          <Route
+            path={ROUTES.securitySetup}
+            element={
+              <RequireAuth>
+                <SecuritySetupPage />
+              </RequireAuth>
+            }
+          />
           {/* Authenticated area: sidebar + topbar layout around every page below */}
           <Route
             element={
               <RequireAuth>
-                <AppShell />
+                <RequireSecuritySetup>
+                  <AppShell />
+                </RequireSecuritySetup>
               </RequireAuth>
             }
           >

@@ -20,6 +20,7 @@
 import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { verifyOtp } from '../api/twoFactor'
 import { useApplySession } from './useApplySession'
+import type { SecurityRequirements } from '../securitySetup'
 import type { TwoFactorMethod } from '../types'
 
 /** Drives the 2FA LoadingButton. The verify-otp endpoint isn't live on the backend yet (see api/twoFactor.ts). */
@@ -32,14 +33,17 @@ export const useVerifyOtp = () => {
       method,
       code,
       rememberMe,
+      requirements,
     }: {
       temporaryAuthToken: string
       method: TwoFactorMethod
       code: string
       rememberMe: boolean
+      /** From the challenge, which knew the user's enabled factors. */
+      requirements: SecurityRequirements | null
     }) => {
       const response = await verifyOtp(temporaryAuthToken, method, code)
-      applySession(response, rememberMe)
+      applySession(response, rememberMe, requirements)
     },
     { successMs: 600 },
   )

@@ -20,6 +20,7 @@
 import { SkeletonText } from '@/components/molecules/Skeleton'
 import { Meter } from '@/components/molecules/Meter'
 import { useOrgInfo } from '@/features/account/hooks/useAccount'
+import { describeOrgProfile } from '@/features/account/orgProfile'
 import { formatBytes, formatDate, formatNumber } from '@/utils/format'
 
 /** One label / value row for a plan limit. */
@@ -29,9 +30,6 @@ const Limit = ({ label, value }: { label: string; value: number }) => (
     <span className="text-text">{formatNumber(value)}</span>
   </div>
 )
-
-/** Displays a free-form organization info value as text. */
-const renderValue = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value))
 
 /** Loads `/user/self/org-info` and shows the organization's quotas and current usage. */
 export const OrgInfoCard = () => {
@@ -60,10 +58,10 @@ export const OrgInfoCard = () => {
               <dt className="text-text-muted">Organization ID</dt>
               <dd className="font-mono text-xs break-all text-text">{org.organizationId}</dd>
             </div>
-            {Object.entries(org.organizationInfo).map(([key, value]) => (
-              <div key={key}>
-                <dt className="text-text-muted">{key}</dt>
-                <dd className="break-words text-text">{renderValue(value)}</dd>
+            {describeOrgProfile(org.organizationInfo).map(({ key, label, value }) => (
+              <div key={key} className={key === 'description' || key === 'address' ? 'sm:col-span-2' : undefined}>
+                <dt className="text-text-muted">{label}</dt>
+                <dd className="break-words whitespace-pre-line text-text">{value}</dd>
               </div>
             ))}
           </dl>

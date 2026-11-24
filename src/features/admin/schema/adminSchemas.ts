@@ -18,6 +18,7 @@
 
 import * as yup from 'yup'
 import { passwordField, usernameField } from '@/features/account/schema/accountSchemas'
+import { isCountryCode } from '@/constants/countries'
 
 /** IPv4 address, optionally with a CIDR suffix (e.g. 203.0.113.0/24). */
 const IPV4_CIDR = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}(\/(3[0-2]|[12]?\d))?$/
@@ -32,23 +33,11 @@ export const splitList = (value: string | undefined): string[] =>
 /** Two-letter country code, as the API's IP location lookup reports it. */
 const COUNTRY_CODE = /^[A-Za-z]{2}$/
 
-/** Add-user form. Username and password follow the API's rules. */
-export const userSchema = yup.object({
-  userName: usernameField('Enter a username.'),
-  displayName: yup.string().trim().required('Enter their name.').max(100, 'Keep it to 100 characters or fewer.'),
-  primaryEmail: yup
-    .string()
-    .trim()
-    .required('Enter their email.')
-    .email('Enter a valid email address.')
-    .max(254, 'Keep it to 254 characters or fewer.'),
-  roleId: yup.number().typeError('Pick a role.').required('Pick a role.').min(1, 'Pick a role.'),
-  password: passwordField('Enter a password.'),
-  confirmPassword: yup
-    .string()
-    .required('Type the password again.')
-    .oneOf([yup.ref('password')], "The passwords don't match."),
-  isActive: yup.boolean().default(true),
+/**
+ * IP and country sign-in limits for the access-policy form. A list is only checked
+ * while its switch is on; an empty list would let everyone in, so an enabled limit needs one entry.
+ */
+const signInRestrictionFields = {
   hasIpRestriction: yup.boolean().default(false),
   allowedIps: yup
     .string()
@@ -75,8 +64,83 @@ export const userSchema = yup.object({
             splitList(v).every((c) => COUNTRY_CODE.test(c)),
           ),
     }),
+}
+
+/** Add-user form. Username and password follow the API's rules. */
+export const userSchema = yup.object({
+  userName: usernameField('Enter a username.'),
+  displayName: yup.string().trim().required('Enter their name.').max(100, 'Keep it to 100 characters or fewer.'),
+  primaryEmail: yup
+    .string()
+    .trim()
+    .required('Enter their email.')
+    .email('Enter a valid email address.')
+    .max(254, 'Keep it to 254 characters or fewer.'),
+  roleId: yup.number().typeError('Pick a role.').required('Pick a role.').min(1, 'Pick a role.'),
+  password: passwordField('Enter a password.'),
+  confirmPassword: yup
+    .string()
+    .required('Type the password again.')
+    .oneOf([yup.ref('password')], "The passwords don't match."),
+  isActive: yup.boolean().default(true),
+  /** 0 = no access policy. */
+  accessPolicyId: yup.number().default(0),
 })
 export type UserFormValues = yup.InferType<typeof userSchema>
+
+/** Expiry choices for an invitation, in hours. The API allows 1 hour to 21 days. */
+export const INVITATION_EXPIRY_HOURS = [1, 24, 72, 168, 336, 504] as const
+
+const HOUR_MS = 3_600_000
+
+/**
+ * The API refuses an expiry more than 21 days minus 10 minutes away, so the longest choice is kept a
+ * few minutes inside that.
+ */
+const MAX_INVITATION_EXPIRY_MS = 21 * 24 * HOUR_MS - 15 * 60_000
+
+/** When an invitation sent at `now` with an expiry choice of `hours` expires. */
+export const invitationExpiry = (hours: number, now = Date.now()) =>
+  new Date(now + Math.min(hours * HOUR_MS, MAX_INVITATION_EXPIRY_MS))
+
+/** Send-invitation form. The API refuses uppercase emails, so the email is lowercased on send. */
+export const invitationSchema = yup.object({
+  email: yup
+    .string()
+    .trim()
+    .required('Enter their email.')
+    .email('Enter a valid email address.')
+    .max(254, 'Keep it to 254 characters or fewer.'),
+  roleId: yup.number().typeError('Pick a role.').required('Pick a role.').min(1, 'Pick a role.'),
+  /** 0 = no access policy. */
+  accessPolicyId: yup.number().default(0),
+  expiresInHours: yup
+    .number()
+    .required()
+    .oneOf([...INVITATION_EXPIRY_HOURS], 'Pick when the invitation expires.'),
+  invitationNotes: yup.string().trim().default('').max(1000, 'Keep it to 1000 characters or fewer.'),
+})
+export type InvitationFormValues = yup.InferType<typeof invitationSchema>
+
+/** Admin editing someone's name and email. */
+export const adminProfileSchema = yup.object({
+  displayName: yup.string().trim().required('Enter their name.').max(100, 'Keep it to 100 characters or fewer.'),
+  primaryEmail: yup
+    .string()
+    .trim()
+    .required('Enter their email.')
+    .email('Enter a valid email address.')
+    .max(254, 'Keep it to 254 characters or fewer.'),
+})
+export type AdminProfileFormValues = yup.InferType<typeof adminProfileSchema>
+
+/** Admin changing someone's role and access policy. */
+export const userAccessSchema = yup.object({
+  roleId: yup.number().typeError('Pick a role.').required('Pick a role.').min(1, 'Pick a role.'),
+  /** 0 = no access policy. */
+  accessPolicyId: yup.number().default(0),
+})
+export type UserAccessFormValues = yup.InferType<typeof userAccessSchema>
 
 export const roleSchema = yup.object({
   roleName: yup.string().trim().required('Enter a role name.').max(100, 'Keep it to 100 characters or fewer.'),
@@ -93,6 +157,27 @@ export const roleSchema = yup.object({
     ),
 })
 export type RoleFormValues = yup.InferType<typeof roleSchema>
+
+/** Create / edit access policy form. */
+export const accessPolicySchema = yup.object({
+  policyName: yup.string().trim().required('Enter a policy name.').max(100, 'Keep it to 100 characters or fewer.'),
+  policyDescription: yup.string().trim().default(''),
+  enforceTotp2fa: yup.boolean().default(false),
+  enforceEmail2fa: yup.boolean().default(false),
+  ...signInRestrictionFields,
+  // picked from the country list, so an array of codes rather than typed text
+  allowedGeoLocations: yup
+    .array(yup.string().required())
+    .default([])
+    .when('hasGeoRestriction', {
+      is: true,
+      then: (s) =>
+        s
+          .min(1, 'Pick at least one country.')
+          .test('known-countries', 'Pick countries from the list.', (v) => (v ?? []).every(isCountryCode)),
+    }),
+})
+export type AccessPolicyFormValues = yup.InferType<typeof accessPolicySchema>
 
 export const apiKeySchema = yup.object({
   keyName: yup

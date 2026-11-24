@@ -23,6 +23,7 @@ import {
   createOrganization,
   deleteOrganization,
   getOrganization,
+  inviteOrganizationAdmin,
   isOrganizationNameAvailable,
   listOrganizations,
   renameOrganization,
@@ -90,6 +91,11 @@ const useOrgMutation = <V>(run: (adminKey: string, vars: V) => Promise<void>) =>
 }
 
 export const useCreateOrganization = () => useOrgMutation((key, org: NewOrganization) => createOrganization(key, org))
+
+export const useInviteOrganizationAdmin = () =>
+  useOrgMutation((key, { organizationId, email }: { organizationId: string; email: string }) =>
+    inviteOrganizationAdmin(key, organizationId, email),
+  )
 
 export const useRenameOrganization = () =>
   useOrgMutation((key, { organizationId, name }: { organizationId: string; name: string }) =>

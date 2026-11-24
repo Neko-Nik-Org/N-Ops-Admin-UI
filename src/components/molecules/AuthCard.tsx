@@ -26,17 +26,19 @@ interface AuthCardProps {
   subtitle?: ReactNode
   /** Replaces the animated N loader, e.g. a phone for two-step. */
   icon?: ReactNode
+  /** Shows no logo or icon above the title. */
+  hideIcon?: boolean
   children: ReactNode
   className?: string
 }
 
 /** The glass card in the middle, with a light running around its edge. Animates in on mount. */
-export const AuthCard = ({ title, subtitle, icon, children, className }: AuthCardProps) => {
+export const AuthCard = ({ title, subtitle, icon, hideIcon, children, className }: AuthCardProps) => {
   const id = useId()
   return (
     <section className={cn('n-auth-card', className)} aria-labelledby={id}>
       <div className="n-auth-card__head">
-        {icon ? (
+        {hideIcon ? null : icon ? (
           <span className="n-auth-card__icon">{icon}</span>
         ) : (
           <NLoader size={64} variant="draw" framed decorative className="n-auth-card__loader" />
