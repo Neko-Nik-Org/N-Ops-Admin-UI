@@ -18,6 +18,7 @@
 
 import { waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { SAVED_STARTUP_QUERIES } from '@/hooks/useAppBootstrap'
 import { useSessionBootstrap } from '@/hooks/useSessionBootstrap'
 import { loadStoredProfile, storeProfile } from '@/store/profileStorage'
 import { currentUserAtom, sessionStatusAtom } from '@/store/session'
@@ -89,5 +90,32 @@ describe('useSessionBootstrap', () => {
     api.get.mockRejectedValue(new Error('Unauthorized'))
     renderHookWithProviders(() => useSessionBootstrap())
     await waitFor(() => expect(loadStoredProfile()).toBeNull())
+  })
+
+  it('signs in at once from saved startup data, then still verifies the session', async () => {
+    setSessionToken('s1', true)
+    storeProfile(makeUser({ userName: 'priya' }))
+    let resolveVerify: (v: unknown) => void = () => {}
+    api.get.mockReturnValue(new Promise((r) => (resolveVerify = r)))
+    const { store } = renderHookWithProviders(() => useSessionBootstrap(), {
+      seed: (client) => SAVED_STARTUP_QUERIES.forEach((key) => client.setQueryData(key, {})),
+    })
+    expect(store.get(sessionStatusAtom)).toBe('authenticated')
+    expect(store.get(currentUserAtom)?.userName).toBe('priya')
+    expect(api.get).toHaveBeenCalledWith('/auth/verify')
+    resolveVerify({ status: 204, data: '' })
+    await waitFor(() => expect(store.get(currentUserAtom)?.userName).toBe('priya'))
+  })
+
+  it('signs out when the session behind saved startup data is refused', async () => {
+    setSessionToken('stale', true)
+    storeProfile(makeUser())
+    api.get.mockRejectedValue(new Error('Unauthorized'))
+    const { store } = renderHookWithProviders(() => useSessionBootstrap(), {
+      seed: (client) => SAVED_STARTUP_QUERIES.forEach((key) => client.setQueryData(key, {})),
+    })
+    await waitFor(() => expect(store.get(sessionStatusAtom)).toBe('unauthenticated'))
+    expect(store.get(currentUserAtom)).toBeNull()
+    expect(getSessionToken()).toBeUndefined()
   })
 })

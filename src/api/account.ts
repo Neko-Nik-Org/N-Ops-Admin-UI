@@ -153,6 +153,9 @@ export const getOrgInfo = async (): Promise<OrgInfo> => {
  */
 const postJsonString = (url: string, value: string) =>
   apiClient.post(url, JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } })
+/** The same, for routes that use PUT. */
+const putJsonString = (url: string, value: string) =>
+  apiClient.put(url, JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } })
 
 /**
  * Length of the email verification code the API generates. Its characters come from the API's
@@ -205,4 +208,22 @@ export const changePassword = async (newPassword: string): Promise<void> => {
  */
 export const deactivateAccount = async (): Promise<void> => {
   await apiClient.delete('/user/self/deactivate')
+}
+
+/**
+ * `GET /user/self/anti-phishing-secret` — the user's anti-phishing secret: a word N-Ops puts in every
+ * email it sends them, so they can tell a real N-Ops email from a fake one. Set when the account is
+ * created; the API stores it encrypted.
+ */
+export const getAntiPhishingSecret = async (): Promise<string> => {
+  const { data } = await apiClient.get<unknown>('/user/self/anti-phishing-secret')
+  return typeof data === 'string' ? data : ''
+}
+
+/**
+ * `PUT /user/self/anti-phishing-secret` — replaces it (bare JSON string). The API takes 4–16 letters,
+ * digits, `-` and `_`, and answers 400 with a plain-text reason otherwise.
+ */
+export const updateAntiPhishingSecret = async (secret: string): Promise<void> => {
+  await putJsonString('/user/self/anti-phishing-secret', secret)
 }

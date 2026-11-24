@@ -24,14 +24,22 @@ import { getSessionToken } from '@/store/sessionToken'
 import { api, makeUser, renderWithProviders } from '../../testUtils'
 
 describe('ProfileMenu', () => {
-  it('shows who is signed in and links to the account page', () => {
+  it('shows who is signed in and links to the account pages', () => {
     renderWithProviders(<ProfileMenu />, { user: makeUser() })
+    // the button is just the icon; the name is in its label and the menu
+    expect(screen.getByRole('button', { name: 'Profile: Priya Rao' })).not.toHaveTextContent('Priya Rao')
     fireEvent.click(screen.getByRole('button', { name: 'Profile: Priya Rao' }))
     const menu = screen.getByRole('menu', { name: 'Profile' })
     expect(menu).toHaveTextContent('@priya · Acme')
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Account' }))
-    expect(screen.getByTestId('location')).toHaveTextContent('/account')
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent)).toEqual([
+      'Profile',
+      'Security',
+      'Organization',
+      'Sign out',
+    ])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Security' }))
+    expect(screen.getByTestId('location')).toHaveTextContent('/account/security')
   })
 
   it('stays signed in when the sign-out is cancelled', async () => {

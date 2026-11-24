@@ -14,11 +14,14 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tests for Admin › Invitations, on the (mocked) live API. */
+/** Tests for Admin › Invitations (list, view and send pages), on the (mocked) live API. */
 
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { AdminInvitationsPage } from '@/pages/admin/invitations'
+import { ROUTES } from '@/constants/routes'
+import { InvitationDetailPage } from '@/pages/admin/invitations/details'
+import { InvitationFormPage } from '@/pages/admin/invitations/form'
+import { AdminInvitationsPage } from '@/pages/admin/invitations/list'
 import { api, makeUser, RAW_ROLES, RAW_USERS, renderWithProviders } from '../../../testUtils'
 
 const dialog = () => screen.getByRole('dialog')
@@ -65,17 +68,30 @@ const serve = () =>
   })
 
 const renderPage = (permissions = ALL) =>
-  renderWithProviders(<AdminInvitationsPage />, { route: '/admin/invitations', user: makeUser({ permissions }) })
-
-describe('AdminInvitationsPage', () => {
-  beforeEach(() => {
-    invitations = [
-      rawInvitation(1, 'priya@company.com', { invitation_notes: 'Joining the SRE team', access_restriction_policy_id: 4 }),
-      rawInvitation(2, 'old@company.com', { invited_at: iso(-10 * DAY), expires_at: iso(-DAY) }),
-    ]
-    serve()
+  renderWithProviders(<AdminInvitationsPage />, { route: ROUTES.adminInvitations, user: makeUser({ permissions }) })
+const renderView = (id: number, permissions = ALL) =>
+  renderWithProviders(<InvitationDetailPage />, {
+    route: `/admin/invitations/${id}`,
+    path: ROUTES.adminInvitation,
+    user: makeUser({ permissions }),
   })
+const renderNew = (permissions = ALL) =>
+  renderWithProviders(<InvitationFormPage />, {
+    route: ROUTES.adminInvitationNew,
+    path: ROUTES.adminInvitationNew,
+    user: makeUser({ permissions }),
+  })
+const location = () => screen.findByTestId('location', {}, { timeout: 2000 })
 
+beforeEach(() => {
+  invitations = [
+    rawInvitation(1, 'priya@company.com', { invitation_notes: 'Joining the SRE team', access_restriction_policy_id: 4 }),
+    rawInvitation(2, 'old@company.com', { invited_at: iso(-10 * DAY), expires_at: iso(-DAY) }),
+  ]
+  serve()
+})
+
+describe('Invitations list', () => {
   it('lists invitations with their role, policy and expiry', async () => {
     renderPage()
     const row = (await screen.findByText('priya@company.com')).closest('tr') as HTMLElement
@@ -103,57 +119,11 @@ describe('AdminInvitationsPage', () => {
     expect(screen.queryByRole('button', { name: /^Revoke / })).not.toBeInTheDocument()
   })
 
-  it('sends an invitation with the picked role, policy and expiry', async () => {
-    api.post.mockResolvedValue({ data: undefined })
+  it("links to the send page and each invitation's own page", async () => {
     renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Invite someone' }))
-    const form = await screen.findByRole('dialog')
-    fireEvent.change(await within(form).findByLabelText('Email'), { target: { value: 'New.Person@Company.com' } })
-    await within(form).findByRole('option', { name: 'Operator' })
-    fireEvent.change(within(form).getByLabelText('Role'), { target: { value: '3' } })
-    await within(form).findByRole('option', { name: 'Office only' })
-    fireEvent.change(within(form).getByLabelText('Access policy'), { target: { value: '4' } })
-    fireEvent.change(within(form).getByLabelText('Expires after'), { target: { value: '24' } })
-    fireEvent.change(within(form).getByLabelText('Note (optional)'), { target: { value: 'See you Monday' } })
-    fireEvent.click(within(form).getByRole('button', { name: 'Send invitation' }))
-    expect(await screen.findByText('Invitation sent to new.person@company.com.')).toBeInTheDocument()
-    expect(api.post).toHaveBeenCalledWith('/invite/new', {
-      invite_to_email: 'new.person@company.com',
-      invitation_notes: 'See you Monday',
-      role_id: 3,
-      access_restriction_policy_id: 4,
-      expiration_datetime: expect.any(String),
-    })
-    const sent = Date.parse((api.post.mock.calls[0][1] as { expiration_datetime: string }).expiration_datetime)
-    expect(Math.abs(sent - (Date.now() + DAY))).toBeLessThan(60_000)
-  })
-
-  it('sends no policy by default', async () => {
-    api.post.mockResolvedValue({ data: undefined })
-    renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Invite someone' }))
-    const form = await screen.findByRole('dialog')
-    fireEvent.change(await within(form).findByLabelText('Email'), { target: { value: 'a@b.co' } })
-    await within(form).findByRole('option', { name: 'Operator' })
-    fireEvent.change(within(form).getByLabelText('Role'), { target: { value: '3' } })
-    fireEvent.click(within(form).getByRole('button', { name: 'Send invitation' }))
-    await waitFor(() =>
-      expect(api.post).toHaveBeenCalledWith('/invite/new', expect.objectContaining({ access_restriction_policy_id: null })),
-    )
-  })
-
-  it('catches an email that is already invited, and a missing role, before calling the API', async () => {
-    renderPage()
-    fireEvent.click(await screen.findByRole('button', { name: 'Invite someone' }))
-    const form = await screen.findByRole('dialog')
-    fireEvent.change(await within(form).findByLabelText('Email'), { target: { value: 'Priya@company.com' } })
-    fireEvent.click(within(form).getByRole('button', { name: 'Send invitation' }))
-    expect(await within(dialog()).findByText('Pick a role.')).toBeInTheDocument()
-    await within(form).findByRole('option', { name: 'Operator' })
-    fireEvent.change(within(form).getByLabelText('Role'), { target: { value: '3' } })
-    fireEvent.click(within(form).getByRole('button', { name: 'Send invitation' }))
-    expect(await within(dialog()).findByText(/already has an invitation/)).toBeInTheDocument()
-    expect(api.post).not.toHaveBeenCalled()
+    expect(await screen.findByRole('link', { name: 'priya@company.com' })).toHaveAttribute('href', '/admin/invitations/1')
+    fireEvent.click(screen.getByRole('button', { name: 'Invite someone' }))
+    expect(await location()).toHaveTextContent('/admin/invitations/new')
   })
 
   it('revokes an invitation', async () => {
@@ -176,5 +146,99 @@ describe('AdminInvitationsPage', () => {
     })
     renderPage()
     expect(await screen.findByText(/Couldn't load invitations: Internal server error/)).toBeInTheDocument()
+  })
+})
+
+describe('Invitation page', () => {
+  it('shows who it is for, the role, policy and note', async () => {
+    renderView(1)
+    expect(await screen.findByRole('heading', { name: 'priya@company.com' })).toBeInTheDocument()
+    expect(await screen.findByText('Admin')).toBeInTheDocument()
+    expect(await screen.findByText('Office only')).toBeInTheDocument()
+    expect(screen.getByText('Joining the SRE team')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Edit/ })).not.toBeInTheDocument() // the API can't edit invitations
+  })
+
+  it('marks an expired invitation', async () => {
+    renderView(2)
+    expect(await screen.findByText('Expired')).toBeInTheDocument()
+  })
+
+  it('says so when the invitation is gone', async () => {
+    renderView(99)
+    expect(await screen.findByText(/There's no invitation here/)).toBeInTheDocument()
+  })
+
+  it('revokes it and returns to the list', async () => {
+    api.delete.mockResolvedValue({ data: undefined })
+    renderView(1)
+    fireEvent.click(await screen.findByRole('button', { name: 'Revoke' }))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Revoke invitation' }))
+    expect(await screen.findByText('Revoked the invitation for priya@company.com.')).toBeInTheDocument()
+    expect(api.delete).toHaveBeenCalledWith('/invite/delete/1')
+    expect(await location()).toHaveTextContent(/^\/admin\/invitations$/)
+  })
+
+  it('hides Revoke without user:invite:delete', async () => {
+    renderView(1, ['user:invite:view'])
+    await screen.findByRole('heading', { name: 'priya@company.com' })
+    expect(screen.queryByRole('button', { name: 'Revoke' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Send invitation page', () => {
+  it('sends an invitation with the picked role, policy and expiry, then returns to the list', async () => {
+    api.post.mockResolvedValue({ data: undefined })
+    renderNew()
+    fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'New.Person@Company.com' } })
+    await screen.findByRole('option', { name: 'Operator' })
+    fireEvent.change(screen.getByLabelText('Role'), { target: { value: '3' } })
+    await screen.findByRole('option', { name: 'Office only' })
+    fireEvent.change(screen.getByLabelText('Access policy'), { target: { value: '4' } })
+    fireEvent.change(screen.getByLabelText('Expires after'), { target: { value: '24' } })
+    fireEvent.change(screen.getByLabelText('Note (optional)'), { target: { value: 'See you Monday' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send invitation' }))
+    expect(await screen.findByText('Invitation sent to new.person@company.com.')).toBeInTheDocument()
+    expect(api.post).toHaveBeenCalledWith('/invite/new', {
+      invite_to_email: 'new.person@company.com',
+      invitation_notes: 'See you Monday',
+      role_id: 3,
+      access_restriction_policy_id: 4,
+      expiration_datetime: expect.any(String),
+    })
+    const sent = Date.parse((api.post.mock.calls[0][1] as { expiration_datetime: string }).expiration_datetime)
+    expect(Math.abs(sent - (Date.now() + DAY))).toBeLessThan(60_000)
+    expect(await location()).toHaveTextContent(/^\/admin\/invitations$/)
+  })
+
+  it('sends no policy by default', async () => {
+    api.post.mockResolvedValue({ data: undefined })
+    renderNew()
+    fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'a@b.co' } })
+    await screen.findByRole('option', { name: 'Operator' })
+    fireEvent.change(screen.getByLabelText('Role'), { target: { value: '3' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send invitation' }))
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/invite/new', expect.objectContaining({ access_restriction_policy_id: null })),
+    )
+  })
+
+  it('catches an email that is already invited, and a missing role, before calling the API', async () => {
+    renderNew()
+    fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'Priya@company.com' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send invitation' }))
+    expect(await screen.findByText('Pick a role.')).toBeInTheDocument()
+    await screen.findByRole('option', { name: 'Operator' })
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('/invite/list', expect.anything()))
+    fireEvent.change(screen.getByLabelText('Role'), { target: { value: '3' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send invitation' }))
+    expect(await screen.findByText(/already has an invitation/)).toBeInTheDocument()
+    expect(api.post).not.toHaveBeenCalled()
+  })
+
+  it('asks for the send permissions without them', async () => {
+    renderNew(['user:invite:view', 'user:invite:create'])
+    expect(await screen.findByText(/user:invite:create, user:create/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
   })
 })

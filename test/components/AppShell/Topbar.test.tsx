@@ -14,9 +14,9 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tests for src/components/AppShell/Topbar.tsx: the sidebar controls it takes over when the sidebar is collapsed. */
+/** Tests for src/components/AppShell/Topbar.tsx: the brand and the sidebar collapse toggle it holds. */
 
-import { act, fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { sidebarCollapsedAtom } from '@/store/sidebar'
 import { Topbar } from '@/components/AppShell/Topbar'
@@ -25,19 +25,16 @@ import { makeUser, renderWithProviders } from '../../testUtils'
 const renderTopbar = () => renderWithProviders(<Topbar onMenuClick={() => {}} />, { user: makeUser() })
 
 describe('Topbar', () => {
-  it('keeps the sidebar controls hidden while the sidebar is open', () => {
+  it('shows the product name next to the logo', () => {
     renderTopbar()
-    // kept on the page (so it can slide in) but hidden from screen readers and keyboard
-    expect(screen.queryByRole('button', { name: 'Expand sidebar' })).not.toBeInTheDocument()
-    expect(screen.getByText('N-Ops').closest('[aria-hidden]')).not.toBeNull()
+    expect(screen.getByText('N-Ops')).toBeVisible()
   })
 
-  it('shows the product name and the expand button while the sidebar is collapsed', () => {
+  it('collapses and expands the sidebar from one toggle', () => {
     const { store } = renderTopbar()
-    act(() => store.set(sidebarCollapsedAtom, true))
-    expect(screen.getByText('N-Ops').closest('[aria-hidden]')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
+    expect(store.get(sidebarCollapsedAtom)).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
     expect(store.get(sidebarCollapsedAtom)).toBe(false)
-    expect(screen.getByText('N-Ops').closest('[aria-hidden]')).not.toBeNull()
   })
 })

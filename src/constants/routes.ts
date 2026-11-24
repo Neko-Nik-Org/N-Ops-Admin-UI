@@ -53,9 +53,21 @@ export const ROUTES = {
   admin: '/admin',
   adminOrganization: '/admin/organization',
   adminUsers: '/admin/users',
+  adminUserNew: '/admin/users/new',
+  adminUser: '/admin/users/:userId',
+  adminUserEdit: '/admin/users/:userId/edit',
   adminInvitations: '/admin/invitations',
+  adminInvitationNew: '/admin/invitations/new',
+  adminInvitation: '/admin/invitations/:invitationId',
   adminApiKeys: '/admin/api-keys',
+  adminApiKeyNew: '/admin/api-keys/new',
+  adminApiKey: '/admin/api-keys/:apiKeyId',
+  adminApiKeyEdit: '/admin/api-keys/:apiKeyId/edit',
   adminRoles: '/admin/roles',
+  /** New role; `?from=<id>` starts from a copy of that one (Duplicate). */
+  adminRoleNew: '/admin/roles/new',
+  adminRole: '/admin/roles/:roleId',
+  adminRoleEdit: '/admin/roles/:roleId/edit',
   adminAccessPolicies: '/admin/access-policies',
   /** New policy; `?from=<id>` starts from a copy of that one (Duplicate). */
   adminAccessPolicyNew: '/admin/access-policies/new',
@@ -63,7 +75,11 @@ export const ROUTES = {
   adminAccessPolicyEdit: '/admin/access-policies/:policyId/edit',
   tags: '/admin/tags',
   adminAuditLogs: '/admin/audit-logs',
+  /** Redirects to the Profile page. */
   account: '/account',
+  accountProfile: '/account/profile',
+  accountSecurity: '/account/security',
+  accountOrganization: '/account/organization',
   /** Forced 2FA setup required by the user's access policy; outside the app shell. */
   securitySetup: '/security-setup',
   login: '/login',
@@ -78,6 +94,31 @@ export const ROUTES = {
   superAdmin: '/super-admin',
   superAdminOrganization: '/super-admin/organizations/:organizationId',
 } as const
+
+/** URL of one user's page. */
+export const userPath = (userId: number) => ROUTES.adminUser.replace(':userId', String(userId))
+
+/** URL of the page that edits one user. */
+export const userEditPath = (userId: number) => ROUTES.adminUserEdit.replace(':userId', String(userId))
+
+/** URL of one invitation's page. */
+export const invitationPath = (invitationId: number) => ROUTES.adminInvitation.replace(':invitationId', String(invitationId))
+
+/** URL of one API key's page. */
+export const apiKeyPath = (apiKeyId: number) => ROUTES.adminApiKey.replace(':apiKeyId', String(apiKeyId))
+
+/** URL of the page that edits one API key. */
+export const apiKeyEditPath = (apiKeyId: number) => ROUTES.adminApiKeyEdit.replace(':apiKeyId', String(apiKeyId))
+
+/** URL of one role's page. */
+export const rolePath = (roleId: number) => ROUTES.adminRole.replace(':roleId', String(roleId))
+
+/** URL of the page that edits one role. */
+export const roleEditPath = (roleId: number) => ROUTES.adminRoleEdit.replace(':roleId', String(roleId))
+
+/** URL of the new-role page, optionally starting from a copy of another role. */
+export const newRolePath = (fromRoleId?: number) =>
+  fromRoleId === undefined ? ROUTES.adminRoleNew : `${ROUTES.adminRoleNew}?from=${fromRoleId}`
 
 /** URL of one access policy's page. */
 export const accessPolicyPath = (policyId: number) => ROUTES.adminAccessPolicy.replace(':policyId', String(policyId))
@@ -159,7 +200,9 @@ export const PAGE_TITLES: Readonly<Record<string, readonly string[]>> = {
   ...Object.fromEntries(
     APP_SECTIONS.flatMap((s) => (s.children ? s.children.map((c) => [c.path, [s.title, c.title]]) : [[s.path, [s.title]]])),
   ),
-  [ROUTES.account]: ['Account'],
+  [ROUTES.accountProfile]: ['Account', 'Profile'],
+  [ROUTES.accountSecurity]: ['Account', 'Security'],
+  [ROUTES.accountOrganization]: ['Account', 'Organization'],
 }
 
 /**

@@ -17,6 +17,8 @@
 
 /** Types for accepting an invitation to join an organization. */
 
+import type { JsonObject } from '@/types/account'
+
 /**
  * What the emailed link carries: `/invite?code=<base64 JSON>`, where the JSON is
  * `{ email, invitation_code, invited_by, org_name }`. It's read in the browser; the API only checks
@@ -34,4 +36,6 @@ export interface AcceptInvitePayload {
   userName: string
   displayName: string
   password: string
+  /** Optional profile details (job, contact, availability …), as saved by utils/profileDetails.ts. */
+  userDetails?: JsonObject
 }

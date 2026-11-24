@@ -68,7 +68,7 @@ export const joinInvite = async (link: InviteLink, payload: AcceptInvitePayload)
       user_name: payload.userName.trim(),
       display_name: payload.displayName.trim(),
       primary_email: link.email,
-      user_details: {},
+      user_details: payload.userDetails ?? {},
       is_active: true,
       role_id: 0,
       password: toBase64(payload.password),

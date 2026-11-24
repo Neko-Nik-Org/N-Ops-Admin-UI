@@ -24,6 +24,7 @@
  */
 
 import Cookies from 'js-cookie'
+import { clearSavedQueries } from '@/utils/queryPersistence'
 import { storeProfile } from './profileStorage'
 import { storeSecurityRequirements } from './securityRequirements'
 
@@ -64,9 +65,10 @@ export const setSessionToken = (token: string, rememberMe: boolean): void => {
   }
 }
 
-/** Removes every session cookie and the saved profile (sign-out, 401 or failed verification). */
+/** Removes every session cookie, the saved profile and saved startup data (sign-out, 401 or failed verification). */
 export const clearSessionToken = (): void => {
   storeProfile(null)
+  clearSavedQueries()
   storeSecurityRequirements(null)
   Cookies.remove(SESSION_COOKIE)
   Cookies.remove(REMEMBER_COOKIE)

@@ -20,7 +20,7 @@ import { screen, waitFor } from '@testing-library/react'
 import { ToastContainer } from 'react-toastify'
 import { render } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { useAppBootstrap } from '@/hooks/useAppBootstrap'
+import { SAVED_STARTUP_QUERIES, useAppBootstrap } from '@/hooks/useAppBootstrap'
 import { currentUserAtom, sessionStatusAtom } from '@/store/session'
 import { setSessionToken } from '@/store/sessionToken'
 import { api, makeUser, renderHookWithProviders } from '../testUtils'
@@ -47,10 +47,26 @@ const serve = (profile: unknown) =>
   api.get.mockImplementation(async (url: string) => ({ data: url === '/user/self/profile' ? profile : {} }))
 
 describe('useAppBootstrap', () => {
-  it('lists the session check and the health check while the session is being checked', async () => {
+  it('is ready at once from saved startup data, refreshing it without waiting for the health check', async () => {
+    setSessionToken('saved', true)
+    api.get.mockReturnValue(new Promise(() => {}))
+    const { result } = renderHookWithProviders(() => useAppBootstrap('authenticated'), {
+      user: makeUser(),
+      seed: (client) =>
+        SAVED_STARTUP_QUERIES.forEach((key) => {
+          client.setQueryData(key, {})
+          void client.invalidateQueries({ queryKey: key, refetchType: 'none' })
+        }),
+    })
+    expect(result.current.ready).toBe(true)
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('/user/self/profile'))
+    expect(api.get).toHaveBeenCalledWith('/tag/list')
+  })
+
+  it("lists the session check, the health check and the app's code while the session is being checked", async () => {
     api.get.mockReturnValue(new Promise(() => {}))
     const { result } = renderHookWithProviders(() => useAppBootstrap('checking'))
-    expect(result.current.pendingLabels).toEqual(['Checking your session', 'Checking N-Ops services'])
+    expect(result.current.pendingLabels).toEqual(['Checking your session', 'Checking N-Ops services', 'Loading the app'])
     expect(result.current.ready).toBe(false)
   })
 
@@ -67,14 +83,14 @@ describe('useAppBootstrap', () => {
     expect(store.get(currentUserAtom)).toEqual(saved)
   })
 
-  it('counts each finished step towards progress, and is ready once all seven are done', async () => {
+  it('counts each finished step towards progress, and is ready once all eight are done', async () => {
     let finishTags: (value: { data: unknown[] }) => void = () => {}
     api.get.mockImplementation((url: string) =>
       url === '/tag/list' ? new Promise((resolve) => (finishTags = resolve)) : Promise.resolve({ data: {} }),
     )
     const { result } = renderHookWithProviders(() => useAppBootstrap('authenticated'))
     await waitFor(() => expect(result.current.pendingLabels).toEqual(['Loading your tags']))
-    expect(result.current.progress).toBeCloseTo(6 / 7)
+    expect(result.current.progress).toBeCloseTo(7 / 8)
     expect(result.current.ready).toBe(false)
 
     finishTags({ data: [] })

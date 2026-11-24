@@ -103,9 +103,10 @@ export const renderWithProviders = (ui: ReactElement, { route = '/', state, path
 /** renderHook with the same providers; returns the store and query client for assertions. */
 export const renderHookWithProviders = <T,>(
   hook: () => T,
-  { user, route = '/' }: { user?: CurrentUser | null; route?: string } = {},
+  { user, route = '/', seed }: { user?: CurrentUser | null; route?: string; seed?: (client: QueryClient) => void } = {},
 ) => {
   const { queryClient, store } = createTestState(user)
+  seed?.(queryClient) // fill the cache before the first render (e.g. data restored at startup)
   // the probe shows where the hook navigated (screen.getByTestId('location'))
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>

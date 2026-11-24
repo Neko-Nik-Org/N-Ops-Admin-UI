@@ -17,7 +17,7 @@
 
 /** Main navigation sidebar with the section links. */
 
-import { PanelLeftClose, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useAtom } from 'jotai'
 import { sidebarCollapsedAtom } from '@/store/sidebar'
 import { NLogo } from '@/components/NLogo'
@@ -59,54 +59,31 @@ export const Sidebar = ({ variant = 'desktop', onNavigate, onClose }: SidebarPro
         // only the width animates; padding stays the same so nothing inside shifts sideways
         'shrink-0 flex-col gap-6 overflow-hidden bg-surface px-2 py-4 transition-[width] duration-200 ease-out',
         collapsed ? 'w-16' : 'w-60',
-        // Header stays put; only the <nav> below it scrolls
-        variant === 'desktop' ? 'sticky top-0 hidden h-screen border-r border-border lg:flex' : 'flex h-full',
+        // Desktop: pinned under the h-16 top bar; only the <nav> scrolls
+        variant === 'desktop' ? 'sticky top-16 hidden h-[calc(100vh-4rem)] border-r border-border lg:flex' : 'flex h-full',
       )}
       // Close the mobile drawer once a link is followed (not when a group is toggled)
       onClick={(e) => {
         if ((e.target as HTMLElement).closest('a')) onNavigate?.()
       }}
     >
-      {/* One layout in both states: the logo stays put, the name and the collapse button fade out */}
-      <div className="flex h-8 items-center gap-2.5 pl-[11px]">
-        <NLogo size={26} className="shrink-0" />
-        <span
-          aria-hidden={collapsed || undefined}
-          className={cn(
-            'text-lg font-semibold whitespace-nowrap text-text transition-opacity duration-200',
-            collapsed && 'opacity-0',
+      {/* Mobile drawer only: on desktop the brand and the collapse toggle live in the top bar */}
+      {variant === 'mobile' && (
+        <div className="flex h-8 items-center gap-2.5 pl-[11px]">
+          <NLogo size={26} className="shrink-0" />
+          <span className="text-lg font-semibold whitespace-nowrap text-text">N-Ops</span>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close menu"
+              className="ml-auto rounded-md p-1.5 text-text-muted hover:bg-surface-raised hover:text-text"
+            >
+              <X size={18} />
+            </button>
           )}
-        >
-          N-Ops
-        </span>
-        {/* collapsed: the expand button and the name move to the top bar (see Topbar) */}
-        {variant === 'desktop' && (
-          <button
-            type="button"
-            onClick={() => setCollapsed(true)}
-            aria-label="Collapse sidebar"
-            title="Collapse sidebar"
-            aria-hidden={collapsed || undefined}
-            inert={collapsed}
-            className={cn(
-              'ml-auto shrink-0 rounded-md p-1.5 text-text-muted transition-opacity duration-200 hover:bg-surface-raised hover:text-text',
-              collapsed && 'opacity-0',
-            )}
-          >
-            <PanelLeftClose size={17} />
-          </button>
-        )}
-        {variant === 'mobile' && onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close menu"
-            className="ml-auto rounded-md p-1.5 text-text-muted hover:bg-surface-raised hover:text-text"
-          >
-            <X size={18} />
-          </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <nav className="-mx-2 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain px-2 [scrollbar-width:thin]">
         {APP_SECTIONS.map(({ path, title, icon, children }) =>

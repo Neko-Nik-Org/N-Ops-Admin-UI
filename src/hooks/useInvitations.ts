@@ -25,6 +25,12 @@ import { ADMIN_KEYS, useAdminRefresh } from '@/hooks/useAdminRefresh'
 export const useInvitations = ({ enabled = true }: { enabled?: boolean } = {}) =>
   useQuery({ queryKey: ADMIN_KEYS.invitations, queryFn: listInvitations, enabled })
 
+/** One invitation, picked from the list (the API has no fetch-one endpoint); undefined when it doesn't exist. */
+export const useInvitation = (invitationId: number | null, { enabled = true }: { enabled?: boolean } = {}) => {
+  const query = useInvitations({ enabled: enabled && invitationId !== null })
+  return { ...query, invitation: query.data?.find((i) => i.invitationId === invitationId) }
+}
+
 export const useSendInvitation = () => {
   const refresh = useAdminRefresh(ADMIN_KEYS.invitations)
   return useMutation({ mutationFn: (input: InvitationInput) => sendInvitation(input), onSuccess: refresh })

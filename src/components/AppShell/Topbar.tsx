@@ -15,20 +15,20 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Top bar of the dashboard: tag selector, theme, notifications and the profile menu (breadcrumb and global search are commented out for now). */
+/** Top bar of the dashboard: brand and sidebar toggle, tag selector, theme, notifications and the profile menu (breadcrumb and global search are commented out for now). */
 
 import { useAtom } from 'jotai'
-import { Bell, Menu, PanelLeftOpen } from 'lucide-react' // add Search back with the global search
+import { Bell, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react' // add Search back with the global search
 // import { useLocation } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { ProfileMenu } from '@/components/AppShell/ProfileMenu'
 import { TagSelect } from '@/components/AppShell/TagSelect'
+import { NLogo } from '@/components/NLogo'
 import { ThemeMenu } from '@/components/ThemeMenu'
 // import { pageTrail } from '@/constants/routes'
 import { sidebarCollapsedAtom } from '@/store/sidebar'
-import { cn } from '@/utils/cn'
 
-/** Sticky header above every authenticated page. `onMenuClick` opens the mobile nav drawer. */
+/** Full-width sticky header above the sidebar and every authenticated page (fixed h-16; the sidebar offsets by it). `onMenuClick` opens the mobile nav drawer. */
 export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useAtom(sidebarCollapsedAtom)
   // Breadcrumb trail, hidden for now:
@@ -37,33 +37,29 @@ export const Topbar = ({ onMenuClick }: { onMenuClick: () => void }) => {
   // const trail = found.length ? found : ['N-Ops']
 
   return (
-    <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-border bg-surface px-4 py-3.5 sm:gap-4 sm:px-6">
+    <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-3 border-b border-border bg-surface px-4 sm:gap-4 sm:px-6 lg:px-4">
       {/* Left and right groups are both flex-1, so they split the free space equally and the search sits dead center */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <button type="button" aria-label="Open menu" onClick={onMenuClick} className="text-text-muted hover:text-text lg:hidden">
           <Menu size={20} />
         </button>
 
-        {/* Desktop sidebar collapsed to its icon rail: its expand button and the product name slide in here */}
-        <div
-          aria-hidden={!sidebarCollapsed || undefined}
-          inert={!sidebarCollapsed}
-          className={cn(
-            'hidden items-center gap-2 overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-out lg:flex',
-            sidebarCollapsed ? 'max-w-40 opacity-100' : 'max-w-0 opacity-0',
-          )}
-        >
-          <button
-            type="button"
-            onClick={() => setSidebarCollapsed(false)}
-            aria-label="Expand sidebar"
-            title="Expand sidebar"
-            className="shrink-0 rounded-md p-1.5 text-text-muted hover:bg-surface-raised hover:text-text"
-          >
-            <PanelLeftOpen size={17} />
-          </button>
-          <span className="text-lg font-semibold text-text">N-Ops</span>
+        {/* Brand: the logo lines up with the sidebar rail's icons below it */}
+        <div className="flex items-center gap-2.5 lg:pl-[3px]">
+          <NLogo size={26} className="shrink-0" />
+          <span className="text-lg font-semibold whitespace-nowrap text-text">N-Ops</span>
         </div>
+
+        {/* Desktop only: collapses the sidebar to its icon rail and back */}
+        <button
+          type="button"
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="hidden shrink-0 rounded-md p-1.5 text-text-muted hover:bg-surface-raised hover:text-text lg:block"
+        >
+          {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+        </button>
 
         {/* Breadcrumb: hidden for now
         <nav aria-label="Breadcrumb" className="hidden min-w-0 truncate text-sm sm:block">

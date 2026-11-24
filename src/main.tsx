@@ -36,7 +36,11 @@ import '@/assets/styles/n-auth.css'
 import App from './App.tsx'
 import { preloadRoute } from '@/routes/lazyPages'
 import { ROUTES } from './constants/routes'
+import { queryClient } from '@/api/queryClient'
+import { SAVED_STARTUP_QUERIES, startupDataOwner } from '@/hooks/useAppBootstrap'
+import { loadStoredProfile } from '@/store/profileStorage'
 import { getSessionToken } from '@/store/sessionToken'
+import { restoreSavedQueries, saveQueriesOnChange } from '@/utils/queryPersistence'
 import { applyLowPowerMode } from '@/utils/lowPower'
 import { initSecureStorage, secureStorage } from '@/utils/secureStorage'
 
@@ -54,6 +58,11 @@ void initSecureStorage().then(() => {
   const saved = secureStorage.getItem('nops-theme')
   const theme = saved ? (JSON.parse(saved) as string) : 'system'
   if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme
+
+  // Reopen from the user's saved startup data (profile, preferences, organization, tags) while it
+  // reloads in the background; see utils/queryPersistence and useSessionBootstrap.
+  if (getSessionToken()) restoreSavedQueries(queryClient, SAVED_STARTUP_QUERIES, loadStoredProfile()?.userId)
+  saveQueriesOnChange(queryClient, SAVED_STARTUP_QUERIES, startupDataOwner)
 
   createRoot(document.getElementById('root')!).render(
     <>

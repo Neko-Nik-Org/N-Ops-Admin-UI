@@ -25,17 +25,20 @@ import { AppRouter } from '@/routes/router'
 import { useSessionBootstrap } from '@/hooks/useSessionBootstrap'
 
 /**
- * Starts the session check on first render (see useSessionBootstrap), so the
- * route guards know whether to show the dashboard or the login screen.
+ * Starts the session check on first render (see useSessionBootstrap), so the route guards know
+ * whether to show the dashboard or the login screen. A component inside AppProviders, because the
+ * check reads the React Query cache (startup data restored from the saved copy).
  */
-const App = () => {
+const SessionBootstrap = () => {
   useSessionBootstrap()
-
-  return (
-    <AppProviders>
-      <AppRouter />
-    </AppProviders>
-  )
+  return null
 }
+
+const App = () => (
+  <AppProviders>
+    <SessionBootstrap />
+    <AppRouter />
+  </AppProviders>
+)
 
 export default App
