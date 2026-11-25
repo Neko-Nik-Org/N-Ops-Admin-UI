@@ -52,6 +52,19 @@ export interface CurrentUser {
   canBypassApprovals?: boolean
 }
 
+/** What the current session may do (`GET /auth/session`), as copied at sign-in. */
+export interface SessionInfo {
+  /** Whether the session can be refreshed ("Keep me signed in"). */
+  allowRefresh: boolean
+  /** Whether the user's access policy lets them link the N-Ops mobile app. */
+  allowDeviceLogins: boolean
+  allowedLinuxUsers: string[]
+  permissions: string[]
+  tags: number[]
+  canApproveApprovals: boolean
+  canBypassApprovals: boolean
+}
+
 /** Login response when no second factor is needed: includes the session id and user profile. */
 /** Signed-in user's profile as the API sends it, in both the login and `/auth/verify` responses. */
 export interface RawSessionProfile {

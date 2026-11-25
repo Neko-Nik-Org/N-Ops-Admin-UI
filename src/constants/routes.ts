@@ -80,6 +80,7 @@ export const ROUTES = {
   accountProfile: '/account/profile',
   accountSecurity: '/account/security',
   accountOrganization: '/account/organization',
+  accountDevices: '/account/devices',
   /** Forced 2FA setup required by the user's access policy; outside the app shell. */
   securitySetup: '/security-setup',
   login: '/login',
@@ -203,6 +204,7 @@ export const PAGE_TITLES: Readonly<Record<string, readonly string[]>> = {
   [ROUTES.accountProfile]: ['Account', 'Profile'],
   [ROUTES.accountSecurity]: ['Account', 'Security'],
   [ROUTES.accountOrganization]: ['Account', 'Organization'],
+  [ROUTES.accountDevices]: ['Account', 'Devices'],
 }
 
 /**

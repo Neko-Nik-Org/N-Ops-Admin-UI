@@ -17,7 +17,7 @@
 /** Tests for src/api/session.ts. */
 
 import { describe, expect, it } from 'vitest'
-import { logout, refreshSession, verifySession } from '@/api/session'
+import { getSessionInfo, logout, refreshSession, verifySession } from '@/api/session'
 import { api } from '../testUtils'
 
 describe('session api', () => {
@@ -30,6 +30,35 @@ describe('session api', () => {
   it('rejects when the session is invalid', async () => {
     api.get.mockRejectedValue(new Error('Unauthorized'))
     await expect(verifySession()).rejects.toThrow('Unauthorized')
+  })
+
+  it('reads what the session may do with GET /auth/session', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        allow_refresh: true,
+        allow_device_logins: false,
+        allowed_linux_users: ['deploy'],
+        permissions: ['tag:view'],
+        tags: [2],
+        can_approve_approvals: true,
+        can_bypass_approvals: false,
+      },
+    })
+    await expect(getSessionInfo()).resolves.toEqual({
+      allowRefresh: true,
+      allowDeviceLogins: false,
+      allowedLinuxUsers: ['deploy'],
+      permissions: ['tag:view'],
+      tags: [2],
+      canApproveApprovals: true,
+      canBypassApprovals: false,
+    })
+    expect(api.get).toHaveBeenCalledWith('/auth/session')
+  })
+
+  it('treats missing session fields as not allowed, except the mobile app (allowed unless false)', async () => {
+    api.get.mockResolvedValue({ data: {} })
+    await expect(getSessionInfo()).resolves.toMatchObject({ allowRefresh: false, allowDeviceLogins: true, permissions: [] })
   })
 
   it('signs out with DELETE /auth/logout', async () => {

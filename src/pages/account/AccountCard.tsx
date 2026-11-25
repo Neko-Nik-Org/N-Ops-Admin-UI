@@ -15,7 +15,7 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Card frame shared by the Account pages (Profile, Security, Organization): icon, title, optional note and buttons. */
+/** Card frame shared by the Account pages (Profile, Security, Devices, Organization): icon, title, optional note and buttons. */
 
 import type { ReactNode } from 'react'
 import { cn } from '@/utils/cn'

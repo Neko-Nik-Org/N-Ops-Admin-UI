@@ -16,7 +16,8 @@
  */
 /**
  * API calls for access restriction policies (`/policy/access-restriction/*`). A policy holds the
- * sign-in rules for the users it is given: required 2FA methods plus allowed IP ranges and countries.
+ * sign-in rules for the users it is given: required 2FA methods, whether they may link the mobile app,
+ * plus allowed IP ranges and countries.
  * Like roles, the API splits a policy into its info (name, description) and its rules.
  */
 
@@ -32,6 +33,8 @@ interface RawAccessPolicy {
   policy_description: string
   enforce_totp_2fa: boolean
   enforce_email_2fa: boolean
+  /** Added with device sign-in; an older API leaves it out (it then meant allowed). */
+  allow_device_logins?: boolean
   has_ip_restriction: boolean
   has_geo_restriction: boolean
   allowed_ips: string[] | null
@@ -45,6 +48,7 @@ const toPolicy = (p: RawAccessPolicy): AccessPolicy => ({
   policyDescription: p.policy_description,
   enforceTotp2fa: p.enforce_totp_2fa,
   enforceEmail2fa: p.enforce_email_2fa,
+  allowDeviceLogins: p.allow_device_logins ?? true,
   hasIpRestriction: p.has_ip_restriction,
   allowedIps: p.allowed_ips ?? [],
   hasGeoRestriction: p.has_geo_restriction,
@@ -58,6 +62,7 @@ const toPolicy = (p: RawAccessPolicy): AccessPolicy => ({
 const toRawRules = (input: AccessPolicyInput) => ({
   enforce_totp_2fa: input.enforceTotp2fa,
   enforce_email_2fa: input.enforceEmail2fa,
+  allow_device_logins: input.allowDeviceLogins,
   set_ip_restriction: input.hasIpRestriction,
   set_geo_restriction: input.hasGeoRestriction,
   allowed_ips: input.hasIpRestriction ? input.allowedIps : [],
@@ -122,7 +127,7 @@ export const updateAccessPolicyInfo = async (
 }
 
 /**
- * `PATCH /policy/access-restriction/update/{id}` — replaces the policy's 2FA and IP / country rules.
+ * `PATCH /policy/access-restriction/update/{id}` — replaces the policy's 2FA, mobile app and IP / country rules.
  * Requires `policy:ar:view` + `policy:ar:edit`.
  */
 export const updateAccessPolicyRules = async (policyId: number, input: AccessPolicyInput): Promise<void> => {
@@ -142,6 +147,7 @@ const rulesChanged = (policy: AccessPolicy, input: AccessPolicyInput) => {
   return (
     before.enforce_totp_2fa !== after.enforce_totp_2fa ||
     before.enforce_email_2fa !== after.enforce_email_2fa ||
+    before.allow_device_logins !== after.allow_device_logins ||
     before.set_ip_restriction !== after.set_ip_restriction ||
     before.set_geo_restriction !== after.set_geo_restriction ||
     !sameSet(before.allowed_ips, after.allowed_ips) ||

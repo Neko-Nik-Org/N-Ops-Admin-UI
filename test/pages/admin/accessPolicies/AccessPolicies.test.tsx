@@ -33,6 +33,7 @@ const rawPolicy = (id: number, name: string, extra: Record<string, unknown> = {}
   policy_description: `${name} policy`,
   enforce_totp_2fa: false,
   enforce_email_2fa: false,
+  allow_device_logins: true,
   has_ip_restriction: false,
   has_geo_restriction: false,
   allowed_ips: [],
@@ -221,6 +222,7 @@ describe('New / edit access policy page', () => {
       description: '',
       enforce_totp_2fa: false,
       enforce_email_2fa: true,
+      allow_device_logins: true,
       set_ip_restriction: false,
       set_geo_restriction: true,
       allowed_ips: [],
@@ -377,6 +379,7 @@ describe('New / edit access policy page', () => {
     expect(api.patch).toHaveBeenCalledWith('/policy/access-restriction/update/1', {
       enforce_totp_2fa: false,
       enforce_email_2fa: false,
+      allow_device_logins: true,
       set_ip_restriction: true,
       set_geo_restriction: false,
       allowed_ips: ['203.0.113.0/24', '198.51.100.7'],
@@ -384,6 +387,24 @@ describe('New / edit access policy page', () => {
     })
     expect(api.put).not.toHaveBeenCalled()
     expect(await location()).toHaveTextContent('/admin/access-policies/1')
+  })
+
+  it('turns the mobile app off for a policy', async () => {
+    api.patch.mockResolvedValue({ data: undefined })
+    renderEdit(1)
+    await waitFor(() => expect(screen.getByLabelText('Name')).toHaveValue('Office only'))
+    const toggle = screen.getByRole('switch', { name: /Allow the mobile app/ })
+    expect(toggle).toBeChecked()
+    fireEvent.click(toggle)
+    const summary = within(screen.getByText('Summary').closest('aside') as HTMLElement)
+    expect(summary.getByText('Not allowed')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith(
+        '/policy/access-restriction/update/1',
+        expect.objectContaining({ allow_device_logins: false }),
+      ),
+    )
   })
 
   it('shows in the action bar whether there are unsaved changes', async () => {

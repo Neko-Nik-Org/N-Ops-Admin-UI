@@ -53,7 +53,18 @@ const Card = ({ title, children }: { title: string; children: ReactNode }) => (
 )
 
 /** "Required" / "Not required" line for one second factor. */
-const Factor = ({ label, on, detail }: { label: string; on: boolean; detail: string }) => (
+const Factor = ({
+  label,
+  on,
+  detail,
+  words = ['Required', 'Not required'],
+}: {
+  label: string
+  on: boolean
+  detail: string
+  /** What on and off read as. */
+  words?: [string, string]
+}) => (
   <li className="flex items-start gap-3">
     <span
       className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full ${on ? 'bg-signal/15 text-signal' : 'bg-ink text-text-muted'}`}
@@ -63,7 +74,7 @@ const Factor = ({ label, on, detail }: { label: string; on: boolean; detail: str
     </span>
     <div>
       <p className="text-sm text-text">
-        {label} <span className={on ? 'text-signal' : 'text-text-muted'}>· {on ? 'Required' : 'Not required'}</span>
+        {label} <span className={on ? 'text-signal' : 'text-text-muted'}>· {on ? words[0] : words[1]}</span>
       </p>
       <p className="text-xs text-text-muted">{detail}</p>
     </div>
@@ -119,6 +130,14 @@ export const AccessPolicyDetails = ({ policy }: { policy: AccessPolicy }) => {
               detail="A TOTP code from an app like Google Authenticator or 1Password."
             />
             <Factor label="Email code" on={policy.enforceEmail2fa} detail="A one-time code sent to their verified email." />
+          </ul>
+          <ul className="mt-3 flex flex-col gap-3 border-t border-border pt-3">
+            <Factor
+              label="Mobile app"
+              on={policy.allowDeviceLogins}
+              words={['Allowed', 'Not allowed']}
+              detail="They can link a phone with the N-Ops app, which stays signed in."
+            />
           </ul>
         </Card>
 

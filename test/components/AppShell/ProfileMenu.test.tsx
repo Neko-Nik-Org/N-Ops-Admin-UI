@@ -36,7 +36,7 @@ describe('ProfileMenu', () => {
       within(menu)
         .getAllByRole('menuitem')
         .map((i) => i.textContent),
-    ).toEqual(['Profile', 'Security', 'Organization', 'Sign out'])
+    ).toEqual(['Profile', 'Security', 'Devices', 'Organization', 'Sign out'])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Security' }))
     expect(screen.getByTestId('location')).toHaveTextContent('/account/security')
   })
