@@ -31,7 +31,8 @@ const phone = {
   device_identifier: 'uuid-7',
   device_details: { os_version: 'Android 16', app_version: '1.2.0' },
   created_at: '2026-11-20T10:00:00Z',
-  last_accessed_at: '2026-11-24T10:00:00Z',
+  // an hour ago, so it never ages past the 7-day limit as the tests get older
+  last_accessed_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
 }
 
 /**
@@ -71,6 +72,23 @@ describe('AccountDevicesPage', () => {
     expect(api.get).toHaveBeenCalledWith('/user/devices/get/7')
   })
 
+  it('shows when each device signs out, and marks one past the 7-day limit', async () => {
+    const stale = {
+      ...phone,
+      session_id: 8,
+      device_name: 'Old iPad',
+      last_accessed_at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+    }
+    mockGets({ devices: [phone, stale] })
+    renderPage()
+    const fresh = (await screen.findByText('Pixel 9')).closest('li') as HTMLElement
+    expect(within(fresh).getByText(/Signs out in 7 days unless used/)).toBeInTheDocument()
+    expect(within(fresh).queryByText('Expired')).not.toBeInTheDocument()
+    const old = screen.getByText('Old iPad').closest('li') as HTMLElement
+    expect(within(old).getByText('Expired')).toBeInTheDocument()
+    expect(within(old).getByText(/Signed out$/)).toBeInTheDocument()
+  })
+
   it('says when no device is linked', async () => {
     mockGets({ devices: [] })
     renderPage()
@@ -82,6 +100,7 @@ describe('AccountDevicesPage', () => {
     api.delete.mockResolvedValue({ data: '' })
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: 'Remove Pixel 9' }))
+    expect(screen.getByText(/signed out within 3 hours/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Remove device' }))
     await waitFor(() => expect(api.delete).toHaveBeenCalledWith('/user/devices/delete/7'))
     expect(await screen.findByText('Removed Pixel 9.')).toBeInTheDocument()

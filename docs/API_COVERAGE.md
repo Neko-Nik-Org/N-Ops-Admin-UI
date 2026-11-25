@@ -2,7 +2,7 @@
 
 Which [N-Ops Main API](https://github.com/Neko-Nik-Org/N-Ops-Main-API) endpoints the Admin UI uses,
 and what is still missing on either side. Checked against the Main API's `src/main.rs` on 2026-11-25
-(up to commit `ca8bdf9`).
+(up to commit `37ef14e`).
 
 **Legend:** ✅ used by the UI · ⏳ the UI is ready and waits for the API · 🧪 the UI runs on mock data
 (`src/data/`) because the API has no endpoint yet
@@ -91,9 +91,20 @@ at all comes from their access policy's `allow_device_logins` rule.
 | `GET /user/devices/get/{id}`           | ✅ `api/devices.ts` | Device details dialog                                                     |
 | `DELETE /user/devices/delete/{id}`     | ✅ `api/devices.ts` | Remove device                                                             |
 
-`POST /auth/device/login` is for the mobile app, not this UI. It takes `user_id`, `device_token`,
-`device_name`, `device_type`, `device_identifier` and `device_details`, and answers with a
-`refresh_token`. That is why the Devices page shows the user ID next to the code, and a QR code
+The mobile app uses three more routes, none of them called by this UI:
+
+- `POST /auth/device/login` takes `user_id`, `device_token`, `device_name`, `device_type`,
+  `device_identifier` and `device_details`, and answers with a `refresh_token`.
+- `POST /auth/device/refresh` takes `user_id`, `device_identifier`, `refresh_token` and
+  `current_session_key`, and answers like `POST /auth/login` (a 3-hour `session_id` and the profile).
+  It refuses devices unused for 7 days, inactive users or organizations, and policies without
+  `allow_device_logins`.
+- `DELETE /auth/device/logout` removes the device and ends its current session.
+
+A background job deletes devices unused for 7 days (every 6 hours). The Devices page shows when
+each device signs out and marks one past the limit as Expired until the job removes it.
+
+`/auth/device/login` needs the user ID as well as the code. That is why the Devices page shows the user ID next to the code, and a QR code
 the app can scan instead (`src/utils/deviceLink.ts`). The QR code holds compact JSON:
 
 ```json
@@ -131,7 +142,6 @@ response shape against the UI file and remove the fallback.
 
 | Feature                         | Endpoint(s) the UI expects                                                                | Status | UI file                     | API status                                                                         |
 | ------------------------------- | ----------------------------------------------------------------------------------------- | ------ | --------------------------- | ---------------------------------------------------------------------------------- |
-| Mobile app session refresh      | device refresh and device logout                                                          | n/a    | mobile app, not this UI     | commented out in `main.rs` (`POST /auth/device/login` is live)                     |
 | 2FA at sign-in                  | `POST /auth/verify-otp`, `POST /auth/resend-otp`                                          | ⏳     | `api/twoFactor.ts`          | commented out in `main.rs`                                                         |
 | Turning on 2FA (security setup) | `POST /user/2fa/email`, `/user/2fa/totp`, `/user/2fa/totp/entries`, `/entries/{id}/check` | ⏳     | `api/twoFactorSetup.ts`     | `/mfa` scope commented out (names differ: `set_email_2fa`, `create_totp_entry`, …) |
 | Forgot / reset password         | none yet (page explains to ask an admin)                                                  | ⏳     | `pages/auth/forgotPassword` | `auth::forgot_password` / `reset_password` commented out                           |
@@ -163,8 +173,10 @@ Reported, not fixed in the UI (the UI must not change the Main API):
   Unicode `is_alphanumeric()`, so non-ASCII letters count double. The UI only allows ASCII
   letters, digits, `-` and `_`.
 - `POST /auth/device/login` deletes the code on any attempt, so one typo uses it up. The UI can only
-  tell that the code is gone, so it checks the device list to say whether linking worked. Device
-  refresh and logout are still commented out, so a phone gets a refresh token it can't use yet.
+  tell that the code is gone, so it checks the device list to say whether linking worked.
+- `device_session` is now `UNIQUE (user_id, device_identifier)`, so linking a phone that is already
+  linked fails on the insert (a database error) and uses up the code. Remove the old entry first.
+  The UI then says no device was linked.
 - `POST /user/devices/generate` answers 403 both when the policy forbids the app and when a code is
   already waiting, so only the message tells them apart (the UI uses `/auth/session` and the
   waiting-code check to word it).
@@ -173,8 +185,14 @@ Reported, not fixed in the UI (the UI must not change the Main API):
 - `allow_device_logins` comes only from `GET /auth/session`, a copy made at sign-in. After an admin
   changes the user's policy, the Devices page (and the API's own check) follow the old rule until
   the user signs in again.
-- Device sessions: `last_accessed_at` is never updated (`update_last_accessed_at` is a TODO), and
-  nothing removes devices unused for 7 days as the schema comment plans. `/list` has no `ORDER BY`
+- Device sessions: `update_last_accessed_at` exists but nothing calls it (not even
+  `/auth/device/refresh`), so "last used" stays at the link time. With the new 7-day rule every
+  device is signed out and deleted 7 days after it was linked, however much it is used.
+  `update_fcm_token` and `update_apns_token` have no route yet.
+- `DELETE /user/devices/delete/{id}` only deletes the database row. The phone's current 3-hour
+  session stays valid until it runs out (the UI's remove dialog says so). `/auth/device/logout`
+  does end it.
+- Device sessions: `/list` has no `ORDER BY`
   (the UI sorts by last use). `/get/{id}` answers 200 with `null` for an unknown id, and
   `/delete/{id}` answers 204 even when nothing was deleted.
 - `GET /user/devices/check/device-token` doesn't check `allow_device_logins`, unlike generate and

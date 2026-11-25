@@ -18,6 +18,7 @@
 
 import { Dialog } from '@/components/Dialog'
 import { SkeletonText } from '@/components/Skeleton'
+import { deviceExpiresAt } from '@/api/devices'
 import { useDevice } from '@/hooks/useDevices'
 import { formatDateTime, formatRelative } from '@/utils/format'
 
@@ -61,6 +62,8 @@ export const DeviceDetailsDialog = ({ sessionId, onClose }: { sessionId: number 
           <dd className="text-text">
             {formatRelative(d.lastAccessedAt)} ({formatDateTime(d.lastAccessedAt)})
           </dd>
+          <dt className="text-text-muted">Signs out</dt>
+          <dd className="text-text">{formatDateTime(new Date(deviceExpiresAt(d.lastAccessedAt)).toISOString())} unless used</dd>
           {Object.entries(d.deviceDetails).map(([key, value]) => (
             <div key={key} className="contents">
               <dt className="text-text-muted">{keyLabel(key)}</dt>

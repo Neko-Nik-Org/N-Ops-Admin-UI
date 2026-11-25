@@ -34,6 +34,15 @@ const BASE = '/user/devices'
 /** How long a device token stays usable after it's made (the API keeps it 5 minutes). */
 export const DEVICE_TOKEN_TTL_MS = 5 * 60 * 1000
 
+/**
+ * A device not used for this long can't renew its sign-in, and the API deletes it (a job every 6 hours).
+ * Counted from `last_accessed_at`.
+ */
+export const DEVICE_IDLE_LIMIT_MS = 7 * 24 * 60 * 60 * 1000
+
+/** When a device stops being able to sign in, unless it's used before then. */
+export const deviceExpiresAt = (lastAccessedAt: string): number => Date.parse(lastAccessedAt) + DEVICE_IDLE_LIMIT_MS
+
 /** Device session as the API sends it (`DeviceSession` in the Main API). */
 interface RawDevice {
   session_id: number
@@ -68,8 +77,9 @@ export const fetchDevice = async (sessionId: number): Promise<Device | null> => 
 }
 
 /**
- * `DELETE /user/devices/delete/{id}` — signs the device out for good; the app has to be linked again.
- * The API answers 204 even if the device was already gone.
+ * `DELETE /user/devices/delete/{id}` — the device can't renew its sign-in any more; the app has to be
+ * linked again. The sign-in it already has (up to 3 hours) isn't ended. The API answers 204 even if the
+ * device was already gone.
  */
 export const removeDevice = async (sessionId: number): Promise<void> => {
   await apiClient.delete(`${BASE}/delete/${sessionId}`)
