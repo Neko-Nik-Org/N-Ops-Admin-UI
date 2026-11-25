@@ -1,8 +1,8 @@
 # API coverage
 
 Which [N-Ops Main API](https://github.com/Neko-Nik-Org/N-Ops-Main-API) endpoints the Admin UI uses,
-and what is still missing on either side. Checked against the Main API's `src/main.rs` on 2026-11-24
-(up to commit `221aa79`).
+and what is still missing on either side. Checked against the Main API's `src/main.rs` on 2026-11-25
+(up to commit `ca8bdf9`).
 
 **Legend:** ✅ used by the UI · ⏳ the UI is ready and waits for the API · 🧪 the UI runs on mock data
 (`src/data/`) because the API has no endpoint yet
@@ -13,13 +13,14 @@ Every route registered in the Main API is wired into the UI. The UI file that ca
 
 ### Health and auth
 
-| Endpoint              | UI                  | Where it shows                          |
-| --------------------- | ------------------- | --------------------------------------- |
-| `GET /health/service` | ✅ `api/health.ts`  | Startup check, sidebar health indicator |
-| `POST /auth/login`    | ✅ `api/login.ts`   | Sign-in                                 |
-| `GET /auth/verify`    | ✅ `api/session.ts` | Session check on load                   |
-| `POST /auth/refresh`  | ✅ `api/session.ts` | "Keep me signed in" sessions            |
-| `DELETE /auth/logout` | ✅ `api/session.ts` | Sign out                                |
+| Endpoint              | UI                  | Where it shows                                |
+| --------------------- | ------------------- | --------------------------------------------- |
+| `GET /health/service` | ✅ `api/health.ts`  | Startup check, sidebar health indicator       |
+| `POST /auth/login`    | ✅ `api/login.ts`   | Sign-in                                       |
+| `GET /auth/verify`    | ✅ `api/session.ts` | Session check on load                         |
+| `POST /auth/refresh`  | ✅ `api/session.ts` | "Keep me signed in" sessions                  |
+| `GET /auth/session`   | ✅ `api/session.ts` | Account › Devices (is the mobile app allowed) |
+| `DELETE /auth/logout` | ✅ `api/session.ts` | Sign out                                      |
 
 ### Signed-in user (`/user/self`)
 
@@ -76,6 +77,35 @@ Every route registered in the Main API is wired into the UI. The UI file that ca
 | `DELETE /invite/delete/{id}`                                     | ✅ `api/invitations.ts`    | Revoke invitation                 |
 | `POST /invite/join/{code}`                                       | ✅ `api/invite.ts`         | `/invite?code=…` (4-step sign-up) |
 
+### Devices (`/user/devices`, mobile app sign-in)
+
+Any signed-in user, for their own devices; no permission is needed. Whether a user may link the app
+at all comes from their access policy's `allow_device_logins` rule.
+
+| Endpoint                               | UI                  | Where it shows                                                            |
+| -------------------------------------- | ------------------- | ------------------------------------------------------------------------- |
+| `POST /user/devices/generate`          | ✅ `api/devices.ts` | Account › Devices › Get a code (user ID + one-time code, 5 min countdown) |
+| `GET /user/devices/check/device-token` | ✅ `api/devices.ts` | Polled every 3 s while a code is shown; "code still waiting" notice       |
+| `DELETE /user/devices/revoke`          | ✅ `api/devices.ts` | Cancel code, and when the countdown ends                                  |
+| `GET /user/devices/list`               | ✅ `api/devices.ts` | Account › Devices › Linked devices                                        |
+| `GET /user/devices/get/{id}`           | ✅ `api/devices.ts` | Device details dialog                                                     |
+| `DELETE /user/devices/delete/{id}`     | ✅ `api/devices.ts` | Remove device                                                             |
+
+`POST /auth/device/login` is for the mobile app, not this UI. It takes `user_id`, `device_token`,
+`device_name`, `device_type`, `device_identifier` and `device_details`, and answers with a
+`refresh_token`. That is why the Devices page shows the user ID next to the code, and a QR code
+the app can scan instead (`src/utils/deviceLink.ts`). The QR code holds compact JSON:
+
+```json
+{ "type": "n-ops-device-link", "version": 1, "api": "https://api.example.com", "user_id": 2, "device_token": "…" }
+```
+
+`api` is the absolute API base URL without a trailing slash. The app should reject other `type`s and
+ask for an update on a `version` it doesn't know.
+
+The access policy endpoints also send and take `allow_device_logins` now. It is the "Allow the
+mobile app" switch on the policy form, and shows on the policy page and in the form summary.
+
 ### Super admin (`/super-admin/organization`, admin key)
 
 | Endpoint                                                                                    | UI                        |
@@ -101,6 +131,7 @@ response shape against the UI file and remove the fallback.
 
 | Feature                         | Endpoint(s) the UI expects                                                                | Status | UI file                     | API status                                                                         |
 | ------------------------------- | ----------------------------------------------------------------------------------------- | ------ | --------------------------- | ---------------------------------------------------------------------------------- |
+| Mobile app session refresh      | device refresh and device logout                                                          | n/a    | mobile app, not this UI     | commented out in `main.rs` (`POST /auth/device/login` is live)                     |
 | 2FA at sign-in                  | `POST /auth/verify-otp`, `POST /auth/resend-otp`                                          | ⏳     | `api/twoFactor.ts`          | commented out in `main.rs`                                                         |
 | Turning on 2FA (security setup) | `POST /user/2fa/email`, `/user/2fa/totp`, `/user/2fa/totp/entries`, `/entries/{id}/check` | ⏳     | `api/twoFactorSetup.ts`     | `/mfa` scope commented out (names differ: `set_email_2fa`, `create_totp_entry`, …) |
 | Forgot / reset password         | none yet (page explains to ask an admin)                                                  | ⏳     | `pages/auth/forgotPassword` | `auth::forgot_password` / `reset_password` commented out                           |
@@ -131,5 +162,22 @@ Reported, not fixed in the UI (the UI must not change the Main API):
 - `PUT /user/self/anti-phishing-secret` checks length in bytes (`len()`) but characters with Rust's
   Unicode `is_alphanumeric()`, so non-ASCII letters count double. The UI only allows ASCII
   letters, digits, `-` and `_`.
+- `POST /auth/device/login` deletes the code on any attempt, so one typo uses it up. The UI can only
+  tell that the code is gone, so it checks the device list to say whether linking worked. Device
+  refresh and logout are still commented out, so a phone gets a refresh token it can't use yet.
+- `POST /user/devices/generate` answers 403 both when the policy forbids the app and when a code is
+  already waiting, so only the message tells them apart (the UI uses `/auth/session` and the
+  waiting-code check to word it).
+- `allow_device_logins` is required in the policy create and PATCH bodies (no serde default), so
+  clients that don't send it get a 400. The UI sends it now.
+- `allow_device_logins` comes only from `GET /auth/session`, a copy made at sign-in. After an admin
+  changes the user's policy, the Devices page (and the API's own check) follow the old rule until
+  the user signs in again.
+- Device sessions: `last_accessed_at` is never updated (`update_last_accessed_at` is a TODO), and
+  nothing removes devices unused for 7 days as the schema comment plans. `/list` has no `ORDER BY`
+  (the UI sorts by last use). `/get/{id}` answers 200 with `null` for an unknown id, and
+  `/delete/{id}` answers 204 even when nothing was deleted.
+- `GET /user/devices/check/device-token` doesn't check `allow_device_logins`, unlike generate and
+  revoke (harmless, it only answers false).
 
 Keep this file up to date when an endpoint is added on either side.

@@ -15,10 +15,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Session lifecycle API calls: verify, sign out and refresh. */
+/** Session lifecycle API calls: verify, session info, sign out and refresh. */
 
 import { apiClient } from '@/api/client'
-import { toCurrentUser, type CurrentUser, type RawSessionProfile } from '@/types/auth'
+import { toCurrentUser, type CurrentUser, type RawSessionProfile, type SessionInfo } from '@/types/auth'
 
 /**
  * `GET /auth/verify`: resolves with the signed-in user's profile when the stored session token
@@ -41,4 +41,33 @@ export const logout = async (): Promise<void> => {
 export const refreshSession = async (): Promise<string> => {
   const { data } = await apiClient.post<{ message: string; session_id: string }>('/auth/refresh')
   return data.session_id
+}
+
+/** `GET /auth/session` response. */
+interface RawSessionInfo {
+  allow_refresh: boolean
+  allow_device_logins: boolean
+  allowed_linux_users: string[]
+  permissions: string[]
+  tags: number[]
+  can_approve_approvals: boolean
+  can_bypass_approvals: boolean
+}
+
+/**
+ * `GET /auth/session` — what this session may do, as copied at sign-in (so a policy change shows only
+ * after signing in again, unlike `/user/self/profile`, which is read fresh).
+ */
+export const getSessionInfo = async (): Promise<SessionInfo> => {
+  const { data } = await apiClient.get<RawSessionInfo>('/auth/session')
+  return {
+    allowRefresh: data.allow_refresh === true,
+    // only an explicit false forbids it, like the API's own default
+    allowDeviceLogins: data.allow_device_logins !== false,
+    allowedLinuxUsers: Array.isArray(data.allowed_linux_users) ? data.allowed_linux_users : [],
+    permissions: Array.isArray(data.permissions) ? data.permissions : [],
+    tags: Array.isArray(data.tags) ? data.tags : [],
+    canApproveApprovals: data.can_approve_approvals === true,
+    canBypassApprovals: data.can_bypass_approvals === true,
+  }
 }

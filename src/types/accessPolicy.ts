@@ -28,6 +28,8 @@ export interface AccessPolicy {
   enforceTotp2fa: boolean
   /** Users with this policy must set up email codes. */
   enforceEmail2fa: boolean
+  /** Users with this policy may link the N-Ops mobile app (long-lived device sessions). */
+  allowDeviceLogins: boolean
   hasIpRestriction: boolean
   /** IPv4 addresses or CIDR ranges. */
   allowedIps: string[]

@@ -36,6 +36,7 @@ const rawPolicy = {
   policy_description: 'HQ network',
   enforce_totp_2fa: true,
   enforce_email_2fa: false,
+  allow_device_logins: true,
   has_ip_restriction: true,
   has_geo_restriction: false,
   allowed_ips: ['203.0.113.0/24'],
@@ -48,6 +49,7 @@ const policy: AccessPolicy = {
   policyDescription: 'HQ network',
   enforceTotp2fa: true,
   enforceEmail2fa: false,
+  allowDeviceLogins: true,
   hasIpRestriction: true,
   allowedIps: ['203.0.113.0/24'],
   hasGeoRestriction: false,
@@ -60,6 +62,7 @@ const policyInput: AccessPolicyInput = input
 const rawRules = {
   enforce_totp_2fa: true,
   enforce_email_2fa: false,
+  allow_device_logins: true,
   set_ip_restriction: true,
   set_geo_restriction: false,
   allowed_ips: ['203.0.113.0/24'],
@@ -121,6 +124,18 @@ describe('access policies api', () => {
     await updateAccessPolicy(policy, { ...policyInput, enforceEmail2fa: true })
     expect(api.patch).toHaveBeenCalledWith('/policy/access-restriction/update/4', { ...rawRules, enforce_email_2fa: true })
     expect(api.put).not.toHaveBeenCalled()
+  })
+
+  it('sends a mobile app change through PATCH', async () => {
+    api.patch.mockResolvedValue({ data: undefined })
+    await updateAccessPolicy(policy, { ...policyInput, allowDeviceLogins: false })
+    expect(api.patch).toHaveBeenCalledWith('/policy/access-restriction/update/4', { ...rawRules, allow_device_logins: false })
+  })
+
+  it('treats a policy from an API without the mobile app rule as allowing it', async () => {
+    const { allow_device_logins: _omit, ...older } = rawPolicy
+    api.get.mockResolvedValue({ data: older })
+    await expect(fetchAccessPolicy(4)).resolves.toEqual(policy)
   })
 
   it('saves rules before the name, and stops if the rules are refused', async () => {

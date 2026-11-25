@@ -32,6 +32,7 @@ import { useForgetSuperAdminKeyElsewhere } from '@/store/adminKey'
 import {
   AccountProfilePage,
   AccountSecurityPage,
+  AccountDevicesPage,
   AccountOrganizationPage,
   AccessPolicyDetailPage,
   AccessPolicyFormPage,
@@ -192,6 +193,7 @@ export const AppRouter = () => {
             <Route path={ROUTES.accountProfile} element={<AccountProfilePage />} />
             <Route path={ROUTES.accountSecurity} element={<AccountSecurityPage />} />
             <Route path={ROUTES.accountOrganization} element={<AccountOrganizationPage />} />
+            <Route path={ROUTES.accountDevices} element={<AccountDevicesPage />} />
           </Route>
           {/* Super admin: its own layout and key prompt, open whether or not anyone is signed in */}
           <Route path={ROUTES.superAdmin} element={<SuperAdminShell />}>

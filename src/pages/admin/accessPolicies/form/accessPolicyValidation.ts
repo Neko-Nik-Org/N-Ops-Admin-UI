@@ -72,6 +72,7 @@ export const accessPolicySchema = yup.object({
   policyDescription: yup.string().trim().default(''),
   enforceTotp2fa: yup.boolean().default(false),
   enforceEmail2fa: yup.boolean().default(false),
+  allowDeviceLogins: yup.boolean().default(true),
   hasIpRestriction: yup.boolean().default(false),
   allowedIps: allowedIpsField,
   hasGeoRestriction: yup.boolean().default(false),

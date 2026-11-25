@@ -9,6 +9,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Account › Devices: link the N-Ops mobile app by scanning a QR code, or with your user ID and a
+  one-time code (5 minute
+  countdown, cancel), and see, inspect and remove linked devices. The page says up front when your
+  access policy doesn't allow the app, and tells a linked device from a code used up by a wrong try.
+- Access policies: an "Allow the mobile app" rule (the API's `allow_device_logins`).
 - Account page: verify your email with an emailed one-time code.
 - Account page: change your username, with a live availability check.
 - Account page: change your password and deactivate your account.

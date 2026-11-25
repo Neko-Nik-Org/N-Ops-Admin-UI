@@ -30,6 +30,7 @@ const loaders = {
   AccountProfilePage: () => import('@/pages/account/profile'),
   AccountSecurityPage: () => import('@/pages/account/security'),
   AccountOrganizationPage: () => import('@/pages/account/organization'),
+  AccountDevicesPage: () => import('@/pages/account/devices'),
   AccessPolicyDetailPage: () => import('@/pages/admin/accessPolicies/details'),
   AccessPolicyFormPage: () => import('@/pages/admin/accessPolicies/form'),
   AdminAccessPoliciesPage: () => import('@/pages/admin/accessPolicies/list'),
@@ -71,6 +72,7 @@ const page = <K extends string, P extends object>(load: () => Promise<Record<K, 
 export const AccountProfilePage = page(loaders.AccountProfilePage, 'AccountProfilePage')
 export const AccountSecurityPage = page(loaders.AccountSecurityPage, 'AccountSecurityPage')
 export const AccountOrganizationPage = page(loaders.AccountOrganizationPage, 'AccountOrganizationPage')
+export const AccountDevicesPage = page(loaders.AccountDevicesPage, 'AccountDevicesPage')
 export const AccessPolicyDetailPage = page(loaders.AccessPolicyDetailPage, 'AccessPolicyDetailPage')
 export const AccessPolicyFormPage = page(loaders.AccessPolicyFormPage, 'AccessPolicyFormPage')
 export const AdminAccessPoliciesPage = page(loaders.AdminAccessPoliciesPage, 'AdminAccessPoliciesPage')
@@ -141,6 +143,7 @@ const ROUTE_LOADERS: Array<[pattern: string, load: () => Promise<unknown>]> = [
   [ROUTES.accountProfile, loaders.AccountProfilePage],
   [ROUTES.accountSecurity, loaders.AccountSecurityPage],
   [ROUTES.accountOrganization, loaders.AccountOrganizationPage],
+  [ROUTES.accountDevices, loaders.AccountDevicesPage],
   [ROUTES.securitySetup, loaders.SecuritySetupPage],
   [ROUTES.superAdminOrganization, loaders.OrganizationDetailPage],
   [ROUTES.superAdmin, loaders.OrganizationsPage],

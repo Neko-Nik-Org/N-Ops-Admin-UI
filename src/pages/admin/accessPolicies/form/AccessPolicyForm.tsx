@@ -303,12 +303,13 @@ const joinWords = (items: string[]) =>
 
 /** What the policy will do, updated as the form changes. */
 const PolicySummary = ({ control }: { control: Control<AccessPolicyFormValues> }) => {
-  const [name, totp, email, hasIp, ips, hasGeo, countries] = useWatch({
+  const [name, totp, email, deviceLogins, hasIp, ips, hasGeo, countries] = useWatch({
     control,
     name: [
       'policyName',
       'enforceTotp2fa',
       'enforceEmail2fa',
+      'allowDeviceLogins',
       'hasIpRestriction',
       'allowedIps',
       'hasGeoRestriction',
@@ -355,6 +356,8 @@ const PolicySummary = ({ control }: { control: Control<AccessPolicyFormValues> }
             <span className="text-text-muted">Not required</span>
           )}
         </dd>
+        <dt className="text-text-muted">Mobile app</dt>
+        <dd>{deviceLogins ? <Badge tone="signal">Allowed</Badge> : <span className="text-text-muted">Not allowed</span>}</dd>
         <dt className="text-text-muted">IPs</dt>
         <dd className="flex flex-wrap gap-1">
           {ipList.length ? (
@@ -427,6 +430,8 @@ const PolicyForm = ({
       policyDescription: start?.policyDescription ?? '',
       enforceTotp2fa: start?.enforceTotp2fa ?? false,
       enforceEmail2fa: start?.enforceEmail2fa ?? false,
+      // the API's default for new policies
+      allowDeviceLogins: start?.allowDeviceLogins ?? true,
       hasIpRestriction: start?.hasIpRestriction ?? false,
       allowedIps: start?.allowedIps.map((value) => ({ value: normalizeCidr(value) })) ?? [],
       hasGeoRestriction: start?.hasGeoRestriction ?? false,
@@ -453,6 +458,7 @@ const PolicyForm = ({
       policyDescription: v.policyDescription,
       enforceTotp2fa: v.enforceTotp2fa,
       enforceEmail2fa: v.enforceEmail2fa,
+      allowDeviceLogins: v.allowDeviceLogins,
       hasIpRestriction: v.hasIpRestriction,
       allowedIps: [
         ...new Set(
@@ -508,6 +514,14 @@ const PolicyForm = ({
               label="Require email codes"
               description="Users with this policy must enter a code sent to their email."
               {...register('enforceEmail2fa')}
+            />
+          </Card>
+
+          <Card title="Mobile app" hint="Signing in on a phone with the N-Ops app, which keeps the device signed in.">
+            <Switch
+              label="Allow the mobile app"
+              description="Users with this policy can link a phone from Account › Devices."
+              {...register('allowDeviceLogins')}
             />
           </Card>
         </div>

@@ -15,10 +15,10 @@
  * <https://www.gnu.org/licenses/>.
  */
 
-/** Signed-in user's dropdown in the Topbar: who you are, links to the account pages (Profile, Security, Organization) and sign out. */
+/** Signed-in user's dropdown in the Topbar: who you are, links to the account pages (Profile, Security, Devices, Organization) and sign out. */
 
 import { useAtomValue } from 'jotai'
-import { Building2, LogOut, ShieldCheck, UserCircle, type LucideIcon } from 'lucide-react'
+import { Building2, LogOut, ShieldCheck, Smartphone, UserCircle, type LucideIcon } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
@@ -31,6 +31,7 @@ import { currentUserAtom } from '@/store/session'
 const ACCOUNT_LINKS: ReadonlyArray<[string, string, LucideIcon]> = [
   [ROUTES.accountProfile, 'Profile', UserCircle],
   [ROUTES.accountSecurity, 'Security', ShieldCheck],
+  [ROUTES.accountDevices, 'Devices', Smartphone],
   [ROUTES.accountOrganization, 'Organization', Building2],
 ]
 
