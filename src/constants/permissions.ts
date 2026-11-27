@@ -16,7 +16,7 @@
  */
 /**
  * Every permission a role can grant, grouped for the role editor, plus the audit log's
- * action types. The tag:*, user:*, user:invite:*, user:role:*, policy:ar:* and vault:project:* permissions exist in the API
+ * action types. The tag:*, user:*, user:invite:*, user:role:*, policy:ar:*, vault:project:* and vault:keys:* permissions exist in the API
  * today (docs/Permissions.md); the rest are the planned ones from the admin modules.
  */
 
@@ -114,7 +114,9 @@ export const PERMISSION_GROUPS: readonly PermissionGroup[] = [
       { key: 'vault:project:edit', label: 'Rename vault projects' },
       { key: 'vault:project:delete', label: 'Delete vault projects' },
       { key: 'vault:keys:view', label: 'View secret keys' },
+      { key: 'vault:keys:create', label: 'Create secret keys' },
       { key: 'vault:keys:edit', label: 'Edit secret keys' },
+      { key: 'vault:keys:delete', label: 'Delete secret keys' },
       { key: 'vault:notes:view', label: 'View secure notes' },
       { key: 'vault:notes:edit', label: 'Edit secure notes' },
       { key: 'vault:config:view', label: 'View config files' },
@@ -202,7 +204,10 @@ export const PERMISSION_MATRIX: readonly PermissionSection[] = [
           delete: 'vault:project:delete',
         },
       },
-      { label: 'Secret keys', actions: { view: 'vault:keys:view', edit: 'vault:keys:edit' } },
+      {
+        label: 'Secret keys',
+        actions: { view: 'vault:keys:view', create: 'vault:keys:create', edit: 'vault:keys:edit', delete: 'vault:keys:delete' },
+      },
       { label: 'Secure notes', actions: { view: 'vault:notes:view', edit: 'vault:notes:edit' } },
       { label: 'Config files', actions: { view: 'vault:config:view', edit: 'vault:config:edit' } },
     ],

@@ -17,7 +17,8 @@
 /**
  * Admin › Users › one user (/admin/users/:userId): their details fresh from `/user/admin/fetch/{id}`,
  * with Edit (its own page) and Delete, plus account actions: change username, reset password, mark
- * email verified and deactivate. Every change needs `user:edit`, and none applies to yourself.
+ * email verified and deactivate. Every change needs `user:edit` (deleting needs `user:delete`), and none
+ * applies to yourself.
  */
 
 import { AtSign, Ban, BadgeCheck, KeyRound, Pencil, Trash2 } from 'lucide-react'
@@ -52,8 +53,8 @@ export const UserDetailPage = () => {
   const userId = Number(useParams().userId)
   const valid = Number.isInteger(userId) && userId > 0
   const canView = useHasPermissions('user:view')
-  // every change to an existing user, deleting included, needs user:edit in the API
   const canEdit = useHasPermissions('user:view', 'user:edit')
+  const canDelete = useHasPermissions('user:view', 'user:delete')
   const me = useAtomValue(currentUserAtom)
   const { roleName } = useRoleOptions()
   const { data: user, isLoading, error } = useAdminUser(valid && canView ? userId : null)
@@ -96,27 +97,31 @@ export const UserDetailPage = () => {
           crumbs={crumbs(user.displayName)}
           back={ROUTES.adminUsers}
           actions={
-            canEdit && (
+            (canEdit || canDelete) && (
               <>
-                <LoadingButton
-                  variant="ghost"
-                  size="sm"
-                  icon={<Trash2 size={14} />}
-                  disabled={isMe}
-                  title={isMe ? "You can't delete yourself." : undefined}
-                  onClick={() => setAction('delete')}
-                >
-                  Delete
-                </LoadingButton>
-                <LoadingButton
-                  size="sm"
-                  icon={<Pencil size={14} />}
-                  disabled={isMe}
-                  title={notSelf}
-                  onClick={() => navigate(userEditPath(user.userId))}
-                >
-                  Edit
-                </LoadingButton>
+                {canDelete && (
+                  <LoadingButton
+                    variant="ghost"
+                    size="sm"
+                    icon={<Trash2 size={14} />}
+                    disabled={isMe}
+                    title={isMe ? "You can't delete yourself." : undefined}
+                    onClick={() => setAction('delete')}
+                  >
+                    Delete
+                  </LoadingButton>
+                )}
+                {canEdit && (
+                  <LoadingButton
+                    size="sm"
+                    icon={<Pencil size={14} />}
+                    disabled={isMe}
+                    title={notSelf}
+                    onClick={() => navigate(userEditPath(user.userId))}
+                  >
+                    Edit
+                  </LoadingButton>
+                )}
               </>
             )
           }
@@ -155,8 +160,8 @@ export const UserDetailPage = () => {
               variant="secondary"
               size="sm"
               icon={<KeyRound size={14} />}
-              disabled={isMe}
-              title={notSelf}
+              disabled={isMe || !user.isActive}
+              title={isMe ? notSelf : user.isActive ? undefined : 'Activate this user before resetting their password.'}
               onClick={() => setAction('password')}
             >
               Reset password

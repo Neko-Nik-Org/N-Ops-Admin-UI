@@ -16,8 +16,8 @@
  */
 /**
  * Users in the organization (`/user/admin/*`). Everything here needs `user:view`; creating also needs
- * `user:create` + `user:role:view`, and every change to an existing user needs `user:edit` (deleting
- * included: the API checks `user:edit`, not `user:delete`). A user's sign-in rules come from the
+ * `user:create` + `user:role:view`, every change to an existing user needs `user:edit`, and deleting
+ * one needs `user:delete`. A user's sign-in rules come from the
  * access policy they're given, not from fields on the user.
  */
 
@@ -155,7 +155,7 @@ export const deactivateUser = async (userId: number): Promise<void> => {
 
 /**
  * `DELETE /user/admin/delete/{id}` — permanently deletes the user and their data (their notes too).
- * A user who is already gone answers 226, which counts as done.
+ * Needs `user:view` + `user:delete`. A user who is already gone answers 226, which counts as done.
  */
 export const deleteUser = async (userId: number): Promise<void> => {
   await apiClient.delete(`/user/admin/delete/${userId}`)

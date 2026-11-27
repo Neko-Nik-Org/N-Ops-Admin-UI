@@ -57,11 +57,11 @@ export interface SecretKey {
   tagId: number
   /** The version in use; can point back at an older one after a rollback. */
   currentVersion: number
-  latestVersion: number
   /** The version in use is hidden: its value can't be revealed, copied or exported from the UI. */
   isHidden: boolean
+  createdAt: string
+  /** When a version was added or the key rolled back. */
   updatedAt: string
-  updatedBy: string
 }
 
 /** A secret version's metadata (`vault_secret_key_versions`), without its value. */

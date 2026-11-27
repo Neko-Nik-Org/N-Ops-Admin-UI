@@ -96,6 +96,7 @@ export const LoginForm = () => {
         <AuthField
           id="userName"
           label="Username"
+          required
           icon={<User size={18} />}
           placeholder="your-username"
           autoComplete="username"
@@ -109,6 +110,7 @@ export const LoginForm = () => {
         <AuthField
           id="password"
           label="Password"
+          required
           type="password"
           icon={<Lock size={18} />}
           placeholder="Your password"

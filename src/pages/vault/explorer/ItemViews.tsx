@@ -48,6 +48,7 @@ import {
   SecretHistoryDialog,
   type SecretDialogState,
 } from '@/pages/vault/SecretDialogs'
+import { useHasPermissions } from '@/hooks/usePermissions'
 import { useTagOptions } from '@/hooks/useTagOptions'
 import { useSelectedTag } from '@/hooks/useTags'
 import {
@@ -58,11 +59,12 @@ import {
   useNotes,
   useRevealSecret,
   useSecrets,
+  useSecretVersions,
 } from '@/hooks/useVault'
+import { errorStatus } from '@/types/api'
 import type { ConfigFile, SecretKey, SecureNote, VaultProject } from '@/types/vault'
 import { formatBytes, formatDateTime, formatRelative } from '@/utils/format'
-import { FolderContents, FolderLayout, FolderPage, ListCard, LocalOnlyBadge, PreviewCard, SectionToolbar } from './ExplorerParts'
-import { FileGlyph } from './ExplorerIcons'
+import { DetailsList, FolderLayout, FolderPage, ListCard, LocalOnlyBadge, PreviewCard, SectionToolbar } from './ExplorerParts'
 import { plural, vaultPath } from './sections'
 import { useSelectedItem } from './useSelectedItem'
 
@@ -98,18 +100,24 @@ const KeyPreview = ({
 }: {
   secret: SecretKey
   tagName: (id: number) => string
-  onNewVersion: () => void
+  /** Absent without `vault:keys:edit`. */
+  onNewVersion?: () => void
   onHistory: () => void
-  onDelete: () => void
+  /** Absent without `vault:keys:delete`. */
+  onDelete?: () => void
 }) => {
-  const { mutateAsync: reveal } = useRevealSecret()
+  const { mutateAsync: revealVersion } = useRevealSecret()
+  const reveal = () => revealVersion({ secretId: secret.secretId, version: secret.currentVersion })
   const [value, setValue] = useState<string | undefined>()
+  // the newest version, to tell when the key was rolled back (the key list doesn't say)
+  const { data: versions } = useSecretVersions(secret)
+  const latestVersion = versions?.[0]?.version
 
   /** Shows or hides the value; showing it fetches (and audits) the version in use. */
   const toggle = async () => {
     if (value !== undefined) return setValue(undefined)
     try {
-      setValue(await reveal({ secretId: secret.secretId }))
+      setValue(await reveal())
     } catch (err) {
       toast.error((err as Error).message)
     }
@@ -151,10 +159,7 @@ const KeyPreview = ({
               aria-label={`${value !== undefined ? 'Hide' : 'Reveal'} ${secret.name}`}
               onClick={toggle}
             />
-            <CopyButton
-              label={`Copy ${secret.name}`}
-              getText={() => (value !== undefined ? Promise.resolve(value) : reveal({ secretId: secret.secretId }))}
-            />
+            <CopyButton label={`Copy ${secret.name}`} getText={() => (value !== undefined ? Promise.resolve(value) : reveal())} />
           </div>
         )}
       </div>
@@ -163,33 +168,41 @@ const KeyPreview = ({
         <dt className="text-text-muted">Version</dt>
         <dd className="text-text">
           v{secret.currentVersion}
-          {secret.currentVersion !== secret.latestVersion && (
+          {latestVersion !== undefined && secret.currentVersion !== latestVersion && (
             <Badge tone="warning" className="ml-1.5">
-              rolled back from v{secret.latestVersion}
+              rolled back from v{latestVersion}
             </Badge>
           )}
         </dd>
         <dt className="text-text-muted">Modified</dt>
         <dd className="text-text" title={formatDateTime(secret.updatedAt)}>
-          {formatRelative(secret.updatedAt)} by {secret.updatedBy}
+          {formatRelative(secret.updatedAt)}
+        </dd>
+        <dt className="text-text-muted">Created</dt>
+        <dd className="text-text" title={formatDateTime(secret.createdAt)}>
+          {formatRelative(secret.createdAt)}
         </dd>
       </dl>
 
       <div className="flex flex-wrap gap-2 border-t border-border pt-4">
-        <LoadingButton variant="secondary" size="sm" icon={<PencilLine size={14} />} onClick={onNewVersion}>
-          New version
-        </LoadingButton>
+        {onNewVersion && (
+          <LoadingButton variant="secondary" size="sm" icon={<PencilLine size={14} />} onClick={onNewVersion}>
+            New version
+          </LoadingButton>
+        )}
         <LoadingButton variant="ghost" size="sm" icon={<History size={14} />} onClick={onHistory}>
           History
         </LoadingButton>
-        <LoadingButton
-          variant="ghost"
-          size="sm"
-          icon={<Trash2 size={14} />}
-          aria-label={`Delete ${secret.name}`}
-          title="Delete"
-          onClick={onDelete}
-        />
+        {onDelete && (
+          <LoadingButton
+            variant="ghost"
+            size="sm"
+            icon={<Trash2 size={14} />}
+            aria-label={`Delete ${secret.name}`}
+            title="Delete"
+            onClick={onDelete}
+          />
+        )}
       </div>
     </div>
   )
@@ -198,7 +211,13 @@ const KeyPreview = ({
 /** The Env folder: a project's keys. Double-click (or Enter) opens a key's history. */
 export const EnvView = ({ project }: { project: VaultProject }) => {
   const navigate = useNavigate()
-  const { data: secrets, isLoading } = useSecrets(project.projectId)
+  const canView = useHasPermissions('vault:keys:view')
+  const canCreate = useHasPermissions('vault:keys:view', 'vault:keys:create')
+  const canEdit = useHasPermissions('vault:keys:view', 'vault:keys:edit')
+  const canDelete = useHasPermissions('vault:keys:view', 'vault:keys:delete')
+  const { data: secrets, isLoading: loadingSecrets, error } = useSecrets(canView ? project.projectId : null)
+  const isLoading = canView && (loadingSecrets || (!secrets && !error))
+  const denied = !canView || errorStatus(error) === 403
   const { tagName } = useTagOptions()
   const tags = useTagFilter()
   const { mutateAsync: remove } = useDeleteSecret()
@@ -221,42 +240,50 @@ export const EnvView = ({ project }: { project: VaultProject }) => {
       <FolderPage
         header={
           <SectionToolbar
-            badge={<LocalOnlyBadge />}
             actions={
-              <>
-                <LoadingButton variant="ghost" icon={<Upload size={14} />} onClick={() => setImporting(true)}>
-                  Import .env
-                </LoadingButton>
-                <LoadingButton
-                  variant="ghost"
-                  icon={<Download size={14} />}
-                  disabled={!secrets?.length}
-                  onClick={() => setExporting(true)}
-                >
-                  Export
-                </LoadingButton>
-                <LoadingButton icon={<Plus size={15} />} onClick={() => setDialog({ kind: 'create' })}>
-                  New key
-                </LoadingButton>
-              </>
+              !denied && (
+                <>
+                  {canCreate && canEdit && (
+                    <LoadingButton variant="ghost" icon={<Upload size={14} />} onClick={() => setImporting(true)}>
+                      Import .env
+                    </LoadingButton>
+                  )}
+                  <LoadingButton
+                    variant="ghost"
+                    icon={<Download size={14} />}
+                    disabled={!secrets?.length}
+                    onClick={() => setExporting(true)}
+                  >
+                    Export
+                  </LoadingButton>
+                  {canCreate && (
+                    <LoadingButton icon={<Plus size={15} />} onClick={() => setDialog({ kind: 'create' })}>
+                      New key
+                    </LoadingButton>
+                  )}
+                </>
+              )
             }
           />
         }
       >
         <FolderLayout
           list={
-            <ListCard title="Keys" count={visible.length} search={search} onSearch={setSearch} note={tags.note}>
-              {isLoading ? (
+            <ListCard listOnly title="Keys" count={visible.length} search={search} onSearch={setSearch} note={tags.note}>
+              {denied ? (
+                <p className="p-4 text-sm text-text-muted">
+                  You need the “View secret keys” permission (vault:keys:view) to see this project's keys.
+                </p>
+              ) : error ? (
+                <p className="p-4 text-sm text-danger">Couldn't load the keys: {error.message}</p>
+              ) : isLoading ? (
                 <Loading />
               ) : (
-                <FolderContents
+                <DetailsList
                   label="Contents of Env"
                   rows={visible}
                   rowId={(s) => s.secretId}
                   name={(s) => <span className="font-mono">{s.name}</span>}
-                  text={(s) => s.name}
-                  subtitle={tags.show ? (s) => tagName(s.tagId) : undefined}
-                  bigIcon={(s) => (s.isHidden ? <FileGlyph glyph={Lock} /> : <FileGlyph glyph={KeyRound} tone="signal" />)}
                   icon={(s) =>
                     s.isHidden ? <Lock size={15} className="text-text-muted" /> : <KeyRound size={15} className="text-signal" />
                   }
@@ -277,31 +304,26 @@ export const EnvView = ({ project }: { project: VaultProject }) => {
                     {
                       key: 'version',
                       label: 'Version',
-                      render: (s) => (
-                        <>
-                          v{s.currentVersion}
-                          {s.currentVersion !== s.latestVersion && (
-                            <Badge tone="warning" className="ml-1.5">
-                              rolled back from v{s.latestVersion}
-                            </Badge>
-                          )}
-                        </>
-                      ),
+                      render: (s) => `v${s.currentVersion}`,
                     },
                     {
                       key: 'modified',
                       label: 'Modified',
-                      render: (s) => (
-                        <span title={`${formatDateTime(s.updatedAt)} by ${s.updatedBy}`}>{formatRelative(s.updatedAt)}</span>
-                      ),
+                      render: (s) => <span title={formatDateTime(s.updatedAt)}>{formatRelative(s.updatedAt)}</span>,
                     },
                   ]}
                   selectedId={selectedId}
                   onSelect={select}
                   onOpen={setHistory}
-                  onDelete={setDeleting}
+                  onDelete={canDelete ? setDeleting : undefined}
                   onUp={() => navigate(vaultPath())}
-                  empty={secrets?.length ? 'No keys match your search or tag.' : 'No keys yet. Add one or import a .env file.'}
+                  empty={
+                    secrets?.length
+                      ? 'No keys match your search.'
+                      : tags.selectedTag
+                        ? `No keys with tag ${tags.selectedTag.tagName} yet.`
+                        : 'No keys yet. Add one or import a .env file.'
+                  }
                 />
               )}
             </ListCard>
@@ -313,9 +335,9 @@ export const EnvView = ({ project }: { project: VaultProject }) => {
                   key={selected.secretId}
                   secret={selected}
                   tagName={tagName}
-                  onNewVersion={() => setDialog({ kind: 'version', secret: selected })}
+                  onNewVersion={canEdit ? () => setDialog({ kind: 'version', secret: selected }) : undefined}
                   onHistory={() => setHistory(selected)}
-                  onDelete={() => setDeleting(selected)}
+                  onDelete={canDelete ? () => setDeleting(selected) : undefined}
                 />
               </PreviewCard>
             )
@@ -333,6 +355,7 @@ export const EnvView = ({ project }: { project: VaultProject }) => {
         // keep the open dialog in step with fresh data (e.g. after a rollback)
         secret={history ? (secrets?.find((s) => s.secretId === history.secretId) ?? history) : null}
         tagName={tagName}
+        canRollback={canEdit}
         onClose={() => setHistory(null)}
       />
       <ImportDotenvDialog
@@ -354,12 +377,12 @@ export const EnvView = ({ project }: { project: VaultProject }) => {
         title="Delete key"
         confirmLabel="Delete key"
         successMessage={`Deleted ${deleting?.name}.`}
-        onConfirm={() => remove(deleting!.secretId).then(() => select(null))}
+        onConfirm={() => remove(deleting!).then(() => select(null))}
         onClose={() => setDeleting(null)}
       >
         <p>
           Delete <span className="font-mono font-medium text-text">{deleting?.name}</span> ({deleting && tagName(deleting.tagId)})
-          and all {deleting?.latestVersion} of its versions? Anything reading it will stop getting a value. This can't be undone.
+          and all of its versions? Anything reading it will stop getting a value. This can't be undone.
         </p>
       </ConfirmDialog>
     </>
@@ -402,18 +425,15 @@ export const ConfView = ({ project }: { project: VaultProject }) => {
         <FolderLayout
           wide
           list={
-            <ListCard title="Files" count={visible.length} search={search} onSearch={setSearch} note={tags.note}>
+            <ListCard listOnly title="Files" count={visible.length} search={search} onSearch={setSearch} note={tags.note}>
               {isLoading ? (
                 <Loading />
               ) : (
-                <FolderContents
+                <DetailsList
                   label="Contents of Conf"
                   rows={visible}
                   rowId={(f) => f.fileId}
                   name={(f) => <span className="font-mono">{f.fileName}</span>}
-                  text={(f) => f.fileName}
-                  subtitle={tags.show ? (f) => tagName(f.tagId) : undefined}
-                  bigIcon={() => <FileGlyph glyph={FileCode2} tone="accent" />}
                   icon={() => <FileCode2 size={15} className="text-accent-secondary" />}
                   columns={[
                     ...(tags.show
@@ -520,6 +540,7 @@ export const NotesView = ({ project }: { project: VaultProject }) => {
           wide
           list={
             <ListCard
+              listOnly
               title="Notes"
               count={visible.length}
               search={search}
@@ -529,14 +550,11 @@ export const NotesView = ({ project }: { project: VaultProject }) => {
               {isLoading ? (
                 <Loading />
               ) : (
-                <FolderContents
+                <DetailsList
                   label="Contents of Notes"
                   rows={visible}
                   rowId={(n) => n.noteId}
                   name={(n) => n.title}
-                  text={(n) => n.title}
-                  subtitle={(n) => (n.myAccess === 'owner' ? sharingLabel(n) : n.ownerName)}
-                  bigIcon={() => <FileGlyph glyph={StickyNote} tone="warning" lines />}
                   icon={(n) => (
                     <StickyNote
                       size={15}

@@ -26,7 +26,7 @@ import { AdminUsersPage } from '@/pages/admin/users/list'
 import { api, makeUser, RAW_ORG_INFO, RAW_USERS, rawRole, renderWithProviders, serveLiveReads } from '../../../testUtils'
 
 const VIEWER = ['user:view', 'user:role:view', 'policy:ar:view']
-const EDITOR = ['user:view', 'user:role:view', 'user:create', 'user:edit']
+const EDITOR = ['user:view', 'user:role:view', 'user:create', 'user:edit', 'user:delete']
 
 const as = (permissions: string[]) => ({ user: makeUser({ permissions }) })
 const renderList = (permissions = VIEWER) =>
@@ -137,6 +137,13 @@ describe('Users list', () => {
     await screen.findByText('Marcus Chen')
     expect(screen.queryByRole('button', { name: 'Edit Marcus Chen' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'View Marcus Chen' })).toBeInTheDocument()
+  })
+
+  it('needs user:delete, not user:edit, to delete', async () => {
+    renderList(EDITOR.filter((p) => p !== 'user:delete'))
+    await screen.findByText('Marcus Chen')
+    expect(screen.getByRole('button', { name: 'Edit Marcus Chen' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete Marcus Chen' })).not.toBeInTheDocument()
   })
 
   it('asks for user:view instead of loading users without it', async () => {

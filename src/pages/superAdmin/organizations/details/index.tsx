@@ -16,30 +16,28 @@
  */
 /**
  * Super admin › one organization (/super-admin/organizations/:organizationId), fresh from the API:
- * usage, plan limits, profile and billing details, with rename, enable / disable and delete.
+ * usage, plan limits, profile and billing details, with invite, enable / disable and delete. Edit
+ * (and each card's Edit) opens the edit page.
  */
 
-import { ArrowLeft, Ban, CheckCircle2, Pencil, Send, Trash2 } from 'lucide-react'
+import { Ban, CheckCircle2, Pencil, Send, Trash2 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Badge } from '@/components/Badge'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { CopyButton } from '@/components/CopyButton'
 import { LoadingButton } from '@/components/LoadingButton'
 import { Meter } from '@/components/Meter'
-import { PageHeader } from '@/components/PageHeader'
+import { PageToolbar, type Crumb } from '@/components/PageToolbar'
 import { SkeletonText } from '@/components/Skeleton'
-import { ROUTES } from '@/constants/routes'
+import { ROUTES, superAdminOrganizationEditPath } from '@/constants/routes'
 import { describeOrgProfile } from '@/utils/orgProfile'
 import { useOrganization, useSetOrganizationActive } from '@/hooks/useOrganizations'
 import { formatBytes, formatDateTime, formatNumber } from '@/utils/format'
-import {
-  DeleteOrganizationDialog,
-  DetailsDialog,
-  InviteAdminDialog,
-  LimitsDialog,
-  RenameOrganizationDialog,
-} from '@/pages/superAdmin/organizations/OrganizationDialogs'
+import { DeleteOrganizationDialog, InviteAdminDialog } from '@/pages/superAdmin/organizations/OrganizationDialogs'
+
+/** "Organizations › <current>". */
+const crumbs = (current: string): Crumb[] => [{ label: 'Organizations', to: ROUTES.superAdmin }, { label: current }]
 
 const Card = ({ title, onEdit, children }: { title: string; onEdit?: () => void; children: ReactNode }) => (
   <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface-raised p-5">
@@ -88,64 +86,66 @@ const Limit = ({ label, value }: { label: string; value: number }) => (
 export const OrganizationDetailPage = () => {
   const { organizationId = '' } = useParams()
   const { data: org, isLoading, error } = useOrganization(organizationId)
-  const [dialog, setDialog] = useState<'rename' | 'invite' | 'state' | 'limits' | 'profile' | 'billing' | 'delete' | null>(null)
+  const [dialog, setDialog] = useState<'invite' | 'state' | 'delete' | null>(null)
   const close = () => setDialog(null)
   const { mutateAsync: setActive } = useSetOrganizationActive()
   const navigate = useNavigate()
-
-  const back = (
-    <Link to={ROUTES.superAdmin} className="inline-flex items-center gap-1 text-sm text-text-muted hover:text-text">
-      <ArrowLeft size={14} aria-hidden="true" /> All organizations
-    </Link>
-  )
+  const edit = (section?: Parameters<typeof superAdminOrganizationEditPath>[1]) =>
+    navigate(superAdminOrganizationEditPath(organizationId, section))
 
   if (isLoading)
     return (
-      <>
-        {back}
+      <div className="flex flex-col gap-6">
+        <PageToolbar crumbs={crumbs('Organization')} back={ROUTES.superAdmin} />
         <SkeletonText lines={8} />
-      </>
+      </div>
     )
   if (error || !org)
     return (
-      <>
-        {back}
+      <div className="flex flex-col gap-6">
+        <PageToolbar crumbs={crumbs('Not found')} back={ROUTES.superAdmin} />
         <p className="text-sm text-text-muted">{error?.message ?? "Couldn't load this organization."}</p>
-      </>
+      </div>
     )
 
   return (
     <>
-      {back}
-      <PageHeader
-        title={org.organizationName}
-        showTitle
-        badge={<Badge tone={org.isActive ? 'signal' : 'neutral'}>{org.isActive ? 'Active' : 'Disabled'}</Badge>}
-        actions={
-          <>
-            <LoadingButton variant="secondary" size="sm" icon={<Send size={14} />} onClick={() => setDialog('invite')}>
-              Invite admin
-            </LoadingButton>
-            <LoadingButton variant="secondary" size="sm" icon={<Pencil size={14} />} onClick={() => setDialog('rename')}>
-              Rename
-            </LoadingButton>
-            <LoadingButton
-              variant="secondary"
-              size="sm"
-              icon={org.isActive ? <Ban size={14} /> : <CheckCircle2 size={14} />}
-              onClick={() => setDialog('state')}
-            >
-              {org.isActive ? 'Disable' : 'Enable'}
-            </LoadingButton>
-            <LoadingButton variant="danger" size="sm" icon={<Trash2 size={14} />} onClick={() => setDialog('delete')}>
-              Delete
-            </LoadingButton>
-          </>
-        }
-      />
-      <p className="-mt-4 flex items-center gap-2 font-mono text-xs text-text-muted">
-        {org.organizationId} <CopyButton text={org.organizationId} label="Copy organization id" />
-      </p>
+      <div className="flex flex-col gap-3">
+        <PageToolbar
+          crumbs={crumbs(org.organizationName)}
+          back={ROUTES.superAdmin}
+          actions={
+            <>
+              <LoadingButton variant="secondary" size="sm" icon={<Send size={14} />} onClick={() => setDialog('invite')}>
+                Invite admin
+              </LoadingButton>
+              <LoadingButton
+                variant="secondary"
+                size="sm"
+                icon={org.isActive ? <Ban size={14} /> : <CheckCircle2 size={14} />}
+                onClick={() => setDialog('state')}
+              >
+                {org.isActive ? 'Disable' : 'Enable'}
+              </LoadingButton>
+              <LoadingButton variant="ghost" size="sm" icon={<Trash2 size={14} />} onClick={() => setDialog('delete')}>
+                Delete
+              </LoadingButton>
+              <LoadingButton size="sm" icon={<Pencil size={14} />} onClick={() => edit()}>
+                Edit
+              </LoadingButton>
+            </>
+          }
+        />
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="truncate text-2xl font-bold text-text">{org.organizationName}</h1>
+            <Badge tone={org.isActive ? 'signal' : 'neutral'}>{org.isActive ? 'Active' : 'Disabled'}</Badge>
+          </div>
+          <p className="flex items-center gap-2 font-mono text-xs text-text-muted">
+            {org.organizationId} <CopyButton text={org.organizationId} label="Copy organization id" />
+          </p>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
         <Card title="Usage">
@@ -153,7 +153,7 @@ export const OrganizationDetailPage = () => {
           <Meter label="AI credit" used={org.aiCredit.used} total={org.aiCredit.allocated} />
           <p className="text-xs text-text-muted">Created {formatDateTime(org.createdAt)}</p>
         </Card>
-        <Card title="Plan limits" onEdit={() => setDialog('limits')}>
+        <Card title="Plan limits" onEdit={() => edit('limits')}>
           <dl>
             <Limit label="Users" value={org.userLimit} />
             <Limit label="Servers" value={org.serverLimit} />
@@ -163,22 +163,15 @@ export const OrganizationDetailPage = () => {
             <Limit label="Vault notes" value={org.vaultNotesLimit} />
           </dl>
         </Card>
-        <Card title="Profile" onEdit={() => setDialog('profile')}>
+        <Card title="Profile" onEdit={() => edit('profile')}>
           <DetailsList details={org.organizationInfo} empty="No profile details saved." />
         </Card>
-        <Card title="Billing" onEdit={() => setDialog('billing')}>
+        <Card title="Billing" onEdit={() => edit('billing')}>
           <DetailsList details={org.billingInfo} empty="No billing details saved." />
         </Card>
       </div>
 
-      <RenameOrganizationDialog org={dialog === 'rename' ? org : null} onClose={close} />
       <InviteAdminDialog org={dialog === 'invite' ? org : null} onClose={close} />
-      <LimitsDialog org={dialog === 'limits' ? org : null} onClose={close} />
-      <DetailsDialog
-        org={dialog === 'profile' || dialog === 'billing' ? org : null}
-        which={dialog === 'billing' ? 'billing' : 'profile'}
-        onClose={close}
-      />
       <ConfirmDialog
         open={dialog === 'state'}
         title={org.isActive ? 'Disable organization' : 'Enable organization'}

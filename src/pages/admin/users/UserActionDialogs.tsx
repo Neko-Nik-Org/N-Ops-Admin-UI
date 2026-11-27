@@ -87,7 +87,7 @@ const RenameForm = ({ user, onClose }: { user: AdminUser; onClose: () => void })
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
-      <FormField id="newUserName" label="New username" error={errors.userName?.message}>
+      <FormField id="newUserName" required label="New username" error={errors.userName?.message}>
         <Input
           id="newUserName"
           autoComplete="off"
@@ -125,7 +125,7 @@ const ResetPasswordForm = ({ user, onClose }: { user: AdminUser; onClose: () => 
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
-      <FormField id="resetPassword" label="New password" error={errors.password?.message}>
+      <FormField id="resetPassword" required label="New password" error={errors.password?.message}>
         <Input
           id="resetPassword"
           type="password"
@@ -134,7 +134,7 @@ const ResetPasswordForm = ({ user, onClose }: { user: AdminUser; onClose: () => 
           {...register('password')}
         />
       </FormField>
-      <FormField id="resetConfirmPassword" label="Confirm password" error={errors.confirmPassword?.message}>
+      <FormField id="resetConfirmPassword" required label="Confirm password" error={errors.confirmPassword?.message}>
         <Input
           id="resetConfirmPassword"
           type="password"

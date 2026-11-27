@@ -115,10 +115,10 @@ export const UserEditForm = ({ user, onSaved, onCancel }: { user: AdminUser; onS
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-6">
           <FormCard title="Account" hint={`Signs in as @${user.userName}. Change that from their page.`}>
-            <FormField id="editDisplayName" label="Name" error={errors.displayName?.message}>
+            <FormField id="editDisplayName" required label="Name" error={errors.displayName?.message}>
               <Input id="editDisplayName" autoComplete="off" hasError={!!errors.displayName} {...register('displayName')} />
             </FormField>
-            <FormField id="editPrimaryEmail" label="Email" error={errors.primaryEmail?.message}>
+            <FormField id="editPrimaryEmail" required label="Email" error={errors.primaryEmail?.message}>
               <Input
                 id="editPrimaryEmail"
                 type="email"
@@ -136,7 +136,7 @@ export const UserEditForm = ({ user, onSaved, onCancel }: { user: AdminUser; onS
             title="Access"
             hint="Someone who's signed in gets a change when they next sign in or their session refreshes."
           >
-            <FormField id="editRoleId" label="Role" error={errors.roleId?.message}>
+            <FormField id="editRoleId" required label="Role" error={errors.roleId?.message}>
               <Select id="editRoleId" disabled={!canViewRoles} hasError={!!errors.roleId} {...register('roleId')}>
                 {!roleKnown && <option value={user.roleId}>Role #{user.roleId}</option>}
                 {roles.map((r) => (

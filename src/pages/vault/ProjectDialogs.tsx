@@ -76,7 +76,7 @@ const ContainerForm = ({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
-      <FormField id="containerName" label="Name" error={error ?? undefined}>
+      <FormField id="containerName" required label="Name" error={error ?? undefined}>
         <Input
           id="containerName"
           value={name}
@@ -133,7 +133,7 @@ export const DeleteProjectDialog = ({
       <p>
         Delete <span className="font-medium text-text">{project?.projectName}</span> and everything in it
         {contents
-          ? `: ${contents.secrets} keys, ${contents.configs} config files and ${contents.notes} notes, with all their versions`
+          ? `: ${contents.secrets === null ? 'its keys' : `${contents.secrets} keys`}, ${contents.configs} config files and ${contents.notes} notes, with all their versions`
           : ''}
         ? Everything in it is removed permanently, and anything reading these secrets stops working. This can't be undone.
       </p>

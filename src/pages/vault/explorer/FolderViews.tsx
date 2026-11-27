@@ -30,6 +30,7 @@ import { FolderContents, FolderHeader, FolderLayout, FolderPage, ListCard, Previ
 import { FolderGlyph } from './ExplorerIcons'
 import { plural, SECTION_ORDER, SECTIONS, vaultPath, type VaultSection } from './sections'
 import { useSectionCounts } from './useSectionCounts'
+import { SectionToolbarSlot } from './sectionToolbarSlot'
 import { useSelectedItem } from './useSelectedItem'
 
 const matches = (search: string, ...values: string[]) => {
@@ -231,43 +232,46 @@ export const ProjectView = ({
   children: ReactNode
 }) => {
   const counts = useSectionCounts(project.projectId)
+  // the open folder's buttons (New key, Import .env …) render here, at the right end of the tabs
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null)
 
   // just the path above the tabs; renaming and deleting a project happen in the Vault's project list
   return (
     <FolderPage header={<FolderHeader path={[ROOT_CRUMB]} title={project.projectName} pathOnly />}>
       {/*
-        Scrolls sideways on narrow screens. The grey baseline is an inset shadow, not a border, so the
-        active tab's underline can sit on it without sticking out (which would add a scrollbar).
+        The grey baseline is an inset shadow, not a border, so the active tab's underline can sit on
+        it without sticking out. On narrow screens the buttons wrap above the tabs, and the tabs scroll
+        sideways.
       */}
-      <nav
-        aria-label={`${project.projectName} folders`}
-        className="-mt-2 flex gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-border)]"
-      >
-        {SECTION_ORDER.map((s) => {
-          const { label, icon: Icon, purpose } = SECTIONS[s]
-          const active = s === section
-          return (
-            <Link
-              key={s}
-              to={vaultPath(project.projectId, s)}
-              aria-current={active ? 'page' : undefined}
-              aria-label={counts[s] === undefined ? label : `${label}, ${plural(counts[s]!, SECTIONS[s].noun)}`}
-              title={purpose}
-              className={cn(
-                'flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
-                active
-                  ? 'border-signal text-text'
-                  : 'border-transparent text-text-muted hover:border-border-strong hover:text-text',
-              )}
-            >
-              <Icon size={15} className={active ? 'text-signal' : undefined} aria-hidden="true" />
-              {label}
-              <span className="rounded-full bg-ink px-1.5 py-0.5 text-[0.6875rem] text-text-muted">{counts[s] ?? '…'}</span>
-            </Link>
-          )
-        })}
-      </nav>
-      {children}
+      <div className="-mt-2 flex flex-wrap-reverse items-end justify-between gap-x-4 gap-y-2 shadow-[inset_0_-1px_0_var(--color-border)]">
+        <nav aria-label={`${project.projectName} folders`} className="flex min-w-0 gap-1 overflow-x-auto overflow-y-hidden">
+          {SECTION_ORDER.map((s) => {
+            const { label, icon: Icon, purpose } = SECTIONS[s]
+            const active = s === section
+            return (
+              <Link
+                key={s}
+                to={vaultPath(project.projectId, s)}
+                aria-current={active ? 'page' : undefined}
+                aria-label={counts[s] === undefined ? label : `${label}, ${plural(counts[s]!, SECTIONS[s].noun)}`}
+                title={purpose}
+                className={cn(
+                  'flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+                  active
+                    ? 'border-signal text-text'
+                    : 'border-transparent text-text-muted hover:border-border-strong hover:text-text',
+                )}
+              >
+                <Icon size={15} className={active ? 'text-signal' : undefined} aria-hidden="true" />
+                {label}
+                <span className="rounded-full bg-ink px-1.5 py-0.5 text-[0.6875rem] text-text-muted">{counts[s] ?? '…'}</span>
+              </Link>
+            )
+          })}
+        </nav>
+        <div ref={setToolbarSlot} className="ml-auto pb-1.5 empty:hidden" />
+      </div>
+      <SectionToolbarSlot.Provider value={toolbarSlot}>{children}</SectionToolbarSlot.Provider>
     </FolderPage>
   )
 }

@@ -81,7 +81,7 @@ const ScheduleForm = ({ schedule, onClose }: { schedule?: AuditExportSchedule; o
           </Select>
         </FormField>
       </div>
-      <FormField id="recipients" label="Email it to" error={errors.recipients?.message}>
+      <FormField id="recipients" required label="Email it to" error={errors.recipients?.message}>
         <Textarea
           id="recipients"
           rows={2}

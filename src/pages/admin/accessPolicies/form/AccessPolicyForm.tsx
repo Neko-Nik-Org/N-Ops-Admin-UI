@@ -146,7 +146,7 @@ const IpListField = ({
 
   return (
     <div className="flex flex-col gap-3">
-      <FormField id="allowedIpInput" label="Allowed IP addresses and ranges" error={draftError?.message}>
+      <FormField id="allowedIpInput" required label="Allowed IP addresses and ranges" error={draftError?.message}>
         <div className="flex items-start gap-2">
           <Input
             id="allowedIpInput"
@@ -483,7 +483,7 @@ const PolicyForm = ({
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_20rem]">
         <div className="flex flex-col gap-6">
           <Card title="Details" hint="How the policy shows up in lists and when assigning it.">
-            <FormField id="policyName" label="Name" error={errors.policyName?.message}>
+            <FormField id="policyName" required label="Name" error={errors.policyName?.message}>
               <Input
                 id="policyName"
                 placeholder="Office only"
@@ -540,7 +540,7 @@ const PolicyForm = ({
             {...register('hasGeoRestriction')}
           />
           {hasGeoRestriction && (
-            <FormField id="allowedGeoLocations" label="Allowed countries" error={errors.allowedGeoLocations?.message}>
+            <FormField id="allowedGeoLocations" required label="Allowed countries" error={errors.allowedGeoLocations?.message}>
               <Controller
                 control={control}
                 name="allowedGeoLocations"

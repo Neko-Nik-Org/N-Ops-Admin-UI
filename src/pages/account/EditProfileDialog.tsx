@@ -118,7 +118,7 @@ export const EditProfileDialog = ({ open, user, onClose }: EditProfileDialogProp
   return (
     <Dialog open={open} onClose={onClose} title="Edit profile" description="How you appear to others in your organization.">
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
-        <FormField id="profileDisplayName" label="Display name" error={errors.displayName?.message}>
+        <FormField id="profileDisplayName" required label="Display name" error={errors.displayName?.message}>
           <Input
             id="profileDisplayName"
             autoComplete="name"
@@ -127,7 +127,7 @@ export const EditProfileDialog = ({ open, user, onClose }: EditProfileDialogProp
             {...register('displayName')}
           />
         </FormField>
-        <FormField id="profilePrimaryEmail" label="Email" error={errors.primaryEmail?.message}>
+        <FormField id="profilePrimaryEmail" required label="Email" error={errors.primaryEmail?.message}>
           <Input
             id="profilePrimaryEmail"
             type="email"

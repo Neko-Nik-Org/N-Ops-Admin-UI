@@ -58,6 +58,7 @@ import {
   NotFoundPage,
   preloadLinksOnIntent,
   OrganizationDetailPage,
+  OrganizationFormPage,
   OrganizationsPage,
   OverviewPage,
   SecuritySetupPage,
@@ -198,7 +199,9 @@ export const AppRouter = () => {
           {/* Super admin: its own layout and key prompt, open whether or not anyone is signed in */}
           <Route path={ROUTES.superAdmin} element={<SuperAdminShell />}>
             <Route index element={<OrganizationsPage />} />
+            <Route path={ROUTES.superAdminOrganizationNew} element={<OrganizationFormPage />} />
             <Route path={ROUTES.superAdminOrganization} element={<OrganizationDetailPage />} />
+            <Route path={ROUTES.superAdminOrganizationEdit} element={<OrganizationFormPage />} />
           </Route>
           {/* Anything unmatched */}
           <Route path="*" element={<NotFoundPage />} />

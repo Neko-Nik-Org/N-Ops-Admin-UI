@@ -288,7 +288,7 @@ const NewConfigForm = ({
   return (
     <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-[3fr_2fr]">
-        <FormField id="configName" label="File name" error={errors.name}>
+        <FormField id="configName" required label="File name" error={errors.name}>
           <Input
             id="configName"
             value={fileName}
@@ -301,7 +301,7 @@ const NewConfigForm = ({
             hasError={!!errors.name}
           />
         </FormField>
-        <FormField id="configTag" label="Tag" error={errors.tag}>
+        <FormField id="configTag" required label="Tag" error={errors.tag}>
           <Select id="configTag" value={tagId} onChange={(e) => setTagId(Number(e.target.value))} hasError={!!errors.tag}>
             <option value={0} disabled>
               {options.length ? 'Pick a tag' : 'No tags yet: create one on the Tags page'}

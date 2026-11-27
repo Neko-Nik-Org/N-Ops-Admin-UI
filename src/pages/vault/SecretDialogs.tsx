@@ -30,7 +30,7 @@ import { useAsyncAction } from '@/hooks/useAsyncAction'
 import { Dialog } from '@/components/Dialog'
 import { FormField } from '@/components/FormField'
 import { useTagOptions } from '@/hooks/useTagOptions'
-import { SECRET_NAME } from '@/api/vaultSecrets'
+import { SECRET_NAME, SECRET_VALUE_MAX_BYTES, secretValueError } from '@/api/vaultSecrets'
 import { parseDotenv } from '@/utils/dotenv'
 import {
   useAddSecretVersion,
@@ -59,7 +59,7 @@ const TagSelect = ({
 }) => {
   const { options } = useTagOptions()
   return (
-    <FormField id={id} label="Tag" error={error}>
+    <FormField id={id} label="Tag" error={error} required>
       <Select id={id} value={value} onChange={(e) => onChange(Number(e.target.value))} hasError={!!error}>
         <option value={0} disabled>
           {options.length ? 'Pick a tag' : 'No tags yet: create one on the Tags page'}
@@ -104,8 +104,8 @@ const SecretForm = ({
   const [saveState, save] = useAsyncAction(
     () =>
       isVersion
-        ? addVersion({ secretId: state.secret.secretId, value, note, isHidden })
-        : create({ projectId: project.projectId, input: { name, tagId, value, note, isHidden } }).then(() => undefined),
+        ? addVersion({ secret: state.secret, value, note, isHidden })
+        : create({ projectId: project.projectId, input: { name, tagId, value, note, isHidden } }),
     { successMs: 400 },
   )
 
@@ -114,12 +114,13 @@ const SecretForm = ({
     const next: typeof errors = {}
     if (!isVersion && !SECRET_NAME.test(name)) next.name = 'Use letters, numbers and underscores, not starting with a number.'
     if (!isVersion && !tagId) next.tag = 'Pick a tag.'
-    if (!value) next.value = 'Enter a value.'
+    const valueError = secretValueError(value)
+    if (valueError) next.value = valueError
     setErrors(next)
     if (Object.keys(next).length) return
     save()
       .then(() => {
-        toast.success(isVersion ? `${state.secret.name} is now on v${state.secret.latestVersion + 1}.` : `Added ${name}.`)
+        toast.success(isVersion ? `Saved a new version of ${state.secret.name}.` : `Added ${name}.`)
         setTimeout(onClose, 400)
       })
       .catch((err: Error) => toast.error(err.message))
@@ -129,7 +130,7 @@ const SecretForm = ({
     <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
       {!isVersion && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[3fr_2fr]">
-          <FormField id="secretName" label="Name" error={errors.name}>
+          <FormField id="secretName" required label="Name" error={errors.name}>
             <Input
               id="secretName"
               value={name}
@@ -147,6 +148,7 @@ const SecretForm = ({
       )}
       <FormField
         id="secretValue"
+        required
         label={isVersion ? 'New value' : 'Value'}
         error={errors.value}
         labelExtra={
@@ -189,7 +191,7 @@ const SecretForm = ({
           description={
             isHidden
               ? 'Write-only: apps can still use it, but nobody can reveal, copy or export it from here. Keep a copy if you need one.'
-              : 'Anyone with access can reveal it later. Every reveal is recorded in the audit log.'
+              : 'Anyone with access to this tag can reveal it later.'
           }
           checked={isHidden}
           onChange={(e) => setIsHidden(e.target.checked)}
@@ -197,8 +199,9 @@ const SecretForm = ({
       </div>
       <p className="text-xs text-text-muted">
         {isVersion
-          ? `Saved as v${state.secret.latestVersion + 1}. Earlier versions stay in the history, so you can roll back.`
-          : 'Stored encrypted (AES-256-GCM).'}
+          ? 'Saved as a new version and used from now on. Earlier versions stay in the history, so you can roll back.'
+          : 'Stored encrypted (AES-256-GCM).'}{' '}
+        Up to {SECRET_VALUE_MAX_BYTES} bytes.
       </p>
       <div className="flex justify-end gap-2">
         <LoadingButton variant="ghost" onClick={onClose}>
@@ -244,8 +247,8 @@ export const SecretDialog = ({
 
 // ── History ──────────────────────────────────────────────
 
-const SecretHistory = ({ secret }: { secret: SecretKey }) => {
-  const { data: versions, isLoading } = useSecretVersions(secret.secretId)
+const SecretHistory = ({ secret, canRollback }: { secret: SecretKey; canRollback: boolean }) => {
+  const { data: versions, isLoading, error } = useSecretVersions(secret)
   const [revealed, setRevealed] = useState<Record<number, string>>({})
   const { mutateAsync: rollback } = useRollbackSecret()
   const { mutateAsync: reveal } = useRevealSecret()
@@ -270,7 +273,10 @@ const SecretHistory = ({ secret }: { secret: SecretKey }) => {
     }
   }
 
+  if (error) return <p className="text-sm text-danger">Couldn't load the history: {error.message}</p>
   if (isLoading || !versions) return <SkeletonText lines={4} />
+  // newest first
+  const latestVersion = versions[0]?.version
   return (
     <ol className="flex flex-col gap-2">
       {versions.map((v) => {
@@ -281,9 +287,10 @@ const SecretHistory = ({ secret }: { secret: SecretKey }) => {
               <span className="font-mono text-sm font-semibold text-text">v{v.version}</span>
               {current && <Badge tone="signal">In use</Badge>}
               {v.isHidden && <Badge tone="neutral">Hidden</Badge>}
-              {v.version === secret.latestVersion && !current && <Badge tone="warning">Latest, not in use</Badge>}
+              {v.version === latestVersion && !current && <Badge tone="warning">Latest, not in use</Badge>}
               <span className="text-xs text-text-muted" title={formatDateTime(v.createdAt)}>
-                {v.createdBy} · {formatRelative(v.createdAt)}
+                {v.createdBy ? `${v.createdBy} · ` : ''}
+                {formatRelative(v.createdAt)}
               </span>
               <span className="ml-auto flex gap-1">
                 {!v.isHidden && (
@@ -295,7 +302,7 @@ const SecretHistory = ({ secret }: { secret: SecretKey }) => {
                     onClick={() => toggle(v.version)}
                   />
                 )}
-                {!current && (
+                {!current && canRollback && (
                   <LoadingButton
                     variant="secondary"
                     size="sm"
@@ -329,10 +336,13 @@ const SecretHistory = ({ secret }: { secret: SecretKey }) => {
 export const SecretHistoryDialog = ({
   secret,
   tagName,
+  canRollback = true,
   onClose,
 }: {
   secret: SecretKey | null
   tagName: (id: number) => string
+  /** `vault:keys:edit`: offer "Use this version". */
+  canRollback?: boolean
   onClose: () => void
 }) => (
   <Dialog
@@ -346,7 +356,7 @@ export const SecretHistoryDialog = ({
         : undefined
     }
   >
-    {secret && <SecretHistory secret={secret} />}
+    {secret && <SecretHistory key={secret.secretId} secret={secret} canRollback={canRollback} />}
   </Dialog>
 )
 
@@ -399,6 +409,7 @@ const ImportForm = ({
       <TagSelect id="importTag" value={tagId} onChange={setTagId} error={tagError} />
       <FormField
         id="importText"
+        required
         label=".env contents"
         labelExtra={
           <label className="flex cursor-pointer items-center gap-1 text-sm text-signal hover:text-signal-strong">
@@ -511,9 +522,7 @@ const ExportForm = ({
   return (
     <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
       <TagSelect id="exportTag" value={tagId} onChange={setTagId} />
-      <p className="text-sm text-text-muted">
-        Downloads the value in use for every key with this tag, except hidden ones. The export is recorded in the audit log.
-      </p>
+      <p className="text-sm text-text-muted">Downloads the value in use for every key with this tag, except hidden ones.</p>
       <div className="flex justify-end gap-2">
         <LoadingButton variant="ghost" onClick={onClose}>
           Cancel

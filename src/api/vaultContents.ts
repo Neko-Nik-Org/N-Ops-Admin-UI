@@ -15,14 +15,14 @@
  * <https://www.gnu.org/licenses/>.
  */
 /**
- * The local side of vault projects. Projects themselves are live (./vaultProjects.ts); what's inside
- * them (Env keys, Conf files, Notes) is kept in memory by project id until those endpoints exist.
- * Every project starts empty.
+ * What's inside vault projects. Projects (./vaultProjects.ts) and their Env keys (./vaultSecrets.ts)
+ * are live; Conf files and Notes are kept in memory by project id until those endpoints exist.
  */
 
 import { db as adminDb } from '@/data/mockAdmin'
 import { mockDelay } from '@/data/mockHelpers'
 import { vaultDb } from '@/data/mockVault'
+import { countSecrets } from './vaultSecrets'
 
 /**
  * A project's name for mock audit entries, e.g. "payments-api". Real projects the mock doesn't
@@ -31,22 +31,25 @@ import { vaultDb } from '@/data/mockVault'
 export const projectPath = (projectId: number) =>
   vaultDb.projects.find((p) => p.projectId === projectId)?.projectName ?? `project #${projectId}`
 
-/** Mock of how much a project holds, for the delete confirmation. */
-export const getProjectContents = async (projectId: number) => {
-  await mockDelay()
+/**
+ * How much a project holds, for the delete confirmation. Keys are counted live across `tagIds` (the
+ * tags the user can see, so a tag-restricted user may see fewer than there are).
+ */
+export const getProjectContents = async (projectId: number, tagIds: readonly number[]) => {
+  // null when the keys can't be counted (e.g. no vault:keys:view)
+  const [secrets] = await Promise.all([countSecrets(projectId, tagIds).catch(() => null), mockDelay()])
   return {
-    secrets: vaultDb.secrets.filter((s) => s.projectId === projectId).length,
+    secrets,
     configs: vaultDb.configs.filter((c) => c.projectId === projectId).length,
     notes: vaultDb.notes.filter((n) => n.projectId === projectId).length,
   }
 }
 
 /**
- * After a real project is deleted, drops the mock keys, files and notes that were inside it, and its
- * links from API keys (the API's ON DELETE CASCADE does the same for the real tables).
+ * After a real project is deleted, drops the mock files and notes that were inside it, and its links
+ * from API keys (the API's ON DELETE CASCADE does the same for the real tables, keys included).
  */
 export const forgetProjectContents = (projectId: number) => {
-  vaultDb.secrets = vaultDb.secrets.filter((s) => s.projectId !== projectId)
   vaultDb.configs = vaultDb.configs.filter((c) => c.projectId !== projectId)
   vaultDb.notes = vaultDb.notes.filter((n) => n.projectId !== projectId)
   for (const key of adminDb.apiKeys) key.vaultProjectIds = key.vaultProjectIds.filter((id) => id !== projectId)

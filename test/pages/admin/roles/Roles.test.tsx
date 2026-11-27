@@ -93,7 +93,7 @@ describe('Roles list', () => {
   it('lists live roles with their permissions, tags and approval flags', async () => {
     renderList()
     const row = (await screen.findByText('Operator')).closest('tr') as HTMLElement
-    expect(within(row).getByText('2 of 43')).toBeInTheDocument()
+    expect(within(row).getByText('2 of 45')).toBeInTheDocument()
     expect(within(row).getByText('production')).toBeInTheDocument()
     expect(within(row).getByText('Approver')).toBeInTheDocument()
     expect(api.get).toHaveBeenCalledWith('/user/roles/list', { params: { limit: 100, offset: 0 } })

@@ -14,7 +14,10 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tests for the Vault explorer (src/pages/vault/index.tsx and explorer/*) on the mock backend. */
+/**
+ * Tests for the Vault explorer (src/pages/vault/index.tsx and explorer/*): projects and Env keys on a
+ * faked live API, Conf and Notes on the mock backend.
+ */
 
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -24,8 +27,17 @@ import { resetVaultMock } from '@/data/mockVault'
 import { VaultPage } from '@/pages/vault'
 import { ApiError } from '@/types/api'
 import { api, makeUser, RAW_ORG_INFO, RAW_PROJECTS, rawProject, renderWithProviders, serveLiveReads } from '../../testUtils'
+import { serveSecretKeys, type FakeKey } from '../../fakeSecretKeys'
 
-const PROJECT_PERMS = ['vault:project:view', 'vault:project:create', 'vault:project:edit', 'vault:project:delete', 'user:view']
+const KEY_PERMS = ['vault:keys:view', 'vault:keys:create', 'vault:keys:edit', 'vault:keys:delete']
+const PROJECT_PERMS = [
+  'vault:project:view',
+  'vault:project:create',
+  'vault:project:edit',
+  'vault:project:delete',
+  'user:view',
+  ...KEY_PERMS,
+]
 
 /** Opens the explorer at `route` (/vault, /vault/1 or /vault/1/env). Other URLs show the location probe. */
 const openAt = (route: string, user: CurrentUser = makeUser({ permissions: PROJECT_PERMS })) => {
@@ -56,10 +68,14 @@ const row = (...texts: string[]) =>
     texts.every((t) => within(r).queryByText(t)),
   ) as HTMLElement
 
+/** The fake API's secret keys, fresh for each test. */
+let keys: FakeKey[]
+
 beforeEach(() => {
   resetAdminMock()
   resetVaultMock()
   serveLiveReads() // real tags 1–4, matching the mock vault data
+  keys = serveSecretKeys()
 })
 
 describe('Vault explorer: the root and project folders', () => {
@@ -101,19 +117,25 @@ describe('Vault explorer: the root and project folders', () => {
     expect(row('internal-tools')).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('shows Large icons by default and switches to Details, remembering the choice', async () => {
-    const { unmount } = openAt('/vault/1/env')
-    expect(await screen.findByRole('listbox', { name: 'Contents of Env' })).toBeInTheDocument()
+  it('shows projects as Large icons by default and switches to Details, remembering the choice', async () => {
+    const { unmount } = openAt('/vault')
+    expect(await screen.findByRole('listbox', { name: 'Projects' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Large icons' })).toHaveAttribute('aria-pressed', 'true')
-    expect(within(row('DATABASE_URL', 'staging')).getByText('staging')).toBeInTheDocument() // tag under the name
-
     fireEvent.click(screen.getByRole('button', { name: 'Details' }))
-    const table = screen.getByRole('grid', { name: 'Contents of Env' })
-    expect(within(table).getByRole('columnheader', { name: 'Version' })).toBeInTheDocument()
+    expect(screen.getByRole('grid', { name: 'Projects' })).toBeInTheDocument()
     unmount()
 
     openAt('/vault')
     expect(await screen.findByRole('grid', { name: 'Projects' })).toBeInTheDocument() // still Details
+  })
+
+  it("lists a project's folders as Details only, without the view switch", async () => {
+    openAt('/vault/1/env')
+    const table = await screen.findByRole('grid', { name: 'Contents of Env' })
+    expect(within(table).getByRole('columnheader', { name: 'Version' })).toBeInTheDocument()
+    expect(within(row('DATABASE_URL', 'staging')).getByText('staging')).toBeInTheDocument() // the Tag column
+    expect(screen.queryByRole('button', { name: 'Large icons' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Details' })).not.toBeInTheDocument()
   })
 
   it('shows the selected item in the details pane, which can be closed', async () => {
@@ -135,11 +157,15 @@ describe('Vault explorer: the root and project folders', () => {
     expect(within(row('payments-api')).getByText('Card payments and payouts.')).toBeInTheDocument()
   })
 
-  it('marks Env, Conf and Notes as not saved to the server yet', async () => {
-    openAt('/vault/1/conf')
+  it('marks Conf and Notes as not saved to the server yet, but not the live Env', async () => {
+    const { unmount } = openAt('/vault/1/conf')
     await list('Contents of Conf')
     expect(screen.getByText('Not saved to the server yet')).toBeInTheDocument()
     expect(screen.queryByText('Mock data')).not.toBeInTheDocument()
+    unmount()
+    openAt('/vault/1/env')
+    await list('Contents of Env')
+    expect(screen.queryByText('Not saved to the server yet')).not.toBeInTheDocument()
   })
 
   it('filters the open folder with the search box', async () => {
@@ -257,14 +283,16 @@ describe('Vault explorer: the root and project folders', () => {
     expect(env).toHaveAttribute('aria-current', 'page')
     expect(await within(tabs).findByRole('link', { name: 'Conf, 4 files' })).toHaveAttribute('href', '/vault/1/conf')
     expect(within(tabs).getByRole('link', { name: 'Notes, 2 notes' })).not.toHaveAttribute('aria-current')
-    // the tab's own buttons stay
-    expect(screen.getByRole('button', { name: 'New key' })).toBeInTheDocument()
+    // the tab's own buttons sit at the right end of the tab row
+    expect(tabs.parentElement).toContainElement(screen.getByRole('button', { name: 'New key' }))
+    expect(tabs.parentElement).toContainElement(screen.getByRole('button', { name: 'Import .env' }))
     expect(screen.queryByRole('tree')).not.toBeInTheDocument()
 
     fireEvent.click(within(tabs).getByRole('link', { name: /Conf/ }))
     expect(await list('Contents of Conf')).toBeInTheDocument()
     expect(within(tabs).getByRole('link', { name: /Conf/ })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('button', { name: 'New file' })).toBeInTheDocument()
+    expect(tabs.parentElement).toContainElement(screen.getByRole('button', { name: 'New file' }))
+    expect(screen.queryByRole('button', { name: 'New key' })).not.toBeInTheDocument()
   })
 
   it('goes back to the Vault with Backspace', async () => {
@@ -285,14 +313,18 @@ describe('Vault explorer: Env', () => {
   it('lists keys with tag and version, and reveals a value in the preview pane', async () => {
     openAt('/vault/1/env')
     await list('Contents of Env')
-    showDetails()
-    expect(within(row('JWT_SIGNING_KEY', 'production')).getByText('rolled back from v2')).toBeInTheDocument()
     expect(heading('Keys 11')).toBeInTheDocument()
+    expect(api.get).toHaveBeenCalledWith('/vault/secret/keys/list', {
+      params: { project_id: 1, tag_id: 1, limit: 100, offset: 0 },
+    })
+    fireEvent.click(row('JWT_SIGNING_KEY', 'production'))
+    expect(await within(preview()).findByText('rolled back from v2')).toBeInTheDocument()
 
     fireEvent.click(row('DATABASE_URL', 'production'))
     expect(within(preview()).getByText('••••••••••••')).toBeInTheDocument()
     fireEvent.click(within(preview()).getByRole('button', { name: 'Reveal DATABASE_URL' }))
     expect(await within(preview()).findByText(/sslmode=require/)).toBeInTheDocument()
+    expect(api.get).toHaveBeenCalledWith('/vault/secret/keys/read/1/3')
   })
 
   it('shows a hidden key without reveal or copy, and its history per version', async () => {
@@ -327,18 +359,64 @@ describe('Vault explorer: Env', () => {
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Add key' }))
     expect(await screen.findByText('Added WEBHOOK_SECRET.')).toBeInTheDocument()
     await waitFor(() => expect(row('WEBHOOK_SECRET', 'production')).toBeTruthy())
+    expect(api.post).toHaveBeenCalledWith('/vault/secret/keys/create', {
+      project_id: 1,
+      tag_id: 1,
+      secret_name: 'WEBHOOK_SECRET',
+      secret_value: 'whsec_123',
+      hide_from_ui: true,
+      details: { note: 'Initial', created_by: 'Priya Rao' },
+    })
+  })
+
+  it('refuses a value over 255 bytes before calling the API', async () => {
+    openAt('/vault/1/env')
+    await list('Contents of Env')
+    fireEvent.click(screen.getByRole('button', { name: 'New key' }))
+    fireEvent.change(within(dialog()).getByLabelText('Name'), { target: { value: 'BIG' } })
+    fireEvent.change(within(dialog()).getByLabelText('Tag'), { target: { value: '1' } })
+    fireEvent.change(within(dialog()).getByLabelText('Value'), { target: { value: 'x'.repeat(256) } })
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Add key' }))
+    expect(await within(dialog()).findByText('Values can be at most 255 bytes.')).toBeInTheDocument()
+    expect(api.post).not.toHaveBeenCalledWith('/vault/secret/keys/create', expect.anything())
+  })
+
+  it('deletes a key by project, tag and id', async () => {
+    openAt('/vault/1/env')
+    await list('Contents of Env')
+    fireEvent.click(row('QUEUE_URL'))
+    fireEvent.click(within(preview()).getByRole('button', { name: 'Delete QUEUE_URL' }))
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Delete key' }))
+    expect(await screen.findByText('Deleted QUEUE_URL.')).toBeInTheDocument()
+    expect(api.delete).toHaveBeenCalledWith('/vault/secret/keys/delete', { params: { project_id: 1, tag_id: 1, secret_id: 9 } })
+    await waitFor(() => expect(row('QUEUE_URL')).toBeUndefined())
+  })
+
+  it('only offers what the vault:keys permissions allow', async () => {
+    const { unmount } = openAt(
+      '/vault/1/env',
+      makeUser({ permissions: [...PROJECT_PERMS.filter((p) => !p.startsWith('vault:keys')), 'vault:keys:view'] }),
+    )
+    await list('Contents of Env')
+    expect(screen.queryByRole('button', { name: 'New key' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Import .env' })).not.toBeInTheDocument()
+    fireEvent.click(row('LOG_LEVEL', 'production'))
+    expect(within(preview()).queryByRole('button', { name: 'New version' })).not.toBeInTheDocument()
+    expect(within(preview()).queryByRole('button', { name: 'Delete LOG_LEVEL' })).not.toBeInTheDocument()
+    unmount()
+    openAt('/vault/1/env', makeUser({ permissions: PROJECT_PERMS.filter((p) => !p.startsWith('vault:keys')) }))
+    expect(await screen.findByText(/View secret keys” permission \(vault:keys:view\)/)).toBeInTheDocument()
   })
 
   it('saves a new version of the selected key and rolls it back from the history', async () => {
     openAt('/vault/1/env')
     await list('Contents of Env')
-    showDetails()
     expect(noPreview()).toBe(true) // nothing selected
     fireEvent.click(row('LOG_LEVEL', 'production'))
     fireEvent.click(within(preview()).getByRole('button', { name: 'New version' }))
     fireEvent.change(within(dialog()).getByLabelText('New value'), { target: { value: 'error' } })
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Save new version' }))
-    expect(await screen.findByText('LOG_LEVEL is now on v2.')).toBeInTheDocument()
+    expect(await screen.findByText('Saved a new version of LOG_LEVEL.')).toBeInTheDocument()
     await waitFor(() => expect(within(row('LOG_LEVEL', 'production')).getByText('v2')).toBeInTheDocument())
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
@@ -358,6 +436,7 @@ describe('Vault explorer: Env', () => {
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Import' }))
     expect(await screen.findByText('Imported: 1 new, 1 changed, 0 unchanged.')).toBeInTheDocument()
     expect(await screen.findByText('CACHE_TTL')).toBeInTheDocument()
+    expect(keys.find((k) => k.name === 'DATABASE_URL' && k.tagId === 3)?.current).toBe(2)
   })
 })
 
@@ -420,7 +499,6 @@ describe('Vault explorer: Notes', () => {
   it('lists only notes you own or that are shared with you', async () => {
     openAt('/vault/1/notes')
     await list('Contents of Notes')
-    showDetails()
     expect(row('On-call runbook', 'Shared with you · can edit')).toBeTruthy()
     expect(row('Break-glass DB access', 'You')).toBeTruthy()
     expect(screen.queryByText("Priya's interview notes")).not.toBeInTheDocument()
