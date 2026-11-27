@@ -28,6 +28,7 @@ import { isSuperAdminPath, SUPER_ADMIN_KEY_STORAGE, useForgetSuperAdminKeyElsewh
 import { superAdminClient } from '@/api/client'
 import { secureStorage } from '@/utils/secureStorage'
 import { OrganizationDetailPage } from '@/pages/superAdmin/organizations/details'
+import { OrganizationFormPage } from '@/pages/superAdmin/organizations/form'
 import { OrganizationsPage } from '@/pages/superAdmin/organizations/list'
 import { SuperAdminShell } from '@/pages/superAdmin/SuperAdminShell'
 import { ApiError } from '@/types/api'
@@ -65,7 +66,9 @@ const renderAt = (route: string) =>
             <Route path="/admin/users" element={<p>Users page</p>} />
             <Route path={ROUTES.superAdmin} element={<SuperAdminShell />}>
               <Route index element={<OrganizationsPage />} />
+              <Route path={ROUTES.superAdminOrganizationNew} element={<OrganizationFormPage />} />
               <Route path={ROUTES.superAdminOrganization} element={<OrganizationDetailPage />} />
+              <Route path={ROUTES.superAdminOrganizationEdit} element={<OrganizationFormPage />} />
             </Route>
           </Routes>
         </MemoryRouter>
@@ -175,29 +178,30 @@ describe('Super admin: managing organizations', () => {
   }
   const dialog = (name: string | RegExp) => within(screen.getByRole('dialog', { name }))
 
-  it('creates an organization after checking its name, with its limits, profile and billing', async () => {
+  it('creates an organization on its own page after checking its name, with its limits, profile and billing', async () => {
     client.post.mockResolvedValue({ data: '' })
     openWithKey('/super-admin')
     fireEvent.click(await screen.findByRole('button', { name: 'New organization' }))
-    const form = dialog('New organization')
-    fireEvent.change(form.getByLabelText('Name'), { target: { value: 'Acme' } })
-    fireEvent.click(form.getByRole('button', { name: 'Create organization' }))
-    expect(await form.findByText('That name is already taken.')).toBeInTheDocument()
+    expect(await screen.findByRole('navigation', { name: 'Path' })).toHaveTextContent('OrganizationsNew organization')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Acme' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create organization' }))
+    expect(await screen.findByText('That name is already taken.')).toBeInTheDocument()
     expect(client.post).not.toHaveBeenCalled()
 
-    fireEvent.change(form.getByLabelText('Name'), { target: { value: 'Initech' } })
-    fireEvent.change(form.getByLabelText('Users'), { target: { value: '0' } })
-    fireEvent.click(form.getByRole('button', { name: 'Create organization' }))
-    expect(await form.findByText('At least 1.')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Initech' } })
+    fireEvent.change(screen.getByLabelText('Users'), { target: { value: '0' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create organization' }))
+    expect(await screen.findByText('At least 1.')).toBeInTheDocument()
 
-    fireEvent.change(form.getByLabelText('Users'), { target: { value: '40' } })
-    fireEvent.change(form.getByLabelText('Storage (GB)'), { target: { value: '2.5' } })
-    fireEvent.change(form.getByLabelText('Website'), { target: { value: 'https://initech.example' } })
-    fireEvent.change(form.getByLabelText('Country'), { target: { value: 'IN' } })
-    fireEvent.click(within(form.getByRole('group', { name: 'Billing' })).getByRole('button', { name: 'Add field' }))
-    fireEvent.change(form.getByLabelText('billing label 1'), { target: { value: 'gst' } })
-    fireEvent.change(form.getByLabelText('billing value 1'), { target: { value: '29ABCDE1234F1Z5' } })
-    fireEvent.click(form.getByRole('button', { name: 'Create organization' }))
+    fireEvent.change(screen.getByLabelText('Users'), { target: { value: '40' } })
+    fireEvent.change(screen.getByLabelText('Storage (GB)'), { target: { value: '2.5' } })
+    fireEvent.change(screen.getByLabelText('Website'), { target: { value: 'https://initech.example' } })
+    fireEvent.change(screen.getByLabelText('Country'), { target: { value: 'IN' } })
+    fireEvent.click(within(screen.getByRole('group', { name: 'Billing' })).getByRole('button', { name: 'Add field' }))
+    fireEvent.change(screen.getByLabelText('billing label 1'), { target: { value: 'gst' } })
+    fireEvent.change(screen.getByLabelText('billing value 1'), { target: { value: '29ABCDE1234F1Z5' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create organization' }))
 
     expect(await screen.findByText('Created Initech.')).toBeInTheDocument()
     expect(client.post).toHaveBeenCalledWith(
@@ -218,6 +222,15 @@ describe('Super admin: managing organizations', () => {
       },
       { headers: key },
     )
+    // then the list, searched for the new name (the API returns no id)
+    expect(await screen.findByPlaceholderText('Search name or id')).toHaveValue('Initech')
+  })
+
+  it('goes back to the list when creating is cancelled', async () => {
+    openWithKey('/super-admin')
+    fireEvent.click(await screen.findByRole('button', { name: 'New organization' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+    expect(await screen.findByPlaceholderText('Search name or id')).toBeInTheDocument()
   })
 
   it('acts on an organization from its row without opening it', async () => {
@@ -225,19 +238,6 @@ describe('Super admin: managing organizations', () => {
     client.delete.mockResolvedValue({ data: '' })
     openWithKey('/super-admin')
     const row = (await screen.findByText('Globex')).closest('tr') as HTMLElement
-
-    // Edit: a menu of the organization page's edit dialogs
-    fireEvent.click(within(row).getByRole('button', { name: 'Edit Globex' }))
-    expect(screen.getAllByRole('menuitem').map((i) => i.textContent)).toEqual([
-      'Rename',
-      'Plan limits',
-      'Profile',
-      'Billing details',
-    ])
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Plan limits' }))
-    expect(screen.getByRole('dialog', { name: /Globex/ })).toBeInTheDocument()
-    fireEvent.click(within(screen.getByRole('dialog', { name: /Globex/ })).getByRole('button', { name: 'Cancel' }))
-    expect(screen.queryByTestId('location')).not.toBeInTheDocument() // still on the list
 
     fireEvent.click(within(row).getByRole('button', { name: 'Invite an admin to Globex' }))
     const invite = dialog('Invite an admin to Globex')
@@ -253,20 +253,42 @@ describe('Super admin: managing organizations', () => {
     await waitFor(() => expect(client.delete).toHaveBeenCalledWith('/super-admin/organization/delete/b-2', { headers: key }))
   })
 
-  it('renames an organization, refusing a name another one has', async () => {
+  it("opens a row's edit page, and Cancel returns to the list", async () => {
+    openWithKey('/super-admin')
+    const row = (await screen.findByText('Globex')).closest('tr') as HTMLElement
+    fireEvent.click(within(row).getByRole('button', { name: 'Edit Globex' }))
+    expect(await screen.findByLabelText('Name')).toHaveValue('Globex')
+    expect(screen.getByRole('navigation', { name: 'Path' })).toHaveTextContent('OrganizationsGlobexEdit')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(await screen.findByPlaceholderText('Search name or id')).toBeInTheDocument()
+  })
+
+  it('renames an organization on the edit page, refusing a name another one has, and sends only what changed', async () => {
     client.put.mockResolvedValue({ data: '' })
     openWithKey('/super-admin/organizations/a-1')
-    fireEvent.click(await screen.findByRole('button', { name: 'Rename' }))
-    const form = dialog('Rename Acme')
-    fireEvent.change(form.getByLabelText('New name'), { target: { value: 'Globex' } })
-    fireEvent.click(form.getByRole('button', { name: 'Rename' }))
-    expect(await form.findByText('That name is already taken.')).toBeInTheDocument()
-    fireEvent.change(form.getByLabelText('New name'), { target: { value: 'Acme Corp' } })
-    fireEvent.click(form.getByRole('button', { name: 'Rename' }))
-    expect(await screen.findByText('Renamed to Acme Corp.')).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    const name = await screen.findByLabelText('Name')
+    fireEvent.change(name, { target: { value: 'Globex' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('That name is already taken.')).toBeInTheDocument()
+    fireEvent.change(name, { target: { value: 'Acme Corp' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('Saved the changes to Acme Corp.')).toBeInTheDocument()
+    expect(client.put).toHaveBeenCalledTimes(1)
     expect(client.put).toHaveBeenCalledWith('/super-admin/organization/update/name/a-1', '"Acme Corp"', {
       headers: { ...key, 'Content-Type': 'application/json' },
     })
+    // back to the organization's page
+    expect(await screen.findByRole('button', { name: 'Invite admin' })).toBeInTheDocument()
+  })
+
+  it('saves nothing when nothing changed', async () => {
+    openWithKey('/super-admin/organizations/a-1/edit')
+    await screen.findByLabelText('Name')
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('Nothing has changed.')).toBeInTheDocument()
+    expect(client.put).not.toHaveBeenCalled()
   })
 
   it('invites an admin to an organization with a lowercase email', async () => {
@@ -295,19 +317,20 @@ describe('Super admin: managing organizations', () => {
     client.put.mockResolvedValue({ data: '' })
     openWithKey('/super-admin/organizations/a-1') // 250 AI credit and 1 GB used
     fireEvent.click(await screen.findByRole('button', { name: 'Edit plan limits' }))
-    const form = dialog('Plan limits for Acme')
+    const form = within(await screen.findByRole('group', { name: 'Plan limits' }))
     expect(form.getByLabelText('Storage (GB)')).toHaveValue(10)
     fireEvent.change(form.getByLabelText('AI credit'), { target: { value: '100' } })
     fireEvent.change(form.getByLabelText('Storage (GB)'), { target: { value: '0.5' } })
-    fireEvent.click(form.getByRole('button', { name: 'Save limits' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
     expect(await form.findByText(/At least 250: that much is already used/)).toBeInTheDocument()
     expect(form.getByText(/At least 1.0 GB: that much is already used/)).toBeInTheDocument()
     expect(client.put).not.toHaveBeenCalled()
 
     fireEvent.change(form.getByLabelText('AI credit'), { target: { value: '5000' } })
     fireEvent.change(form.getByLabelText('Storage (GB)'), { target: { value: '20' } })
-    fireEvent.click(form.getByRole('button', { name: 'Save limits' }))
-    expect(await screen.findByText('Updated the limits for Acme.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('Saved the changes to Acme.')).toBeInTheDocument()
+    expect(client.put).toHaveBeenCalledTimes(1)
     expect(client.put).toHaveBeenCalledWith(
       '/super-admin/organization/update/quota/a-1',
       expect.objectContaining({ allocated_ai_credit: 5000, allocated_storage_bytes: 20 * 1024 ** 3, user_limit: 25 }),
@@ -324,14 +347,14 @@ describe('Super admin: managing organizations', () => {
       openWithKey('/super-admin/organizations/a-1')
       expect(await screen.findByText('India (IN)')).toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Edit profile' }))
-      const form = dialog('Profile for Acme')
+      const form = within(await screen.findByRole('group', { name: /^Profile/ }))
       expect(form.getByLabelText('Description')).toHaveValue('Rockets')
       expect(form.getByLabelText('extras value 1')).toHaveValue('abc') // an older free-form field
       expect(form.getByText('1 other saved value is kept as they are.')).toBeInTheDocument()
 
       fireEvent.change(form.getByLabelText('Support email'), { target: { value: 'not-an-email' } })
       fireEvent.change(form.getByLabelText('Website'), { target: { value: 'acme.example' } })
-      fireEvent.click(form.getByRole('button', { name: 'Save profile' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
       expect(await form.findByText('Enter a valid email address.')).toBeInTheDocument()
       expect(form.getByText('Enter a full address, like https://example.com.')).toBeInTheDocument()
       expect(client.put).not.toHaveBeenCalled()
@@ -340,8 +363,9 @@ describe('Super admin: managing organizations', () => {
       fireEvent.change(form.getByLabelText('Website'), { target: { value: 'https://acme.example' } })
       fireEvent.change(form.getByLabelText('Industry'), { target: { value: 'Healthcare' } })
       fireEvent.change(form.getByLabelText('Description'), { target: { value: '' } })
-      fireEvent.click(form.getByRole('button', { name: 'Save profile' }))
-      expect(await screen.findByText('Saved the profile for Acme.')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+      expect(await screen.findByText('Saved the changes to Acme.')).toBeInTheDocument()
+      expect(client.put).toHaveBeenCalledTimes(1)
       expect(client.put).toHaveBeenCalledWith(
         '/super-admin/organization/update/basic/a-1',
         {
@@ -366,11 +390,12 @@ describe('Super admin: managing organizations', () => {
       openWithKey('/super-admin/organizations/a-1')
       expect(await screen.findByText('pro')).toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Edit billing' }))
-      const form = dialog('Billing details for Acme')
+      const form = within(await screen.findByRole('group', { name: /^Billing/ }))
       expect(form.getByText('1 other saved value is kept as they are.')).toBeInTheDocument()
-      fireEvent.change(form.getByLabelText('rows value 1'), { target: { value: 'enterprise' } })
-      fireEvent.click(form.getByRole('button', { name: 'Save details' }))
-      expect(await screen.findByText('Saved the billing details for Acme.')).toBeInTheDocument()
+      fireEvent.change(form.getByLabelText('billing value 1'), { target: { value: 'enterprise' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+      expect(await screen.findByText('Saved the changes to Acme.')).toBeInTheDocument()
+      expect(client.put).toHaveBeenCalledTimes(1)
       expect(client.put).toHaveBeenCalledWith(
         '/super-admin/organization/update/billing/a-1',
         { seats: 25, plan: 'enterprise' },

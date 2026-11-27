@@ -66,12 +66,13 @@ export const useOrganizations = () => {
   })
 }
 
-export const useOrganization = (organizationId: string) => {
+/** One organization; `enabled` false skips loading it (e.g. on the new-organization page). */
+export const useOrganization = (organizationId: string, enabled = true) => {
   const adminKey = useAtomValue(superAdminKeyAtom)
   return useQuery({
     queryKey: [...KEY, adminKey, organizationId],
     queryFn: () => getOrganization(adminKey!, organizationId),
-    enabled: !!adminKey,
+    enabled: enabled && !!adminKey && !!organizationId,
     retry: false,
     staleTime: FRESH_MS,
   })

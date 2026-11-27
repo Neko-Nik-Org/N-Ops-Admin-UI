@@ -97,7 +97,7 @@ export const NoteForm = ({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
-      <FormField id="noteTitle" label="Title" error={errors.title}>
+      <FormField id="noteTitle" required label="Title" error={errors.title}>
         <Input
           id="noteTitle"
           value={title}

@@ -20,16 +20,16 @@
  */
 
 import {
-  Boxes,
-  CheckCircle2,
+  // Boxes,
+  // CheckCircle2,
   LayoutGrid,
-  LineChart,
+  // LineChart,
   Lock,
-  ScrollText,
-  Server,
+  // ScrollText,
+  // Server,
   ShieldCheck,
-  Workflow,
-  Wrench,
+  // Workflow,
+  // Wrench,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -93,7 +93,9 @@ export const ROUTES = {
    * Deliberately not linked from anywhere in the app.
    */
   superAdmin: '/super-admin',
+  superAdminOrganizationNew: '/super-admin/organizations/new',
   superAdminOrganization: '/super-admin/organizations/:organizationId',
+  superAdminOrganizationEdit: '/super-admin/organizations/:organizationId/edit',
 } as const
 
 /** URL of one user's page. */
@@ -135,6 +137,10 @@ export const newAccessPolicyPath = (fromPolicyId?: number) =>
 export const superAdminOrganizationPath = (organizationId: string) =>
   ROUTES.superAdminOrganization.replace(':organizationId', encodeURIComponent(organizationId))
 
+/** URL of the page that edits one organization, optionally opened at one of its sections. */
+export const superAdminOrganizationEditPath = (organizationId: string, section?: 'name' | 'limits' | 'profile' | 'billing') =>
+  `${ROUTES.superAdminOrganizationEdit.replace(':organizationId', encodeURIComponent(organizationId))}${section ? `#${section}` : ''}`
+
 /** A routed page reached from the sidebar. */
 export interface AppPage {
   path: string
@@ -153,20 +159,20 @@ export interface AppSection extends AppPage {
 /** Sidebar sections, in display order. */
 export const APP_SECTIONS: readonly AppSection[] = [
   { path: ROUTES.overview, title: 'Overview', icon: LayoutGrid },
-  { path: ROUTES.servers, title: 'Servers', icon: Server },
-  { path: ROUTES.tools, title: 'Tools', icon: Wrench },
-  {
-    path: ROUTES.serviceManagement,
-    title: 'Service management',
-    icon: Boxes,
-    children: [{ path: ROUTES.postgres, title: 'Postgres' }],
-  },
+  // { path: ROUTES.servers, title: 'Servers', icon: Server },
+  // { path: ROUTES.tools, title: 'Tools', icon: Wrench },
+  // {
+  //   path: ROUTES.serviceManagement,
+  //   title: 'Service management',
+  //   icon: Boxes,
+  //   children: [{ path: ROUTES.postgres, title: 'Postgres' }],
+  // },
   // one link: the Vault page is a file explorer that navigates its own folders
   { path: ROUTES.vault, title: 'Vault', icon: Lock },
-  { path: ROUTES.approvals, title: 'Approvals', icon: CheckCircle2 },
-  { path: ROUTES.metrics, title: 'Metrics', icon: LineChart },
-  { path: ROUTES.workflows, title: 'Workflows', icon: Workflow },
-  { path: ROUTES.serviceLogs, title: 'Service logs', icon: ScrollText },
+  // { path: ROUTES.approvals, title: 'Approvals', icon: CheckCircle2 },
+  // { path: ROUTES.metrics, title: 'Metrics', icon: LineChart },
+  // { path: ROUTES.workflows, title: 'Workflows', icon: Workflow },
+  // { path: ROUTES.serviceLogs, title: 'Service logs', icon: ScrollText },
   {
     path: ROUTES.admin,
     title: 'Admin',
@@ -175,11 +181,11 @@ export const APP_SECTIONS: readonly AppSection[] = [
       { path: ROUTES.adminOrganization, title: 'Organization' },
       { path: ROUTES.adminUsers, title: 'Users' },
       { path: ROUTES.adminInvitations, title: 'Invitations' },
-      { path: ROUTES.adminApiKeys, title: 'API keys' },
+      // { path: ROUTES.adminApiKeys, title: 'API keys' },
       { path: ROUTES.adminRoles, title: 'Roles' },
       { path: ROUTES.adminAccessPolicies, title: 'Access policies' },
       { path: ROUTES.tags, title: 'Tags' },
-      { path: ROUTES.adminAuditLogs, title: 'Audit logs' },
+      // { path: ROUTES.adminAuditLogs, title: 'Audit logs' },
     ],
   },
 ]

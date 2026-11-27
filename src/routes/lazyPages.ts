@@ -54,6 +54,7 @@ const loaders = {
   LoginPage: () => import('@/pages/auth/login'),
   NotFoundPage: () => import('@/pages/notFound'),
   OrganizationDetailPage: () => import('@/pages/superAdmin/organizations/details'),
+  OrganizationFormPage: () => import('@/pages/superAdmin/organizations/form'),
   OrganizationsPage: () => import('@/pages/superAdmin/organizations/list'),
   OverviewPage: () => import('@/pages/overview'),
   SecuritySetupPage: () => import('@/pages/auth/securitySetup'),
@@ -100,6 +101,7 @@ export const SecuritySetupPage = page(loaders.SecuritySetupPage, 'SecuritySetupP
 export const SuperAdminShell = page(loaders.SuperAdminShell, 'SuperAdminShell')
 export const OrganizationsPage = page(loaders.OrganizationsPage, 'OrganizationsPage')
 export const OrganizationDetailPage = page(loaders.OrganizationDetailPage, 'OrganizationDetailPage')
+export const OrganizationFormPage = page(loaders.OrganizationFormPage, 'OrganizationFormPage')
 export const TagsPage = page(loaders.TagsPage, 'TagsPage')
 export const TwoFactorPage = page(loaders.TwoFactorPage, 'TwoFactorPage')
 export const VaultPage = page(loaders.VaultPage, 'VaultPage')
@@ -145,6 +147,9 @@ const ROUTE_LOADERS: Array<[pattern: string, load: () => Promise<unknown>]> = [
   [ROUTES.accountOrganization, loaders.AccountOrganizationPage],
   [ROUTES.accountDevices, loaders.AccountDevicesPage],
   [ROUTES.securitySetup, loaders.SecuritySetupPage],
+  // the new and edit pages before the detail page, whose :organizationId would also match "new"
+  [ROUTES.superAdminOrganizationNew, loaders.OrganizationFormPage],
+  [ROUTES.superAdminOrganizationEdit, loaders.OrganizationFormPage],
   [ROUTES.superAdminOrganization, loaders.OrganizationDetailPage],
   [ROUTES.superAdmin, loaders.OrganizationsPage],
 ]
@@ -201,7 +206,9 @@ const NOT_SIGNED_IN_APP = new Set<string>([
   ROUTES.forgotPassword,
   ROUTES.invite,
   ROUTES.superAdmin,
+  ROUTES.superAdminOrganizationNew,
   ROUTES.superAdminOrganization,
+  ROUTES.superAdminOrganizationEdit,
 ])
 
 /** Longest the startup screen waits for the app's code; anything slower keeps loading in the background. */

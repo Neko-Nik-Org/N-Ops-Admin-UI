@@ -92,7 +92,7 @@ export const TagFormDialog = ({ open, tag, onClose }: TagFormDialogProps) => {
       description="Tags group servers, secrets and API keys, and scope what each role can reach."
     >
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-        <FormField id="tagName" label="Name" error={errors.tagName?.message}>
+        <FormField id="tagName" required label="Name" error={errors.tagName?.message}>
           <Input id="tagName" placeholder="production" autoComplete="off" hasError={!!errors.tagName} {...register('tagName')} />
         </FormField>
 

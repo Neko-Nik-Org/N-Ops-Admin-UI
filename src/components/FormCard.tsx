@@ -17,24 +17,29 @@
 /** Building blocks for the full-page create / edit forms: titled field cards and the sticky save bar. */
 
 import type { ReactNode } from 'react'
+import { REQUIRED_MARK } from '@/components/FormField'
 import { LoadingButton, type ButtonState } from '@/components/LoadingButton'
+import { cn } from '@/utils/cn'
 
 /** A titled card holding one group of fields. `aside` sits at the right of the title (e.g. a count). */
 export const FormCard = ({
   title,
   hint,
   aside,
+  required,
   children,
 }: {
   title: string
   hint?: string
   aside?: ReactNode
+  /** The group needs an answer (e.g. at least one pick): a red "*" after the title. */
+  required?: boolean
   children: ReactNode
 }) => (
   <fieldset className="flex min-w-0 flex-col gap-4 rounded-xl border border-border bg-surface-raised p-5">
     <legend className="contents">
       <span className="flex items-baseline justify-between gap-2">
-        <span className="text-sm font-semibold text-text">{title}</span>
+        <span className={cn('text-sm font-semibold text-text', required && REQUIRED_MARK)}>{title}</span>
         {aside}
       </span>
     </legend>

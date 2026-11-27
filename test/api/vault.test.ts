@@ -14,7 +14,7 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Tests for the mock-backed Vault API (src/api/vault*.ts). */
+/** Tests for the mock-backed Vault API (src/api/vaultConfigs.ts, vaultNotes.ts, vaultContents.ts). */
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db as adminDb, resetAdminMock } from '@/data/mockAdmin'
@@ -30,117 +30,11 @@ import {
   updateNote,
 } from '@/api/vaultNotes'
 import { forgetProjectContents, projectPath } from '@/api/vaultContents'
-import {
-  addSecretVersion,
-  createSecret,
-  exportDotenv,
-  importDotenv,
-  listSecrets,
-  listSecretVersions,
-  revealSecret,
-  rollbackSecret,
-} from '@/api/vaultSecrets'
 import { resetVaultMock, vaultDb } from '@/data/mockVault'
 
 beforeEach(() => {
   resetAdminMock()
   resetVaultMock()
-})
-
-/** The payments-api DATABASE_URL for production (3 versions). */
-const dbUrlProd = () => vaultDb.secrets.find((s) => s.projectId === 1 && s.name === 'DATABASE_URL' && s.tagId === 1)!
-/** The payments-api STRIPE_SECRET_KEY for production: v1 visible, v2 and v3 hidden. */
-const stripeProd = () => vaultDb.secrets.find((s) => s.projectId === 1 && s.name === 'STRIPE_SECRET_KEY' && s.tagId === 1)!
-const input = (name: string, tagId: number, isHidden = false) => ({ name, tagId, value: 'x', note: '', isHidden })
-
-describe('secret keys', () => {
-  it("lists a project's keys (all former services together) without values, and audits every reveal", async () => {
-    const keys = await listSecrets(1)
-    expect(keys.map((k) => k.name)).toEqual(expect.arrayContaining(['DATABASE_URL', 'QUEUE_URL', 'CONCURRENCY']))
-    expect(JSON.stringify(keys)).not.toContain('postgres://')
-    expect(await revealSecret(dbUrlProd().secretId)).toContain('sslmode=require')
-    expect(adminDb.auditLogs[0]).toMatchObject({
-      action: 'vault.secret_reveal',
-      resourceName: 'payments-api / DATABASE_URL',
-      details: 'v3',
-    })
-  })
-
-  it('allows the same name once per tag', async () => {
-    await expect(createSecret(1, input('DATABASE_URL', 1))).rejects.toThrow('already exists for this tag')
-    await expect(createSecret(1, input('DATABASE_URL', 4))).resolves.toMatchObject({ currentVersion: 1 })
-    await expect(createSecret(1, input('1BAD', 4))).rejects.toThrow('not starting with a number')
-  })
-
-  it('keeps every version: a change adds one, a rollback only moves the pointer', async () => {
-    const { secretId } = dbUrlProd()
-    await addSecretVersion(secretId, 'postgres://new', 'Rotate', false)
-    expect(dbUrlProd()).toMatchObject({ currentVersion: 4, latestVersion: 4 })
-
-    await rollbackSecret(secretId, 2)
-    expect(dbUrlProd()).toMatchObject({ currentVersion: 2, latestVersion: 4 })
-    expect(await revealSecret(secretId)).toContain('Lm8Rt3Zp')
-    expect((await listSecretVersions(secretId)).map((v) => v.version)).toEqual([4, 3, 2, 1])
-  })
-
-  it('imports a .env: new keys, new versions for changed values, skips unchanged ones', async () => {
-    const result = await importDotenv(
-      1,
-      2,
-      'DATABASE_URL=postgres://payments:staging-pass@db-staging.internal:5432/payments\nLOG_LEVEL=warn\nNEW_ONE=1',
-      '',
-    )
-    expect(result).toEqual({ created: 1, updated: 1, unchanged: 1 })
-    expect(adminDb.auditLogs[0]).toMatchObject({ action: 'vault.env_import', details: '1 new, 1 changed' })
-
-    const exported = await exportDotenv(1, 2)
-    expect(exported.body.split('\n')).toEqual(expect.arrayContaining(['LOG_LEVEL=warn', 'NEW_ONE=1']))
-    expect(exported.skippedHidden).toEqual([])
-    await expect(importDotenv(1, 2, 'not a line', '')).rejects.toThrow('Line 1: expected KEY=value')
-  })
-})
-
-describe('hidden secrets (is_hidden)', () => {
-  it('lists a hidden key as hidden and refuses to reveal it, recording a denied attempt', async () => {
-    const stripe = stripeProd()
-    expect((await listSecrets(1)).find((s) => s.secretId === stripe.secretId)).toMatchObject({ isHidden: true })
-    await expect(revealSecret(stripe.secretId)).rejects.toThrow('This value is hidden.')
-    expect(adminDb.auditLogs[0]).toMatchObject({ action: 'vault.secret_reveal', outcome: 'denied', details: 'v3 is hidden' })
-  })
-
-  it('is per version: an older visible version can still be revealed, and the history says which are hidden', async () => {
-    const { secretId } = stripeProd()
-    expect(await revealSecret(secretId, 1)).toBe('example_stripe_key_51Hc2f…old1')
-    expect((await listSecretVersions(secretId)).map((v) => [v.version, v.isHidden])).toEqual([
-      [3, true],
-      [2, true],
-      [1, false],
-    ])
-  })
-
-  it('follows the version in use on rollback and on new versions', async () => {
-    const { secretId } = stripeProd()
-    await rollbackSecret(secretId, 1)
-    expect(stripeProd().isHidden).toBe(false)
-    await addSecretVersion(secretId, 'example_stripe_key_new', 'Rotate', true)
-    expect(stripeProd()).toMatchObject({ currentVersion: 4, isHidden: true })
-  })
-
-  it('creates a hidden key, and leaves hidden keys out of a .env export', async () => {
-    await createSecret(1, input('WEBHOOK_SECRET', 2, true))
-    const exported = await exportDotenv(1, 2)
-    expect(exported.body).not.toContain('WEBHOOK_SECRET')
-    expect(exported.skippedHidden).toEqual(['WEBHOOK_SECRET'])
-    expect(adminDb.auditLogs[0]).toMatchObject({
-      action: 'vault.env_export',
-      details: expect.stringContaining('1 hidden left out'),
-    })
-  })
-
-  it('keeps a hidden key hidden when a .env import changes it', async () => {
-    await importDotenv(1, 1, 'STRIPE_SECRET_KEY=example_stripe_key_imported', '')
-    expect(stripeProd()).toMatchObject({ currentVersion: 4, isHidden: true })
-  })
 })
 
 describe('config files', () => {
@@ -231,19 +125,12 @@ describe('project contents (the mock side of real projects)', () => {
     expect(projectPath(42)).toBe('project #42')
   })
 
-  it('drops a deleted project’s keys, files, notes and API key links', () => {
+  it('drops a deleted project’s files, notes and API key links', () => {
     forgetProjectContents(1)
-    expect(vaultDb.secrets.some((s) => s.projectId === 1)).toBe(false)
     expect(vaultDb.configs.some((c) => c.projectId === 1)).toBe(false)
     expect(vaultDb.notes.some((n) => n.projectId === 1)).toBe(false)
     // API keys lose the link to the project (ON DELETE CASCADE on api_key_vault_project), not the key
     expect(adminDb.apiKeys.find((k) => k.keyName === 'staging-config-sync')?.vaultProjectIds).toEqual([2])
     expect(adminDb.apiKeys.find((k) => k.keyName === 'github-actions-prod')?.vaultProjectIds).toEqual([])
-  })
-
-  it('lets a real project the mock has never seen hold keys', async () => {
-    await createSecret(42, { name: 'TOKEN', tagId: 1, value: 'x', note: '', isHidden: false })
-    expect((await listSecrets(42)).map((k) => k.name)).toEqual(['TOKEN'])
-    expect(adminDb.auditLogs[0]).toMatchObject({ resourceName: 'project #42 / TOKEN' })
   })
 })

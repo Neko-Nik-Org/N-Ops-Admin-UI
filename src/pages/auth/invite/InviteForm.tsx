@@ -202,6 +202,7 @@ export const InviteForm = ({ link }: { link: InviteLink }) => {
             <AuthField
               id="displayName"
               label="Your name"
+              required
               icon={<User size={18} />}
               placeholder="Priya Rao"
               autoComplete="name"
@@ -212,6 +213,7 @@ export const InviteForm = ({ link }: { link: InviteLink }) => {
             <AuthField
               id="userName"
               label="Username"
+              required
               icon={<AtSign size={18} />}
               placeholder="priya"
               autoComplete="username"
@@ -229,6 +231,7 @@ export const InviteForm = ({ link }: { link: InviteLink }) => {
             <AuthField
               id="password"
               label="Create a password"
+              required
               type="password"
               icon={<Lock size={18} />}
               autoComplete="new-password"
@@ -240,6 +243,7 @@ export const InviteForm = ({ link }: { link: InviteLink }) => {
             <AuthField
               id="confirmPassword"
               label="Confirm password"
+              required
               type="password"
               icon={<Lock size={18} />}
               autoComplete="new-password"

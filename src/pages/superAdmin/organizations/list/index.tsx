@@ -14,40 +14,27 @@
  * version 3 along with this program. If not, see
  * <https://www.gnu.org/licenses/>.
  */
-/** Super admin › Organizations (/super-admin): every organization with its plan and usage. */
+/**
+ * Super admin › Organizations (/super-admin): every organization with its plan and usage. New and
+ * Edit open their own pages; `?search=` pre-fills the search (a newly created organization lands here).
+ */
 
 import { Pencil, Plus, Send, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Badge } from '@/components/Badge'
 import { Select } from '@/components/Select'
-import { DropdownMenu, menuItemClass } from '@/components/DropdownMenu'
 import { LoadingButton } from '@/components/LoadingButton'
 import { PageHeader } from '@/components/PageHeader'
 import { SearchInput } from '@/components/SearchInput'
 import { TableSkeleton } from '@/components/Skeleton'
-import { superAdminOrganizationPath } from '@/constants/routes'
+import { ROUTES, superAdminOrganizationEditPath, superAdminOrganizationPath } from '@/constants/routes'
 import { useOrganizations } from '@/hooks/useOrganizations'
 import { formatBytes, formatDate, formatNumber } from '@/utils/format'
 import type { Organization } from '@/types/organization'
-import {
-  DeleteOrganizationDialog,
-  DetailsDialog,
-  InviteAdminDialog,
-  LimitsDialog,
-  NewOrganizationDialog,
-  RenameOrganizationDialog,
-} from '@/pages/superAdmin/organizations/OrganizationDialogs'
+import { DeleteOrganizationDialog, InviteAdminDialog } from '@/pages/superAdmin/organizations/OrganizationDialogs'
 
-type RowAction = 'invite' | 'rename' | 'limits' | 'profile' | 'billing' | 'delete'
-
-/** The Edit menu's items, each opening the same dialog as on the organization's own page. */
-const EDIT_ITEMS: Array<[RowAction, string]> = [
-  ['rename', 'Rename'],
-  ['limits', 'Plan limits'],
-  ['profile', 'Profile'],
-  ['billing', 'Billing details'],
-]
+type RowAction = 'invite' | 'delete'
 
 /** "used / total" with a thin bar; warning color past 85 %. */
 const Usage = ({ used, total, format = formatNumber }: { used: number; total: number; format?: (n: number) => string }) => {
@@ -70,9 +57,9 @@ const Usage = ({ used, total, format = formatNumber }: { used: number; total: nu
 export const OrganizationsPage = () => {
   const { data: orgs, isLoading, error } = useOrganizations()
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
+  const [searchParams] = useSearchParams()
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '')
   const [status, setStatus] = useState('all')
-  const [creating, setCreating] = useState(false)
   const [action, setAction] = useState<{ kind: RowAction; org: Organization } | null>(null)
   const close = () => setAction(null)
   const orgFor = (kind: RowAction) => (action?.kind === kind ? action.org : null)
@@ -92,13 +79,11 @@ export const OrganizationsPage = () => {
         title="Organizations"
         badge={orgs && <span className="text-sm text-text-muted">{formatNumber(orgs.length)}</span>}
         actions={
-          <LoadingButton icon={<Plus size={15} />} onClick={() => setCreating(true)}>
+          <LoadingButton icon={<Plus size={15} />} onClick={() => navigate(ROUTES.superAdminOrganizationNew)}>
             New organization
           </LoadingButton>
         }
       />
-      {/* a new organization is found by name in the refreshed list, then opened */}
-      <NewOrganizationDialog open={creating} onClose={() => setCreating(false)} onCreated={setSearch} />
       {isLoading ? (
         <TableSkeleton rows={6} columns={6} />
       ) : error ? (
@@ -174,27 +159,14 @@ export const OrganizationsPage = () => {
                               title="Invite admin"
                               onClick={() => setAction({ kind: 'invite', org: o })}
                             />
-                            <DropdownMenu
-                              label={`Edit ${o.organizationName}`}
-                              menuLabel="Edit"
-                              trigger={<Pencil size={14} aria-hidden="true" />}
-                              // looks like the ghost icon buttons beside it (Delete)
-                              triggerClassName="h-[2.125rem] rounded-lg border-transparent bg-transparent px-2 text-signal hover:border-transparent hover:bg-surface-raised hover:text-signal"
-                              chevron={false}
-                              floating
-                            >
-                              {EDIT_ITEMS.map(([kind, label]) => (
-                                <button
-                                  key={kind}
-                                  type="button"
-                                  role="menuitem"
-                                  className={menuItemClass}
-                                  onClick={() => setAction({ kind, org: o })}
-                                >
-                                  {label}
-                                </button>
-                              ))}
-                            </DropdownMenu>
+                            <LoadingButton
+                              variant="ghost"
+                              size="sm"
+                              icon={<Pencil size={14} />}
+                              aria-label={`Edit ${o.organizationName}`}
+                              title="Edit"
+                              onClick={() => navigate(superAdminOrganizationEditPath(o.organizationId))}
+                            />
                             <LoadingButton
                               variant="ghost"
                               size="sm"
@@ -216,13 +188,6 @@ export const OrganizationsPage = () => {
       )}
 
       <InviteAdminDialog org={orgFor('invite')} onClose={close} />
-      <RenameOrganizationDialog org={orgFor('rename')} onClose={close} />
-      <LimitsDialog org={orgFor('limits')} onClose={close} />
-      <DetailsDialog
-        org={orgFor('profile') ?? orgFor('billing')}
-        which={action?.kind === 'billing' ? 'billing' : 'profile'}
-        onClose={close}
-      />
       <DeleteOrganizationDialog org={orgFor('delete')} onClose={close} onDeleted={close} />
     </>
   )

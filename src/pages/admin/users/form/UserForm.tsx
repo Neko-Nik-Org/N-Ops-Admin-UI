@@ -106,7 +106,7 @@ export const UserForm = ({ onSaved, onCancel }: { onSaved: () => void; onCancel:
         <div className="flex flex-col gap-6">
           <FormCard title="Account" hint="They sign in with the username and password you set here.">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField id="displayName" label="Name" error={errors.displayName?.message}>
+              <FormField id="displayName" required label="Name" error={errors.displayName?.message}>
                 <Input
                   id="displayName"
                   placeholder="Priya Rao"
@@ -115,7 +115,7 @@ export const UserForm = ({ onSaved, onCancel }: { onSaved: () => void; onCancel:
                   {...register('displayName')}
                 />
               </FormField>
-              <FormField id="userName" label="Username" error={errors.userName?.message}>
+              <FormField id="userName" required label="Username" error={errors.userName?.message}>
                 <Input
                   id="userName"
                   placeholder="priya"
@@ -127,7 +127,7 @@ export const UserForm = ({ onSaved, onCancel }: { onSaved: () => void; onCancel:
                 />
               </FormField>
             </div>
-            <FormField id="primaryEmail" label="Email" error={errors.primaryEmail?.message}>
+            <FormField id="primaryEmail" required label="Email" error={errors.primaryEmail?.message}>
               <Input
                 id="primaryEmail"
                 type="email"
@@ -138,7 +138,7 @@ export const UserForm = ({ onSaved, onCancel }: { onSaved: () => void; onCancel:
               />
             </FormField>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField id="password" label="Password" error={errors.password?.message}>
+              <FormField id="password" required label="Password" error={errors.password?.message}>
                 <Input
                   id="password"
                   type="password"
@@ -147,7 +147,7 @@ export const UserForm = ({ onSaved, onCancel }: { onSaved: () => void; onCancel:
                   {...register('password')}
                 />
               </FormField>
-              <FormField id="confirmPassword" label="Confirm password" error={errors.confirmPassword?.message}>
+              <FormField id="confirmPassword" required label="Confirm password" error={errors.confirmPassword?.message}>
                 <Input
                   id="confirmPassword"
                   type="password"
@@ -165,7 +165,7 @@ export const UserForm = ({ onSaved, onCancel }: { onSaved: () => void; onCancel:
           </FormCard>
 
           <FormCard title="Access">
-            <FormField id="roleId" label="Role" error={errors.roleId?.message}>
+            <FormField id="roleId" required label="Role" error={errors.roleId?.message}>
               <Select id="roleId" hasError={!!errors.roleId} {...register('roleId')}>
                 <option value={0} disabled>
                   Pick a role

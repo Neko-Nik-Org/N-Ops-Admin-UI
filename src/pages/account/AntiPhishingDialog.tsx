@@ -62,7 +62,7 @@ export const AntiPhishingDialog = ({ open, current, onClose }: { open: boolean; 
       description="Every email N-Ops sends you shows this secret. If an email claims to be from N-Ops but doesn't show it, don't trust it."
     >
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
-        <FormField id="antiPhishingSecret" label="Secret" error={errors.secret?.message}>
+        <FormField id="antiPhishingSecret" required label="Secret" error={errors.secret?.message}>
           <Input
             id="antiPhishingSecret"
             autoComplete="off"

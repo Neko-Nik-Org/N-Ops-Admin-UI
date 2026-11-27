@@ -101,7 +101,7 @@ export const ChangeUsernameDialog = ({ open, currentUserName, onClose }: ChangeU
       description="You sign in with your username. It must be unique."
     >
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-        <FormField id="newUserName" label="New username" error={errors.userName?.message}>
+        <FormField id="newUserName" required label="New username" error={errors.userName?.message}>
           <Input
             id="newUserName"
             autoComplete="username"

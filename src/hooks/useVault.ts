@@ -17,6 +17,7 @@
 /** React Query hooks for the Vault. Every change refreshes the vault data and the admin audit log. */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAtomValue } from 'jotai'
 import {
   createConfig,
   deleteConfig,
@@ -49,7 +50,10 @@ import {
   listSecretVersions,
   revealSecret,
   rollbackSecret,
+  type SecretRef,
 } from '@/api/vaultSecrets'
+import { useSelectedTag, useTags } from '@/hooks/useTags'
+import { currentUserAtom } from '@/store/session'
 import type { ConfigFileInput, NoteInput, NoteLinkInput, SecretInput, VaultContainerInput, VaultProject } from '@/types/vault'
 
 /** Wraps a mutation function so success refreshes everything under ['vault'] and ['admin'] (audit log, usage). */
@@ -73,12 +77,15 @@ const useVaultMutation = <V, R>(fn: (vars: V) => Promise<R>) => {
 export const useVaultProjects = () => useQuery({ queryKey: ['vault', 'projects'], queryFn: listVaultProjects, retry: false })
 
 /** What deleting a project would remove; loaded only while the confirmation is open. */
-export const useProjectContents = (projectId: number | null) =>
-  useQuery({
-    queryKey: ['vault', 'project-contents', projectId],
-    queryFn: () => getProjectContents(projectId!),
-    enabled: projectId !== null,
+export const useProjectContents = (projectId: number | null) => {
+  const { data: tags } = useTags()
+  const tagIds = tags?.map((t) => t.tagId)
+  return useQuery({
+    queryKey: ['vault', 'project-contents', projectId, tagIds],
+    queryFn: () => getProjectContents(projectId!, tagIds!),
+    enabled: projectId !== null && !!tagIds,
   })
+}
 
 /** Creates a project (live API) and resolves with it, so the caller can select it. */
 export const useCreateProject = () => useVaultMutation((input: VaultContainerInput) => createVaultProjectAndFind(input))
@@ -89,7 +96,7 @@ export const useUpdateProject = () =>
     updateVaultProject(project.projectId, input, project.details),
   )
 
-/** Deletes a project (live API), then drops the mock keys, files and notes that were inside it. */
+/** Deletes a project (live API, which removes its keys too), then drops the mock files and notes that were inside it. */
 export const useDeleteProject = () =>
   useVaultMutation(async (id: number) => {
     await deleteVaultProject(id)
@@ -98,40 +105,67 @@ export const useDeleteProject = () =>
 
 // ── Env (secret keys) ───────────────────────────────────────────
 
-export const useSecrets = (projectId: number | null) =>
-  useQuery({ queryKey: ['vault', 'secrets', projectId], queryFn: () => listSecrets(projectId!), enabled: projectId !== null })
+/**
+ * The tags whose keys to load: the top bar's tag, or every tag the user can see under "All tags".
+ * `null` until the tags have loaded.
+ */
+const useSecretTagIds = (): number[] | null => {
+  const { tags, selectedTag } = useSelectedTag()
+  if (!tags) return null
+  return selectedTag ? [selectedTag.tagId] : tags.map((t) => t.tagId)
+}
 
-export const useSecretVersions = (secretId: number | null) =>
-  useQuery({
-    queryKey: ['vault', 'secret-versions', secretId],
-    queryFn: () => listSecretVersions(secretId!),
-    enabled: secretId !== null,
-  })
+/** The signed-in user's name, stored as `created_by` on each version. */
+const useMyName = () => useAtomValue(currentUserAtom)?.displayName ?? ''
 
-/** Reveals a value (default: the version in use). Each reveal is audited, so only the audit log is refreshed. */
-export const useRevealSecret = () => {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: ({ secretId, version }: { secretId: number; version?: number }) => revealSecret(secretId, version),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'audit'] }),
+/** A project's keys (live), already narrowed to the top bar's tag. */
+export const useSecrets = (projectId: number | null) => {
+  const tagIds = useSecretTagIds()
+  return useQuery({
+    queryKey: ['vault', 'secrets', projectId, tagIds],
+    queryFn: () => listSecrets(projectId!, tagIds!),
+    enabled: projectId !== null && tagIds !== null,
+    retry: false,
   })
 }
 
-export const useCreateSecret = () =>
-  useVaultMutation(({ projectId, input }: { projectId: number; input: SecretInput }) => createSecret(projectId, input))
-export const useAddSecretVersion = () =>
-  useVaultMutation(({ secretId, value, note, isHidden }: { secretId: number; value: string; note: string; isHidden: boolean }) =>
-    addSecretVersion(secretId, value, note, isHidden),
+export const useSecretVersions = (secret: SecretRef | null) =>
+  useQuery({
+    queryKey: ['vault', 'secret-versions', secret?.secretId],
+    queryFn: () => listSecretVersions(secret!),
+    enabled: secret !== null,
+    retry: false,
+  })
+
+/** Reads one version's value (the API has no audit log for it yet, so nothing else is refreshed). */
+export const useRevealSecret = () =>
+  useMutation({
+    mutationFn: ({ secretId, version }: { secretId: number; version: number }) => revealSecret(secretId, version),
+  })
+
+export const useCreateSecret = () => {
+  const by = useMyName()
+  return useVaultMutation(({ projectId, input }: { projectId: number; input: SecretInput }) => createSecret(projectId, input, by))
+}
+export const useAddSecretVersion = () => {
+  const by = useMyName()
+  return useVaultMutation(
+    ({ secret, value, note, isHidden }: { secret: SecretRef; value: string; note: string; isHidden: boolean }) =>
+      addSecretVersion(secret, value, note, isHidden, by),
   )
+}
 export const useRollbackSecret = () =>
   useVaultMutation(({ secretId, version }: { secretId: number; version: number }) => rollbackSecret(secretId, version))
-export const useDeleteSecret = () => useVaultMutation((secretId: number) => deleteSecret(secretId))
-export const useImportDotenv = () =>
-  useVaultMutation(({ projectId, tagId, text, note }: { projectId: number; tagId: number; text: string; note: string }) =>
-    importDotenv(projectId, tagId, text, note),
+export const useDeleteSecret = () => useVaultMutation((secret: SecretRef) => deleteSecret(secret))
+export const useImportDotenv = () => {
+  const by = useMyName()
+  return useVaultMutation(({ projectId, tagId, text, note }: { projectId: number; tagId: number; text: string; note: string }) =>
+    importDotenv(projectId, tagId, text, note, by),
   )
+}
+/** Builds a .env download; reads values only, so nothing is refreshed afterwards. */
 export const useExportDotenv = () =>
-  useVaultMutation(({ projectId, tagId }: { projectId: number; tagId: number }) => exportDotenv(projectId, tagId))
+  useMutation({ mutationFn: ({ projectId, tagId }: { projectId: number; tagId: number }) => exportDotenv(projectId, tagId) })
 
 // ── Conf (config files) ─────────────────────────────────────────
 

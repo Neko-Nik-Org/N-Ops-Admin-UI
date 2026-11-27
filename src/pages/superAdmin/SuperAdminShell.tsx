@@ -73,7 +73,7 @@ const KeyGate = ({ onAccepted }: { onAccepted: (key: string) => void }) => {
         </p>
       </div>
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
-        <FormField id="adminKey" label="Admin key" error={errors.adminKey?.message}>
+        <FormField id="adminKey" required label="Admin key" error={errors.adminKey?.message}>
           <Input
             id="adminKey"
             type="password"

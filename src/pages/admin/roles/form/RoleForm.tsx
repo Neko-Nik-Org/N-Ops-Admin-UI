@@ -140,7 +140,7 @@ export const RoleForm = ({
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[24rem_minmax(0,1fr)]">
         <div className="flex flex-col gap-6">
           <FormCard title="Details" hint="A role is a set of permissions. Each user gets one role.">
-            <FormField id="roleName" label="Name" error={errors.roleName?.message}>
+            <FormField id="roleName" required label="Name" error={errors.roleName?.message}>
               <Input
                 id="roleName"
                 placeholder="Operator"
@@ -243,6 +243,7 @@ export const RoleForm = ({
 
         <FormCard
           title="Permissions"
+          required
           hint={
             user && ALL_PERMISSIONS.some((p) => !canGrant(p))
               ? 'You can only grant permissions your own role has, so only those modules are shown. The rest are greyed out.'

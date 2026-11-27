@@ -22,12 +22,14 @@
 
 import { useAtom } from 'jotai'
 import { ChevronRight, CloudOff, LayoutGrid, List, X } from 'lucide-react'
-import { useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { useContext, useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
 import { SearchInput } from '@/components/SearchInput'
 import { cn } from '@/utils/cn'
 import { explorerViewAtom } from '@/store/vaultExplorerView'
+import { SectionToolbarSlot } from './sectionToolbarSlot'
 
 /** One step of the folder path above the title. */
 export interface Crumb {
@@ -231,6 +233,7 @@ export const ListCard = ({
   search,
   onSearch,
   note,
+  listOnly = false,
   children,
 }: {
   title: string
@@ -238,6 +241,8 @@ export const ListCard = ({
   search: string
   onSearch: (text: string) => void
   note?: ReactNode
+  /** The contents are always a details list (a project's folders), so there's no Large icons / Details switch. */
+  listOnly?: boolean
   children: ReactNode
 }) => (
   <section aria-label={title} className="min-w-0 rounded-xl border border-border bg-surface-raised p-5">
@@ -255,7 +260,7 @@ export const ListCard = ({
           placeholder={`Search ${title.toLowerCase()}`}
           className="flex-1 sm:w-56"
         />
-        <ViewToggle />
+        {!listOnly && <ViewToggle />}
       </div>
     </div>
     {children}
@@ -306,13 +311,20 @@ export const FolderLayout = ({ list, preview, wide = false }: { list: ReactNode;
   </div>
 )
 
-/** Top of a project tab: notes on the left (e.g. the local-only badge), the tab's buttons on the right. */
-export const SectionToolbar = ({ badge, actions }: { badge?: ReactNode; actions?: ReactNode }) => (
-  <div className="flex flex-wrap items-center justify-between gap-3">
-    <div className="flex items-center gap-2">{badge}</div>
-    {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
-  </div>
-)
+/**
+ * A project folder's notes (e.g. the local-only badge) and buttons. Inside a project they sit at the
+ * right end of the tab row (Env, Conf, Notes); elsewhere, in place.
+ */
+export const SectionToolbar = ({ badge, actions }: { badge?: ReactNode; actions?: ReactNode }) => {
+  const slot = useContext(SectionToolbarSlot)
+  const toolbar = (
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      {badge}
+      {actions}
+    </div>
+  )
+  return slot ? createPortal(toolbar, slot) : toolbar
+}
 
 /** A folder's whole page: header, then list and preview. */
 export const FolderPage = ({ header, children }: { header: ReactNode; children: ReactNode }) => (
@@ -323,7 +335,7 @@ export const FolderPage = ({ header, children }: { header: ReactNode; children: 
 )
 
 /**
- * Beside Env, Conf and Notes: the API has no endpoints for them yet, so what you add is kept in this
+ * Beside Conf and Notes: the API has no endpoints for them yet, so what you add is kept in this
  * browser tab only and is gone after a reload.
  */
 export const LocalOnlyBadge = () => (

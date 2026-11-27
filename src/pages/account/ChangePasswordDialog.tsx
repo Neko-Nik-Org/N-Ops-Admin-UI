@@ -70,7 +70,7 @@ export const ChangePasswordDialog = ({ open, onClose }: ChangePasswordDialogProp
       description="Other signed-in sessions stay signed in until they expire."
     >
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-        <FormField id="newPassword" label="New password" error={errors.newPassword?.message}>
+        <FormField id="newPassword" required label="New password" error={errors.newPassword?.message}>
           <Input
             id="newPassword"
             type="password"
@@ -79,7 +79,7 @@ export const ChangePasswordDialog = ({ open, onClose }: ChangePasswordDialogProp
             {...register('newPassword')}
           />
         </FormField>
-        <FormField id="confirmPassword" label="Confirm new password" error={errors.confirmPassword?.message}>
+        <FormField id="confirmPassword" required label="Confirm new password" error={errors.confirmPassword?.message}>
           <Input
             id="confirmPassword"
             type="password"

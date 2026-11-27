@@ -19,6 +19,7 @@
 import { CircleAlert, Eye, EyeOff } from 'lucide-react'
 import { forwardRef, useId, useState, type InputHTMLAttributes, type ReactNode } from 'react'
 import { cn } from '@/utils/cn'
+import { REQUIRED_MARK } from '@/components/FormField'
 
 /** Native input props plus label, icon, error and a slot on the label row. */
 interface AuthFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
@@ -35,7 +36,7 @@ interface AuthFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'si
 
 /** Input with an icon, an error line and a show/hide button for passwords. Forwards its ref for react-hook-form. */
 export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(
-  ({ label, icon, error, aside, hint, id, type = 'text', className, ...rest }, ref) => {
+  ({ label, icon, error, aside, hint, id, type = 'text', className, required, ...rest }, ref) => {
     const autoId = useId()
     const fid = id ?? autoId
     const eid = `${fid}-error`
@@ -45,7 +46,9 @@ export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(
     return (
       <div className={cn('n-auth-field', className)}>
         <div className="n-auth-label">
-          <label htmlFor={fid}>{label}</label>
+          <label htmlFor={fid} className={required ? REQUIRED_MARK : undefined}>
+            {label}
+          </label>
           {aside}
         </div>
         <div className="n-auth-input" data-invalid={error ? '' : undefined}>
@@ -59,6 +62,8 @@ export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(
             id={fid}
             type={isPassword && show ? 'text' : type}
             aria-invalid={error ? true : undefined}
+            // not the native `required`: the forms validate themselves and show their own messages
+            aria-required={required || undefined}
             aria-describedby={error ? eid : undefined}
             {...rest}
           />

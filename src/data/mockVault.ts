@@ -15,12 +15,11 @@
  * <https://www.gnu.org/licenses/>.
  */
 /**
- * In-memory store for what's inside vault projects. Projects are live (`/vault/project/*`), but the
- * API has no Env/Conf/Notes endpoints yet (the /vault/secret/* scopes are commented out in
- * N-Ops-Main-API/src/main.rs), so the vault API files (`api/vault*.ts`) call this. The app starts it empty; the
- * sample data below is loaded only by `resetVaultMock()` in tests. It shares the Admin
- * mock's users, plan limits and audit log, keeps changes until reload, and treats versions as
- * immutable like `vault_secret_key_versions`.
+ * In-memory store for what's inside vault projects. Projects (`/vault/project/*`) and Env keys
+ * (`/vault/secret/keys/*`) are live, but the API has no Conf/Notes endpoints yet, so
+ * `api/vaultConfigs.ts` and `api/vaultNotes.ts` call this. The app starts it empty; the sample data
+ * below is loaded only by `resetVaultMock()` in tests. It shares the Admin mock's users, plan limits
+ * and audit log, keeps changes until reload, and treats versions as immutable.
  *
  * Tag ids: 1 production, 2 staging, 3 development, 4 internal.
  * Notes as seen by the mock signed-in user (Neko Nik, user 1): "On-call runbook" is Priya's, shared
@@ -30,23 +29,10 @@
 
 import moment from 'moment'
 import { db as adminDb } from '@/data/mockAdmin'
-import type {
-  ConfigFile,
-  ConfigVersion,
-  NoteLink,
-  NoteShare,
-  NoteVersion,
-  SecretKey,
-  SecretVersion,
-  VaultProject,
-} from '@/types/vault'
+import type { ConfigFile, ConfigVersion, NoteLink, NoteShare, NoteVersion, VaultProject } from '@/types/vault'
 
 const ago = (days: number, hours = 0) => moment().subtract(days, 'days').subtract(hours, 'hours').toISOString()
 
-/** A secret with all its versions. */
-export interface StoredSecret extends SecretKey {
-  versions: SecretVersion[]
-}
 /** A config file with all its versions. */
 export interface StoredConfig extends ConfigFile {
   versions: ConfigVersion[]
@@ -61,17 +47,6 @@ export interface StoredNote {
   links: NoteLink[]
   versions: NoteVersion[]
 }
-
-/** Builds version history: `[value, daysAgo, by, note, hidden?]` oldest first. */
-const history = (rows: Array<[string, number, string, string, boolean?]>): SecretVersion[] =>
-  rows.map(([value, days, createdBy, note, isHidden = false], i) => ({
-    version: i + 1,
-    value,
-    createdAt: ago(days),
-    createdBy,
-    note,
-    isHidden,
-  }))
 
 const seedProjects = (): VaultProject[] =>
   (
@@ -88,108 +63,6 @@ const seedProjects = (): VaultProject[] =>
     createdAt: ago(days),
     updatedAt: ago(days),
   }))
-
-/**
- * [projectId, name, tagId, versions, currentVersion (defaults to latest)]. Before services were
- * dropped from the schema these sat in services; each now lives directly in its project.
- */
-type SecretRow = [number, string, number, SecretVersion[], number?]
-
-const SECRET_ROWS = (): SecretRow[] => [
-  [
-    1,
-    'DATABASE_URL',
-    1,
-    history([
-      ['postgres://payments:Xk2v9Qe1@db-primary.internal:5432/payments', 200, 'Neko Nik', 'Initial'],
-      ['postgres://payments:Lm8Rt3Zp@db-primary.internal:5432/payments', 95, 'Priya Rao', 'Quarterly rotation'],
-      ['postgres://payments:Hd7Wq4Ns@db-primary.internal:5432/payments?sslmode=require', 12, 'Priya Rao', 'Require TLS'],
-    ]),
-  ],
-  [
-    1,
-    'DATABASE_URL',
-    2,
-    history([['postgres://payments:staging-pass@db-staging.internal:5432/payments', 150, 'Marcus Chen', 'Initial']]),
-  ],
-  [1, 'DATABASE_URL', 3, history([['postgres://payments:dev@localhost:5432/payments', 150, 'Tomás Ruiz', 'Initial']])],
-  [
-    1,
-    'STRIPE_SECRET_KEY',
-    1,
-    history([
-      ['example_stripe_key_51Hc2f…old1', 200, 'Neko Nik', 'Initial'],
-      ['example_stripe_key_51Hc2f9QpZt4mK2lYv8Rx', 120, 'Priya Rao', 'Rolled after Stripe dashboard change', true],
-      ['example_stripe_key_51Hc2f7WqLp0dJ6nUe3Ta', 40, 'Priya Rao', 'Rotated after leak drill', true],
-    ]),
-  ],
-  [1, 'STRIPE_SECRET_KEY', 2, history([['sk_test_51Hc2fA8bC3dE4fG5hI6j', 150, 'Marcus Chen', 'Initial']])],
-  [
-    1,
-    'JWT_SIGNING_KEY',
-    1,
-    history([
-      ['b64:3q2+7w==9fK1aYp2Lm', 180, 'Neko Nik', 'Initial'],
-      ['b64:Zx9!Qw2#Er4$Ty6^Ui8', 3, 'Marcus Chen', 'Rotate signing key'],
-    ]),
-    1, // rolled back: the new key broke older mobile clients
-  ],
-  [1, 'LOG_LEVEL', 1, history([['warn', 200, 'Neko Nik', 'Initial']])],
-  [
-    1,
-    'LOG_LEVEL',
-    2,
-    history([
-      ['info', 150, 'Marcus Chen', 'Initial'],
-      ['debug', 20, 'Aisha Bello', 'Chasing webhook bug'],
-    ]),
-  ],
-  [1, 'QUEUE_URL', 1, history([['amqps://worker:Vb6Nm2Qa@mq.internal:5671/payouts', 170, 'Neko Nik', 'Initial']])],
-  [1, 'SENTRY_DSN', 1, history([['https://4f1c2e@o12345.ingest.sentry.io/678', 170, 'Neko Nik', 'Initial']])],
-  [
-    1,
-    'CONCURRENCY',
-    1,
-    history([
-      ['8', 170, 'Neko Nik', 'Initial'],
-      ['16', 30, 'Aisha Bello', 'Black Friday load'],
-    ]),
-  ],
-  [2, 'NEXT_PUBLIC_API_URL', 1, history([['https://api.acme.dev', 160, 'Lena Fischer', 'Initial']])],
-  [2, 'NEXT_PUBLIC_API_URL', 2, history([['https://api.staging.acme.dev', 160, 'Lena Fischer', 'Initial']])],
-  [2, 'SESSION_SECRET', 1, history([['c1f9a7e3d5b2468f0e9d8c7b6a5f4e3d', 160, 'Lena Fischer', 'Initial']])],
-  [2, 'CLOUDFLARE_API_TOKEN', 1, history([['cf_Tk_8e3Qz1Lp6Wv2Ny9', 140, 'Marcus Chen', 'Initial']])],
-  [
-    2,
-    'ORIGIN_HOST',
-    1,
-    history([
-      ['10.0.4.12', 140, 'Marcus Chen', 'Initial'],
-      ['10.0.4.20', 9, 'Marcus Chen', 'New origin box'],
-    ]),
-  ],
-  [3, 'SMTP_PASSWORD', 1, history([['Sm7p!Pa55-2026', 100, 'Sara Lindqvist', 'Initial']])],
-  [3, 'PDF_RENDERER_URL', 1, history([['http://pdf-renderer.internal:3000', 100, 'Sara Lindqvist', 'Initial']])],
-  [4, 'GRAFANA_ADMIN_PASSWORD', 4, history([['gr4f4n4-Adm1n!', 55, 'Olivia Hart', 'Initial']])],
-]
-
-const seedSecrets = (): StoredSecret[] =>
-  SECRET_ROWS().map(([projectId, name, tagId, versions, current], i) => {
-    const latest = versions.at(-1)!
-    const currentVersion = current ?? latest.version
-    return {
-      secretId: i + 1,
-      projectId,
-      name,
-      tagId,
-      versions,
-      currentVersion,
-      latestVersion: latest.version,
-      isHidden: versions.find((v) => v.version === currentVersion)!.isHidden,
-      updatedAt: latest.createdAt,
-      updatedBy: latest.createdBy,
-    }
-  })
 
 const NGINX_V1 = `server {
     listen 443 ssl http2;
@@ -459,22 +332,19 @@ const seedNotes = (): StoredNote[] => [
 /** Everything the vault mock holds. */
 interface VaultState {
   projects: VaultProject[]
-  secrets: StoredSecret[]
   configs: StoredConfig[]
   notes: StoredNote[]
-  nextId: { project: number; secret: number; config: number; note: number }
+  nextId: { project: number; config: number; note: number }
 }
 
 /** `withSamples` fills in the sample projects, keys, files and notes (tests only). */
 const createState = (withSamples: boolean): VaultState => {
   const state: VaultState = {
     projects: withSamples ? seedProjects() : [],
-    secrets: withSamples ? seedSecrets() : [],
     configs: withSamples ? seedConfigs() : [],
     notes: withSamples ? seedNotes() : [],
-    nextId: { project: 5, secret: 0, config: 0, note: 0 },
+    nextId: { project: 5, config: 0, note: 0 },
   }
-  state.nextId.secret = state.secrets.length + 1
   state.nextId.config = state.configs.length + 1
   state.nextId.note = state.notes.length + 1
   return state

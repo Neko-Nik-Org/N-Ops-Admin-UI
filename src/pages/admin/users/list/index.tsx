@@ -17,7 +17,7 @@
 /**
  * Admin › Users (/admin/users): people in the organization, from `/user/admin/list`, with search and
  * role / status filters. Viewing, adding and editing someone each open their own page; deleting asks
- * in a dialog. Edits and deleting need `user:edit`; adding needs `user:create` + `user:role:view`.
+ * in a dialog. Edits need `user:edit`, deleting `user:delete`; adding needs `user:create` + `user:role:view`.
  */
 
 import { Eye, Pencil, Trash2, UserPlus } from 'lucide-react'
@@ -53,8 +53,8 @@ export const AdminUsersPage = () => {
   const policyOf = usePolicyLookup()
   const me = useAtomValue(currentUserAtom)
   const canCreate = useHasPermissions('user:view', 'user:create', 'user:role:view')
-  // every change to an existing user, deleting included, needs user:edit in the API
   const canEdit = useHasPermissions('user:view', 'user:edit')
+  const canDelete = useHasPermissions('user:view', 'user:delete')
   const { data: org } = useOrgInfo()
   const seatsFull = !!org && org.users.current >= org.users.limit
   const { mutateAsync: remove } = useDeleteUser()
@@ -89,7 +89,7 @@ export const AdminUsersPage = () => {
     />
   )
 
-  /** View, Edit and Delete at the end of a user's row; Edit and Delete only with `user:edit`. */
+  /** View, Edit and Delete at the end of a user's row; Edit only with `user:edit`, Delete with `user:delete`. */
   const rowActions = (user: AdminUser) => {
     const name = user.displayName
     const isMe = user.userId === me?.userId
@@ -104,26 +104,26 @@ export const AdminUsersPage = () => {
           onClick={() => navigate(userPath(user.userId))}
         />
         {canEdit && (
-          <>
-            <LoadingButton
-              variant="ghost"
-              size="sm"
-              icon={<Pencil size={14} />}
-              aria-label={`Edit ${name}`}
-              title={isMe ? NOT_SELF : 'Edit'}
-              disabled={isMe}
-              onClick={() => navigate(userEditPath(user.userId))}
-            />
-            <LoadingButton
-              variant="ghost"
-              size="sm"
-              icon={<Trash2 size={14} />}
-              aria-label={`Delete ${name}`}
-              title={isMe ? "You can't delete yourself." : 'Delete'}
-              disabled={isMe}
-              onClick={() => setDeleting(user)}
-            />
-          </>
+          <LoadingButton
+            variant="ghost"
+            size="sm"
+            icon={<Pencil size={14} />}
+            aria-label={`Edit ${name}`}
+            title={isMe ? NOT_SELF : 'Edit'}
+            disabled={isMe}
+            onClick={() => navigate(userEditPath(user.userId))}
+          />
+        )}
+        {canDelete && (
+          <LoadingButton
+            variant="ghost"
+            size="sm"
+            icon={<Trash2 size={14} />}
+            aria-label={`Delete ${name}`}
+            title={isMe ? "You can't delete yourself." : 'Delete'}
+            disabled={isMe}
+            onClick={() => setDeleting(user)}
+          />
         )}
       </div>
     )

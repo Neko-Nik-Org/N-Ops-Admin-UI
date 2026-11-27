@@ -182,7 +182,7 @@ export const InvitationForm = ({ onSent, onCancel }: { onSent: () => void; onCan
           title="Who and what"
           hint="They get an email with a link to join your organization. The link works until it expires."
         >
-          <FormField id="inviteEmail" label="Email" error={errors.email?.message}>
+          <FormField id="inviteEmail" required label="Email" error={errors.email?.message}>
             <Input
               id="inviteEmail"
               type="email"
@@ -195,7 +195,7 @@ export const InvitationForm = ({ onSent, onCancel }: { onSent: () => void; onCan
             />
           </FormField>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField id="inviteRoleId" label="Role" error={errors.roleId?.message}>
+            <FormField id="inviteRoleId" required label="Role" error={errors.roleId?.message}>
               <Select id="inviteRoleId" hasError={!!errors.roleId} {...register('roleId')}>
                 <option value={0} disabled>
                   Pick a role

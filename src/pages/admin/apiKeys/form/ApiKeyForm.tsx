@@ -129,7 +129,7 @@ export const ApiKeyForm = ({
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
         <div className="flex flex-col gap-6">
           <FormCard title="Details" hint="For scripts and pipelines that read the Vault. Give each one its own key.">
-            <FormField id="keyName" label="Name" error={errors.keyName?.message}>
+            <FormField id="keyName" required label="Name" error={errors.keyName?.message}>
               <Input
                 id="keyName"
                 placeholder="github-actions-prod"
@@ -139,7 +139,7 @@ export const ApiKeyForm = ({
                 {...register('keyName')}
               />
             </FormField>
-            <FormField id="keyDescription" label="What is it for?" error={errors.keyDescription?.message}>
+            <FormField id="keyDescription" required label="What is it for?" error={errors.keyDescription?.message}>
               <Textarea
                 id="keyDescription"
                 rows={2}
@@ -151,7 +151,7 @@ export const ApiKeyForm = ({
           </FormCard>
           <FormCard title="Access" hint="The key acts with a role's permissions, only on resources with one tag.">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField id="roleId" label="Role" error={errors.roleId?.message}>
+              <FormField id="roleId" required label="Role" error={errors.roleId?.message}>
                 <Select id="roleId" hasError={!!errors.roleId} {...register('roleId')}>
                   <option value={0} disabled>
                     Pick a role
@@ -170,7 +170,7 @@ export const ApiKeyForm = ({
                   </p>
                 )}
               </FormField>
-              <FormField id="tagId" label="Tag" error={errors.tagId?.message}>
+              <FormField id="tagId" required label="Tag" error={errors.tagId?.message}>
                 <Select id="tagId" hasError={!!errors.tagId} {...register('tagId')}>
                   <option value={0} disabled>
                     {tags.length ? 'Pick a tag' : 'No tags yet: create one on the Tags page'}
@@ -191,7 +191,7 @@ export const ApiKeyForm = ({
           </FormCard>
         </div>
         <div className="flex flex-col gap-6">
-          <FormCard title="Vault projects">
+          <FormCard title="Vault projects" required>
             {!projects.length && (
               <p className="text-xs text-text-muted">There are no vault projects yet. Create one in the Vault first.</p>
             )}
