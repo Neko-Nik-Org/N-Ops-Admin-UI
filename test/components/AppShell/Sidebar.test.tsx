@@ -38,18 +38,8 @@ describe('Sidebar', () => {
       .concat(within(nav()).getAllByRole('button'))
       .sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
       .map((el) => el.textContent?.replace(/\d+$/, '').trim())
-    expect(labels).toEqual([
-      'Overview',
-      'Servers',
-      'Tools',
-      'Service management',
-      'Vault',
-      'Approvals',
-      'Metrics',
-      'Workflows',
-      'Service logs',
-      'Admin',
-    ])
+    // the sections without a working API yet (Servers, Tools, Approvals…) are hidden for now
+    expect(labels).toEqual(['Overview', 'Vault', 'Admin'])
   })
 
   it('expands a group to show its pages', () => {
@@ -60,7 +50,7 @@ describe('Sidebar', () => {
 
     fireEvent.click(admin)
     expect(admin).toHaveAttribute('aria-expanded', 'true')
-    for (const name of ['Organization', 'Users', 'API keys', 'Roles', 'Tags', 'Audit logs']) {
+    for (const name of ['Organization', 'Users', 'Invitations', 'Roles', 'Access policies', 'Tags']) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument()
     }
   })
@@ -75,7 +65,7 @@ describe('Sidebar', () => {
   it('opens the group that holds the current page', () => {
     renderSidebar('/admin/users')
     expect(screen.getByRole('button', { name: 'Admin' })).toHaveAttribute('aria-expanded', 'true')
-    for (const name of ['Organization', 'Users', 'API keys', 'Roles']) {
+    for (const name of ['Organization', 'Users', 'Roles']) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument()
     }
   })
